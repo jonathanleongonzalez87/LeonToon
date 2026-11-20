@@ -63,6 +63,33 @@ impl Raster {
         self.ver = next_ver();
     }
 
+    /// Compone `src` (RGBA premultiplicado, mismo tamaño) sobre este mapa con la opacidad dada,
+    /// solo dentro de `b = [x0, y0, x1, y1]` (x1 e y1 no incluidos).
+    pub fn composite_over(&mut self, src: &Raster, b: [u32; 4], opacity: f32) {
+        if src.w != self.w || src.h != self.h || self.data.len() != src.data.len() {
+            return;
+        }
+        let op = opacity.clamp(0.0, 1.0);
+        let (x1, y1) = (b[2].min(self.w), b[3].min(self.h));
+        for y in b[1]..y1 {
+            for x in b[0]..x1 {
+                let i = ((y * self.w + x) * 4) as usize;
+                let s = &src.data[i..i + 4];
+                if s[3] == 0 {
+                    continue;
+                }
+                let sa = s[3] as f32 / 255.0 * op;
+                let keep = 1.0 - sa;
+                for k in 0..4 {
+                    let v = s[k] as f32 * op + self.data[i + k] as f32 * keep;
+                    self.data[i + k] = v.round().min(255.0) as u8;
+                }
+            }
+        }
+        self.inked = self.inked || self.data.chunks_exact(4).any(|p| p[3] != 0);
+        self.ver = next_ver();
+    }
+
     /// Color (sin premultiplicar) del píxel en el punto de la escena, si no es transparente.
     pub fn pick(&self, p: [f32; 2]) -> Option<[u8; 4]> {
         if p[0] < 0.0 || p[1] < 0.0 {
