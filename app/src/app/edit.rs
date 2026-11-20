@@ -407,7 +407,32 @@ impl LeonApp {
                 return;
             }
         };
+        // Pincel sobre una capa de mapa de bits: lo pinta el motor de pinceles (marcas con dureza,
+        // espaciado, flujo, redondez y ángulo) en lugar de estampar el trazo vectorial.
+        self.brush_live = None;
+        self.brush_tex = None;
+        if self.tool == Tool::Brush && self.layer().kind == LayerKind::Bitmap {
+            let spec = crate::brush::BrushSpec { size: self.brush_size, opacity: self.stroke_opacity, color: [color[0], color[1], color[2]], params: self.brush };
+            let mut ls = crate::brush::LiveStroke::new(self.project.width, self.project.height, spec);
+            ls.push(p);
+            self.brush_live = Some(ls);
+        }
         self.gesture = Some(g);
+    }
+
+    /// Termina el trazo del motor de pinceles: lo compone sobre la capa con la opacidad del trazo.
+    fn commit_live(&mut self, ls: crate::brush::LiveStroke) {
+        let f = self.frame;
+        let (w, h) = (self.project.width, self.project.height);
+        let layer = &mut self.project.layers[self.cl];
+        if layer.drawing_at(f).is_none() {
+            layer.keys.insert(f, Default::default());
+        }
+        if let Some(d) = layer.drawing_at_mut(f) {
+            let r = d.raster.get_or_insert_with(|| Arc::new(crate::raster::Raster::new(w, h)));
+            ls.finish_into(Arc::make_mut(r));
+            self.changed = true;
+        }
     }
 
     /// Relleno: la forma cerrada de más arriba que contiene el punto toma el color actual.
@@ -488,6 +513,9 @@ impl LeonApp {
                 let last = *stroke.points.last().unwrap();
                 if ((smooth[0] - last[0]).powi(2) + (smooth[1] - last[1]).powi(2)).sqrt() >= min_step {
                     stroke.points.push(smooth);
+                    if let Some(ls) = &mut self.brush_live {
+                        ls.push(smooth);
+                    }
                 }
                 self.gesture = Some(Gesture::Paint { stroke, smooth, last_raw: p });
             }
@@ -577,6 +605,17 @@ impl LeonApp {
 
     pub(super) fn finish_gesture(&mut self) {
         match self.gesture.take() {
+            Some(Gesture::Paint { mut stroke, last_raw, .. }) if self.brush_live.is_some() => {
+                // Capa de mapa de bits con el motor de pinceles.
+                if let Some(mut ls) = self.brush_live.take() {
+                    if stroke.points.len() > 1 {
+                        ls.push(last_raw);
+                    }
+                    self.commit_live(ls);
+                }
+                self.brush_tex = None;
+                stroke.points.clear();
+            }
             Some(Gesture::Paint { mut stroke, last_raw, .. }) => {
                 let last = *stroke.points.last().unwrap();
                 if last != last_raw && stroke.points.len() > 1 {

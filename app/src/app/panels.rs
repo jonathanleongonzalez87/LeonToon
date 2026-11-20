@@ -93,7 +93,7 @@ impl LeonApp {
                     Tool::Eraser => &mut self.eraser_size,
                     _ => &mut self.shape_width,
                 };
-                ui.add(egui::Slider::new(size, 1.0..=40.0).max_decimals(0));
+                ui.add(egui::Slider::new(size, 1.0..=300.0).logarithmic(true).max_decimals(0));
                 if t != Tool::Eraser {
                     ui.label(RichText::new("Suavizado").color(MU));
                     let mut s = self.smoothing * 100.0;
@@ -515,19 +515,60 @@ impl LeonApp {
                 row(ui, "Distancia Y", if l.is3d || l.kind == LayerKind::Camera { format!("{:.0}", l.depth) } else { "—".into() });
             }
             1 => {
+                // Los parámetros de la herramienta elegida se configuran aquí.
                 let t = self.tool;
                 panel_header(ui, t.name());
                 row(ui, "Atajo", t.letter().into());
-                let size = match t {
-                    Tool::Brush => self.brush_size,
-                    Tool::Vector => self.pencil_size,
-                    Tool::Eraser => self.eraser_size,
-                    _ => self.shape_width,
-                };
-                row(ui, "Grosor", format!("{size:.0} px"));
-                row(ui, "Presión", if self.pressure { "Activa".into() } else { "Inactiva".into() });
-                row(ui, "Suavizado", format!("{:.0} %", self.smoothing * 100.0));
-                row(ui, "Opacidad", format!("{:.0} %", self.stroke_opacity * 100.0));
+                if t.draws() {
+                    let size = match t {
+                        Tool::Brush => &mut self.brush_size,
+                        Tool::Vector => &mut self.pencil_size,
+                        Tool::Eraser => &mut self.eraser_size,
+                        _ => &mut self.shape_width,
+                    };
+                    param_row(ui, if t == Tool::Brush { "Tamaño" } else { "Grosor" }, |ui| {
+                        ui.add(egui::Slider::new(size, 1.0..=300.0).logarithmic(true).max_decimals(0).suffix(" px"));
+                    });
+                    if t != Tool::Eraser {
+                        param_row(ui, "Opacidad", |ui| pct_slider(ui, &mut self.stroke_opacity, 15.0, 100.0));
+                    }
+                    if t == Tool::Brush {
+                        param_row(ui, "Dureza", |ui| pct_slider(ui, &mut self.brush.hardness, 0.0, 100.0));
+                        param_row(ui, "Espaciado", |ui| {
+                            ui.add(egui::Slider::new(&mut self.brush.spacing, 1.0..=200.0).logarithmic(true).max_decimals(0).suffix(" %"));
+                        });
+                        param_row(ui, "Flujo", |ui| pct_slider(ui, &mut self.brush.flow, 1.0, 100.0));
+                        param_row(ui, "Redondez", |ui| pct_slider(ui, &mut self.brush.roundness, 5.0, 100.0));
+                        param_row(ui, "Ángulo", |ui| {
+                            ui.add(egui::Slider::new(&mut self.brush.angle, 0.0..=360.0).max_decimals(0).suffix("°"));
+                        });
+                    }
+                    if t != Tool::Eraser {
+                        param_row(ui, "Suavizado", |ui| pct_slider(ui, &mut self.smoothing, 0.0, 85.0));
+                    }
+                    param_row(ui, "Presión", |ui| {
+                        ui.checkbox(&mut self.pressure, "Activa");
+                    });
+                    if t == Tool::Brush {
+                        self.brush_preview(ui);
+                        if self.layer().kind != LayerKind::Bitmap {
+                            muted(ui, "Dureza, espaciado, flujo, redondez y ángulo actúan en capas de mapa de bits. En capas vectoriales el pincel solo usa tamaño, opacidad y suavizado.");
+                        }
+                        if ui.small_button("Restablecer pincel").on_hover_text("Vuelve a la punta redonda y dura").clicked() {
+                            self.brush = Default::default();
+                        }
+                    }
+                    if t == Tool::Shape {
+                        for (k, n) in [(ShapeKind::Line, "Línea"), (ShapeKind::Rect, "Rectángulo"), (ShapeKind::Ellipse, "Elipse")] {
+                            if pill(ui, n, self.shape_kind == k).clicked() {
+                                self.shape_kind = k;
+                            }
+                        }
+                        if self.shape_kind != ShapeKind::Line {
+                            ui.checkbox(&mut self.fill_shapes, "Rellenar");
+                        }
+                    }
+                }
                 muted(ui, t.tip());
             }
             _ => {
@@ -539,6 +580,52 @@ impl LeonApp {
                     self.need_fit = true;
                 }
             }
+        }
+    }
+}
+
+/// Fila de parámetro de herramienta: etiqueta a la izquierda y control dentro de un campo (panel N).
+fn param_row(ui: &mut egui::Ui, label: &str, add: impl FnOnce(&mut egui::Ui)) {
+    let (r, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 26.0), Sense::hover());
+    ui.painter().text(r.left_center() + Vec2::new(2.0, 0.0), Align2::LEFT_CENTER, label, FontId::proportional(11.5), MU);
+    let fw = (r.width() * 0.64).max(90.0);
+    let fr = Rect::from_min_max(Pos2::new(r.max.x - fw, r.min.y + 1.0), Pos2::new(r.max.x, r.max.y - 1.0));
+    let mut c = ui.new_child(egui::UiBuilder::new().max_rect(fr).layout(egui::Layout::left_to_right(egui::Align::Center)));
+    c.spacing_mut().slider_width = (fw - 60.0).max(40.0);
+    c.spacing_mut().interact_size.y = 22.0;
+    add(&mut c);
+}
+
+/// Deslizador de un valor 0…1 que se muestra como porcentaje entre `lo` y `hi`.
+fn pct_slider(ui: &mut egui::Ui, v: &mut f32, lo: f32, hi: f32) {
+    let mut p = (*v * 100.0).clamp(lo, hi);
+    if ui.add(egui::Slider::new(&mut p, lo..=hi).max_decimals(0).suffix(" %")).changed() {
+        *v = p / 100.0;
+    }
+}
+
+impl LeonApp {
+    /// Muestra un trazo de muestra con el pincel actual, hecho con el mismo motor que pinta en la escena.
+    fn brush_preview(&mut self, ui: &mut egui::Ui) {
+        let spec = crate::brush::BrushSpec { size: self.brush_size.min(34.0), opacity: self.stroke_opacity, color: [232, 232, 232], params: self.brush };
+        let key = format!("{:.2}|{:.2}|{:?}", spec.size, spec.opacity, spec.params);
+        if self.brush_prev.as_ref().map(|(k, _)| k) != Some(&key) {
+            let r = crate::brush::preview(spec, 240, 60);
+            let img = egui::ColorImage::from_rgba_premultiplied([240, 60], &r.data);
+            match &mut self.brush_prev {
+                Some((k, tex)) => {
+                    tex.set(img, egui::TextureOptions::LINEAR);
+                    *k = key;
+                }
+                None => self.brush_prev = Some((key, ui.ctx().load_texture("brush_prev", img, egui::TextureOptions::LINEAR))),
+            }
+        }
+        let (r, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 64.0), Sense::hover());
+        ui.painter().rect_filled(r, 4.0, UI0);
+        ui.painter().rect_stroke(r, 4.0, stk(1.0, LINE), EStrokeKind::Inside);
+        if let Some((_, tex)) = &self.brush_prev {
+            let img = Rect::from_center_size(r.center(), Vec2::new(240.0, 60.0).min(r.size() - Vec2::splat(4.0)));
+            ui.painter().image(tex.id(), img, Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)), Color32::WHITE);
         }
     }
 }

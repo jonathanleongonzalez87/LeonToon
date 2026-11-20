@@ -245,6 +245,12 @@ pub struct LeonApp {
     add_menu: Option<Pos2>,
     /// Vista 3D (planos en profundidad): activa, modo (0 cámara, 1 usuario, 2 superior, 3 lateral…),
     /// giro, proyección ortográfica, desplazamiento y zoom.
+    /// Pincel de píxeles: forma de la punta (dureza, espaciado, flujo, redondez, ángulo),
+    /// trazo en curso, su textura de vista previa y la imagen de muestra del panel N.
+    brush: crate::brush::BrushParams,
+    brush_live: Option<crate::brush::LiveStroke>,
+    brush_tex: Option<egui::TextureHandle>,
+    brush_prev: Option<(String, egui::TextureHandle)>,
     view3d: bool,
     v3: u8,
     yaw: f32,
@@ -366,6 +372,27 @@ impl LeonApp {
         if std::env::var("LEONTOON_BITMAP").is_ok() {
             let mut l = Layer::new("Píxeles");
             l.kind = LayerKind::Bitmap;
+            if std::env::var("LEONTOON_BRUSH").is_ok() {
+                // Tres pinceles del motor: duro, difuso con poco flujo y plano girado (caligráfico).
+                use crate::brush::{BrushParams, BrushSpec, LiveStroke};
+                let specs = [
+                    BrushSpec { size: 30.0, opacity: 1.0, color: [230, 60, 160], params: BrushParams::default() },
+                    BrushSpec { size: 46.0, opacity: 1.0, color: [30, 120, 230], params: BrushParams { hardness: 0.1, flow: 0.25, spacing: 6.0, ..Default::default() } },
+                    BrushSpec { size: 44.0, opacity: 1.0, color: [20, 150, 80], params: BrushParams { roundness: 0.25, angle: 40.0, spacing: 40.0, ..Default::default() } },
+                ];
+                let mut r = crate::raster::Raster::new(project.width, project.height);
+                for (i, s) in specs.into_iter().enumerate() {
+                    let mut ls = LiveStroke::new(project.width, project.height, s);
+                    let y = 180.0 + i as f32 * 130.0;
+                    for k in 0..=60 {
+                        let t = k as f32 / 60.0;
+                        ls.push([280.0 + t * 560.0, y + (t * 9.0).sin() * 36.0]);
+                    }
+                    ls.finish_into(&mut r);
+                }
+                l.keys.insert(0, std::sync::Arc::new(Drawing { strokes: vec![], raster: Some(std::sync::Arc::new(r)) }));
+                project.layers.insert(0, l);
+            } else {
             for (f, dy) in [(0u32, 0.0f32), (2, 120.0)] {
                 let mut r = crate::raster::Raster::new(project.width, project.height);
                 for (i, c) in [[230, 60, 160, 255], [30, 120, 230, 255]].into_iter().enumerate() {
@@ -376,6 +403,7 @@ impl LeonApp {
                 l.keys.insert(f, std::sync::Arc::new(Drawing { strokes: vec![], raster: Some(std::sync::Arc::new(r)) }));
             }
             project.layers.insert(0, l);
+            }
         }
         // Para pruebas y capturas: LEONTOON_SALA=<nombre de sala> abre esa sala.
         let room_idx = std::env::var("LEONTOON_SALA")
@@ -407,7 +435,7 @@ impl LeonApp {
             obj_mode: false,
             show_toolbar: true,
             show_n: true,
-            n_tab: 0,
+            n_tab: std::env::var("LEONTOON_NTAB").ok().and_then(|v| v.parse().ok()).unwrap_or(0),
             props_editor: None,
             // Variables de prueba para capturas: LEONTOON_POP=1|2|3, LEONTOON_ALPHA=1, LEONTOON_ADDMENU=1.
             hud_pop: std::env::var("LEONTOON_POP").ok().and_then(|v| v.parse().ok()).unwrap_or(0),
@@ -420,6 +448,10 @@ impl LeonApp {
             chk_con: 12.0,
             view_op: 100.0,
             add_menu: if std::env::var("LEONTOON_ADDMENU").is_ok() { Some(Pos2::new(560.0, 260.0)) } else { None },
+            brush: Default::default(),
+            brush_live: None,
+            brush_tex: None,
+            brush_prev: None,
             view3d: false,
             v3: std::env::var("LEONTOON_V3").ok().and_then(|v| v.parse().ok()).unwrap_or(1),
             yaw: match std::env::var("LEONTOON_V3").ok().and_then(|v| v.parse::<u8>().ok()) { Some(2) | Some(4) | Some(7) => 0.0, Some(3) => -90.0, Some(5) => 180.0, Some(6) => 90.0, _ => -32.0 },

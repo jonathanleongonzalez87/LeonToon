@@ -87,6 +87,7 @@ impl LeonApp {
         }
 
         // ---- Dibujo ----
+        self.sync_brush_tex(&ctx);
         let painter = ui.painter_at(rect);
         // Mesa de luz: el gris del fondo va de 0 (negro) a 100 (blanco).
         let g = (self.light_gray / 100.0 * 255.0).round().clamp(0.0, 255.0) as u8;
@@ -240,7 +241,10 @@ impl LeonApp {
                 paint_drawing(painter, d, &map, zs, None, alpha);
             }
             if live && li == self.cl {
-                if let Some(Gesture::Paint { stroke, .. }) | Some(Gesture::Shape { stroke, .. }) = &self.gesture {
+                if let (Some(ls), Some(tex)) = (&self.brush_live, &self.brush_tex) {
+                    // Trazo del motor de pinceles en curso, con la opacidad del trazo.
+                    paint_tex_quad(painter, tex.id(), ls.buf.w, ls.buf.h, &map, alpha * ls.spec.opacity);
+                } else if let Some(Gesture::Paint { stroke, .. }) | Some(Gesture::Shape { stroke, .. }) = &self.gesture {
                     paint_stroke(painter, stroke, &map, zs, None, alpha);
                 }
             }
@@ -365,7 +369,12 @@ pub(super) fn paint_raster(p: &egui::Painter, d: &Drawing, map: &dyn Fn([f32; 2]
         return;
     }
     let id = raster_tex_id(p.ctx(), r, tint);
-    let (w, h) = (r.w as f32, r.h as f32);
+    paint_tex_quad(p, id, r.w, r.h, map, alpha);
+}
+
+/// Una textura del tamaño de la escena (w×h px) dibujada con la transformación `map`.
+pub(super) fn paint_tex_quad(p: &egui::Painter, id: egui::TextureId, w: u32, h: u32, map: &dyn Fn([f32; 2]) -> Pos2, alpha: f32) {
+    let (w, h) = (w as f32, h as f32);
     let col = Color32::from_white_alpha((alpha.clamp(0.0, 1.0) * 255.0).round() as u8);
     let mut mesh = egui::Mesh::with_texture(id);
     for (pt, uv) in [([0.0, 0.0], Pos2::new(0.0, 0.0)), ([w, 0.0], Pos2::new(1.0, 0.0)), ([w, h], Pos2::new(1.0, 1.0)), ([0.0, h], Pos2::new(0.0, 1.0))] {
@@ -374,6 +383,32 @@ pub(super) fn paint_raster(p: &egui::Painter, d: &Drawing, map: &dyn Fn([f32; 2]
     mesh.add_triangle(0, 1, 2);
     mesh.add_triangle(0, 2, 3);
     p.add(Shape::mesh(mesh));
+}
+
+impl LeonApp {
+    /// Mantiene al día la textura del trazo del motor de pinceles (solo sube la zona nueva).
+    pub(super) fn sync_brush_tex(&mut self, ctx: &egui::Context) {
+        let Some(ls) = &mut self.brush_live else {
+            self.brush_tex = None;
+            return;
+        };
+        let (w, h) = (ls.buf.w as usize, ls.buf.h as usize);
+        if self.brush_tex.is_none() {
+            let blank = egui::ColorImage::new([w, h], Color32::TRANSPARENT);
+            self.brush_tex = Some(ctx.load_texture("brush_live", blank, egui::TextureOptions::LINEAR));
+            ls.mark_all_dirty();
+        }
+        if let (Some(b), Some(tex)) = (ls.take_dirty(), self.brush_tex.as_mut()) {
+            let (bw, bh) = ((b[2] - b[0]) as usize, (b[3] - b[1]) as usize);
+            let mut px = Vec::with_capacity(bw * bh * 4);
+            for y in b[1]..b[3] {
+                let i = ((y * ls.buf.w + b[0]) * 4) as usize;
+                px.extend_from_slice(&ls.buf.data[i..i + bw * 4]);
+            }
+            let img = egui::ColorImage::from_rgba_premultiplied([bw, bh], &px);
+            tex.set_partial([b[0] as usize, b[1] as usize], img, egui::TextureOptions::LINEAR);
+        }
+    }
 }
 
 /// Miniatura de un dibujo (en coordenadas de la escena w×h) dentro de `rect`.
