@@ -1,0 +1,66 @@
+name: Función o mejora
+description: Algo nuevo, o que mejora lo que ya existe
+title: "[Función] "
+labels: ["tipo:funcion"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Un Issue es un contrato: dice qué se hará, qué NO se hará y cómo sabremos que está terminado.
+        Si una sección no aplica, escribe «No aplica» (no la borres).
+  - type: textarea
+    id: contexto
+    attributes:
+      label: Contexto y problema
+      description: ¿Qué falta o qué molesta hoy? Si hay una referencia (prototipo HTML, MECHANICS.md, programa original), enlázala o nómbrala.
+    validations:
+      required: true
+  - type: textarea
+    id: alcance
+    attributes:
+      label: Alcance
+      description: Lista de lo que SÍ se hará. Una viñeta por comportamiento visible para la persona.
+      placeholder: "- Se puede ...\n- Se guarda en el .ltoon ..."
+    validations:
+      required: true
+  - type: textarea
+    id: fuera
+    attributes:
+      label: Fuera de alcance
+      description: Lo que NO se hará en este Issue (aunque parezca cercano), para evitar mezclas y sorpresas.
+    validations:
+      required: true
+  - type: textarea
+    id: criterios
+    attributes:
+      label: Criterios de aceptación
+      description: Numerados y comprobables por alguien que no leyó el código. Cada uno debe poder responderse «sí» o «no».
+      placeholder: "1. ...\n2. ..."
+    validations:
+      required: true
+  - type: checkboxes
+    id: verificacion
+    attributes:
+      label: Cómo se verificará
+      description: Marca todo lo que haga falta. Lo que requiera a la persona o hardware se registra en un Issue de pruebas manuales.
+      options:
+        - label: Prueba automática (cargo test)
+        - label: Captura de pantalla de la interfaz
+        - label: Prueba manual de la persona con ratón y teclado
+        - label: Prueba con hardware (tableta gráfica u otro)
+        - label: "Compatibilidad: abrir proyectos .ltoon anteriores"
+  - type: textarea
+    id: dependencias
+    attributes:
+      label: Dependencias y Issues relacionados
+      description: "Qué debe existir antes (#N) y qué Issues se solapan con este. Indica cuál cubre cada cosa."
+  - type: textarea
+    id: restricciones
+    attributes:
+      label: Restricciones técnicas conocidas
+      description: Límites de la plataforma o de las bibliotecas que ya se conocen (por ejemplo, lo que egui no expone), rendimiento esperado, compatibilidad del formato.
+  - type: textarea
+    id: preguntas
+    attributes:
+      label: Preguntas abiertas
+      description: Decisiones que la persona debe tomar antes de empezar. Si no hay, escribe «Ninguna».
