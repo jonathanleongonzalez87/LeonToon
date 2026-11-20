@@ -11,7 +11,7 @@ Refs #
 
 ## Pruebas
 - Automáticas: <!-- número de pruebas y qué cubren -->
-- Capturas: <!-- archivos en app/shots/ -->
+- Capturas: <!-- pégalas aquí en el PR (arrastra la imagen al cuadro de texto); no se suben como archivos al repositorio -->
 
 ## Compatibilidad
 - [ ] Los proyectos `.ltoon` anteriores se abren igual (campos nuevos opcionales)
