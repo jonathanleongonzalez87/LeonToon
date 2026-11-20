@@ -519,6 +519,9 @@ impl LeonApp {
                 let t = self.tool;
                 panel_header(ui, t.name());
                 row(ui, "Atajo", t.letter().into());
+                if t == Tool::Brush {
+                    self.brush_presets_ui(ui);
+                }
                 if t.draws() {
                     let size = match t {
                         Tool::Brush => &mut self.brush_size,
@@ -625,7 +628,7 @@ impl LeonApp {
         let [r, g, b, _] = rgba(self.fill_color);
         crate::brush::BrushSpec::new(size, self.stroke_opacity, color, self.brush, seed)
             .with_color2([r, g, b])
-            .with_images(self.brush_tip_img.as_ref().map(|(_, g)| g.clone()), self.brush_tex_img.as_ref().map(|(_, g)| g.clone()))
+            .with_images(self.brush_tip_img.as_ref().map(|i| i.gray.clone()), self.brush_tex_img.as_ref().map(|i| i.gray.clone()))
     }
 
     /// Pide una imagen PNG o WebP y la carga como punta o como textura del pincel.
@@ -636,10 +639,10 @@ impl LeonApp {
                 let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
                 let msg = format!("{} cargada: {name} ({}×{})", if tip { "Punta" } else { "Textura" }, g.w, g.h);
                 if tip {
-                    self.brush_tip_img = Some((name, std::sync::Arc::new(g)));
+                    self.brush_tip_img = Some(self.register_image(&name, g));
                     self.brush.use_tip_image = true;
                 } else {
-                    self.brush_tex_img = Some((name, std::sync::Arc::new(g)));
+                    self.brush_tex_img = Some(self.register_image(&name, g));
                     self.brush.texture = crate::brush::TexKind::Image;
                 }
                 self.say(msg);
@@ -705,7 +708,7 @@ impl LeonApp {
                 }
             });
             if self.brush.texture == TexKind::Image {
-                let name = self.brush_tex_img.as_ref().map_or("ninguna".to_string(), |(n, _)| n.clone());
+                let name = self.brush_tex_img.as_ref().map_or("ninguna".to_string(), |i| i.name.clone());
                 ui.horizontal(|ui| {
                     if ui.small_button("Cargar imagen…").clicked() {
                         self.pick_brush_image(false);
@@ -761,7 +764,7 @@ impl LeonApp {
                         self.brush.use_tip_image = false;
                     }
                 }
-                let name = self.brush_tip_img.as_ref().map_or("ninguna".to_string(), |(n, _)| n.clone());
+                let name = self.brush_tip_img.as_ref().map_or("ninguna".to_string(), |i| i.name.clone());
                 ui.horizontal(|ui| {
                     if ui.small_button("Cargar punta…").clicked() {
                         self.pick_brush_image(true);
@@ -784,7 +787,7 @@ impl LeonApp {
     fn brush_preview(&mut self, ui: &mut egui::Ui) {
         let colorful = self.brush.hue_jitter > 0.0 || self.brush.sat_jitter > 0.0 || self.brush.bri_jitter > 0.0 || self.brush.fg_bg_jitter > 0.0;
         let spec = self.brush_spec(if colorful { [240, 130, 60] } else { [232, 232, 232] }, self.brush_size.min(34.0), 7).with_color2(if colorful { [60, 150, 240] } else { [232, 232, 232] });
-        let names = (self.brush_tip_img.as_ref().map(|(n, _)| n.clone()), self.brush_tex_img.as_ref().map(|(n, _)| n.clone()));
+        let names = (self.brush_tip_img.as_ref().map(|i| i.id.clone()), self.brush_tex_img.as_ref().map(|i| i.id.clone()));
         let key = format!("{:.2}|{:.2}|{:?}|{:?}", spec.size, spec.opacity, spec.params, names);
         if self.brush_prev.as_ref().map(|(k, _)| k) != Some(&key) {
             let r = crate::brush::preview(spec, 240, 60);
