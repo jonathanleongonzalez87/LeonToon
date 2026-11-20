@@ -149,6 +149,9 @@ impl LeonApp {
                 }
             }
         });
+        ui.add_space(4.0);
+        self.paper_swatches_ui(ui);
+        ui.add_space(4.0);
         egui::Grid::new("light_grid2").num_columns(2).spacing([8.0, 6.0]).show(ui, |ui| {
             ui.label(RichText::new("Fondo").color(MU));
             ui.add(egui::Slider::new(&mut self.light_gray, 0.0..=100.0).step_by(5.0).max_decimals(0));
