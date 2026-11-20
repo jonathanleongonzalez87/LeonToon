@@ -644,7 +644,10 @@ impl LeonApp {
                 }
             });
         });
-        if self.vstyle.profile != Profile::Uniform {
+        if self.vstyle.profile == Profile::Custom {
+            super::vectorui::shape_editor(ui, &mut self.vstyle.shape);
+        }
+        if self.vstyle.profile.is_taper() {
             param_row(ui, "Afilado", |ui| pct_slider(ui, &mut self.vstyle.taper, 2.0, 50.0));
         }
         param_row(ui, "Extremo", |ui| {

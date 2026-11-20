@@ -192,7 +192,7 @@ fn plain_strokes_keep_the_original_fast_path() {
 
 #[test]
 fn style_roundtrips_and_old_files_load() {
-    let s = VStyle { cap: Cap::Square, join: Join::Bevel, profile: Profile::TaperBoth, taper: 0.4, pressure: false, min_width: 0.5, curve: 1.5, brush: Some("Tinta".into()), version: 1 };
+    let s = VStyle { cap: Cap::Square, join: Join::Bevel, profile: Profile::TaperBoth, taper: 0.4, pressure: false, min_width: 0.5, curve: 1.5, shape: Vec::new(), brush: Some("Tinta".into()), version: 1 };
     let back: VStyle = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
     assert_eq!(back, s);
     let old: VStyle = serde_json::from_str(r#"{"cap":"Flat"}"#).unwrap();
@@ -703,4 +703,98 @@ fn erasing_a_curve_bakes_it_into_plain_pieces() {
     let mid = d.strokes[0].points[d.strokes[0].points.len() / 2];
     assert!(d.erase(mid, 6.0));
     assert!(d.strokes.len() >= 2 && d.strokes.iter().all(|s| s.nodes.is_none()));
+}
+
+// ---------- Perfil de grosor personalizado (Fase 5) ----------
+
+#[test]
+fn custom_profile_follows_its_points() {
+    let shape = vec![[0.0, 0.0], [0.5, 1.0], [1.0, 0.0]];
+    assert_eq!(shape_at(&shape, 0.0), 0.0);
+    assert_eq!(shape_at(&shape, 0.5), 1.0);
+    assert_eq!(shape_at(&shape, 1.0), 0.0);
+    let (a, b) = (shape_at(&shape, 0.2), shape_at(&shape, 0.3));
+    assert!(a > 0.0 && b > a && b < 1.0, "sube de forma suave: {a} {b}");
+    assert_eq!(shape_at(&[], 0.4), 1.0, "sin puntos no cambia el grosor");
+    assert_eq!(shape_at(&[[0.3, 0.7]], 0.9), 0.7);
+}
+
+#[test]
+fn custom_profile_shapes_the_stroke_width() {
+    let pts: Vec<[f32; 2]> = (0..=40).map(|i| [i as f32 * 5.0, 0.0]).collect();
+    let style = VStyle { profile: Profile::Custom, shape: vec![[0.0, 1.0], [0.5, 0.2], [1.0, 1.0]], pressure: false, ..Default::default() };
+    let w = widths(&pts, &[], 20.0, &style, false);
+    assert!((w[0] - 20.0).abs() < 1e-3 && (w[40] - 20.0).abs() < 1e-3);
+    assert!((w[20] - 4.0).abs() < 0.3, "al centro queda estrecho: {}", w[20]);
+    assert!(!is_plain(Some(&style), &[]));
+    // Un trazo cerrado no usa el perfil (no tiene extremos).
+    assert!(widths(&pts, &[], 20.0, &style, true).iter().all(|v| (*v - 20.0).abs() < 1e-3));
+}
+
+#[test]
+fn custom_profile_is_cleaned_and_saved() {
+    let messy = VStyle { profile: Profile::Custom, shape: vec![[0.9, 0.5], [f32::NAN, 1.0], [0.1, 3.0], [0.1, 0.4], [-2.0, 0.2]], ..Default::default() }.clamped();
+    assert!(messy.shape.windows(2).all(|w| w[0][0] < w[1][0]), "ordenado y sin repetidos: {:?}", messy.shape);
+    assert!(messy.shape.iter().all(|p| (0.0..=1.0).contains(&p[0]) && (0.0..=1.0).contains(&p[1])));
+    let empty = VStyle { profile: Profile::Custom, shape: vec![], ..Default::default() }.clamped();
+    assert_eq!(empty.shape, default_shape(), "un perfil personalizado vacío se repara");
+    let many: Vec<[f32; 2]> = (0..40).map(|i| [i as f32 / 40.0, 0.5]).collect();
+    assert_eq!(clean_shape(&many).len(), MAX_SHAPE_POINTS);
+    let s = VStyle { profile: Profile::Custom, shape: default_shape(), ..Default::default() };
+    let back: VStyle = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
+    assert_eq!(back, s);
+    // Los estilos guardados antes no traen `shape` y no lo escriben si no se usa.
+    assert!(!serde_json::to_string(&VStyle::default()).unwrap().contains("shape"));
+    let old: VStyle = serde_json::from_str(r#"{"cap":"Flat","profile":"TaperEnd"}"#).unwrap();
+    assert!(old.shape.is_empty() && old.profile == Profile::TaperEnd);
+}
+
+#[test]
+fn editing_the_custom_profile_of_existing_strokes() {
+    let mut a = drawn();
+    let mut b = drawn();
+    let shape = vec![[0.0, 0.3], [0.5, 1.0], [1.0, 0.3]];
+    for s in [&mut a, &mut b] {
+        edit::set_prop(s, &Prop::Shape(shape.clone()));
+    }
+    let c = edit::common(&[&a, &b]);
+    assert_eq!((c.profile, c.shape.as_ref()), (Some(Profile::Custom), Some(&shape)));
+    edit::set_prop(&mut b, &Prop::Shape(vec![[0.0, 1.0], [1.0, 0.0]]));
+    assert_eq!(edit::common(&[&a, &b]).shape, None, "formas distintas: mixto");
+    assert!(edit::restore(&mut a) && a.style.as_ref().unwrap().profile == Profile::Uniform);
+    // Con el perfil Personalizado el trazo cambia de contorno sin mover su trayectoria.
+    let mut s = drawn();
+    let (pts, before) = (s.points.clone(), s.pieces());
+    edit::set_prop(&mut s, &Prop::Shape(shape));
+    assert_eq!(s.points, pts);
+    assert_ne!(s.pieces(), before);
+}
+
+#[test]
+fn included_custom_brushes_exist() {
+    let l = VLibrary::default();
+    for id in ["Entintado/Entintado con carga", "Pinceles artísticos/Gota"] {
+        let p = l.find(id).unwrap();
+        assert_eq!(p.style.profile, Profile::Custom, "{id}");
+        assert!(p.style.shape.len() >= 3);
+        assert_eq!(p.clone().clamped().style, p.style);
+    }
+}
+
+#[test]
+fn many_strokes_build_quickly() {
+    // Control de rendimiento: 3000 trazos de 120 puntos con perfil y presión deben generarse en un instante.
+    let strokes: Vec<Stroke> = (0..3000)
+        .map(|k| {
+            let pts: Vec<[f32; 2]> = (0..120).map(|i| [i as f32 * 4.0, (i as f32 * 0.2 + k as f32).sin() * 40.0]).collect();
+            let pr: Vec<f32> = (0..120).map(|i| 0.3 + 0.7 * (i as f32 / 120.0)).collect();
+            pencil(pts, pr, Some(VStyle { profile: Profile::Custom, shape: default_shape(), ..Default::default() }))
+        })
+        .collect();
+    let t0 = std::time::Instant::now();
+    let n: usize = strokes.iter().map(|s| s.pieces().len()).sum();
+    let ms = t0.elapsed().as_millis();
+    assert!(n > 3000 * 100);
+    assert!(ms < 3000, "{ms} ms para 3000 trazos");
+    eprintln!("3000 trazos × 120 puntos: {ms} ms ({n} piezas)");
 }

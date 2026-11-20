@@ -435,9 +435,28 @@ pub(super) fn paint_drawing(
     tint: Option<Color32>,
     alpha: f32,
 ) {
+    // Con muchos trazos, los que quedan fuera de la zona visible no se calculan ni se envían a la pantalla.
+    let clip = p.clip_rect().expand(2.0);
     for s in &d.strokes {
+        if s.points.len() > 8 && !stroke_visible(s, to_screen, z, clip) {
+            continue;
+        }
         paint_stroke(p, s, to_screen, z, tint, alpha);
     }
+}
+
+/// ¿Toca el trazo la zona visible? Usa su caja (con el grosor), pasada por la transformación de la capa.
+fn stroke_visible(s: &Stroke, to_screen: &dyn Fn([f32; 2]) -> Pos2, z: f32, clip: Rect) -> bool {
+    let b = s.bounds();
+    if b[0] > b[2] {
+        return true;
+    }
+    let corners = [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]].map(|c| to_screen(c));
+    let mut r = Rect::from_min_max(corners[0], corners[0]);
+    for c in &corners[1..] {
+        r.extend_with(*c);
+    }
+    r.expand(s.width * z * 4.0 + 2.0).intersects(clip)
 }
 
 pub(super) fn paint_stroke(
