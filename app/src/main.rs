@@ -3,6 +3,7 @@
 mod app;
 mod brush;
 mod model;
+mod presets;
 mod raster;
 mod render;
 

@@ -13,6 +13,7 @@ mod start;
 mod select;
 mod shell;
 mod storyboard;
+mod brushui;
 mod hud;
 mod view3d;
 mod timebar;
@@ -252,8 +253,13 @@ pub struct LeonApp {
     /// Última presión leída del lápiz (1 si no hay lápiz).
     pen_pressure: f32,
     /// Imágenes cargadas para la punta y para la textura del pincel (nombre, máscara).
-    brush_tip_img: Option<(String, std::sync::Arc<crate::brush::Gray>)>,
-    brush_tex_img: Option<(String, std::sync::Arc<crate::brush::Gray>)>,
+    brush_tip_img: Option<brushui::BrushImg>,
+    brush_tex_img: Option<brushui::BrushImg>,
+    /// Preset del que viene el pincel en uso (categoría y nombre) y editor de presets del panel N.
+    brush_preset: Option<crate::presets::PresetKey>,
+    preset_ui: brushui::PresetUi,
+    /// Máscaras ya decodificadas de las imágenes guardadas en el proyecto.
+    brush_img_cache: std::collections::HashMap<String, std::sync::Arc<crate::brush::Gray>>,
     brush_tex: Option<egui::TextureHandle>,
     brush_prev: Option<(String, egui::TextureHandle)>,
     view3d: bool,
@@ -469,6 +475,9 @@ impl LeonApp {
             pen_pressure: 1.0,
             brush_tip_img: None,
             brush_tex_img: None,
+            brush_preset: None,
+            preset_ui: Default::default(),
+            brush_img_cache: Default::default(),
             brush_tex: None,
             brush_prev: None,
             view3d: false,
@@ -560,6 +569,27 @@ impl LeonApp {
         };
         app.set_room_idx(room_idx);
         app.status = "LeonToon listo · funciona sin conexión. Pulsa F1 para ver la guía rápida.".into();
+        app.adopt_project_brush();
+        // Para capturas: LEONTOON_PRESET="Categoría/Nombre" aplica ese pincel guardado; LEONTOON_USERPRESETS=1
+        // añade dos pinceles propios al proyecto (sin tocar la biblioteca del usuario).
+        if std::env::var("LEONTOON_USERPRESETS").is_ok() {
+            let base = app.brush_setup_now();
+            let mut a = base.clone();
+            a.params.hardness = 0.5;
+            a.size = 24.0;
+            crate::presets::save_new(&mut app.project.brush_presets, "Boceto suave", "Mis pinceles", a);
+            let mut b = base;
+            b.params.roundness = 0.4;
+            b.params.angle = 30.0;
+            crate::presets::save_new(&mut app.project.brush_presets, "Caligrafía fina", "Letras", b);
+        }
+        if let Ok(v) = std::env::var("LEONTOON_PRESET") {
+            if let Some((c, n)) = v.split_once('/') {
+                if let Some(p) = crate::presets::find(&app.project.brush_presets, &(c.to_string(), n.to_string())) {
+                    app.apply_preset(&p);
+                }
+            }
+        }
         if let Some(p) = open {
             app.load_from(&p);
         }
@@ -598,7 +628,9 @@ impl LeonApp {
     fn do_undo(&mut self) {
         self.finish_gesture();
         if let Some(p) = self.undo.pop() {
+            let brush = self.brush_data();
             let cur = std::mem::replace(&mut self.project, p);
+            self.restore_brush_data(brush);
             self.redo.push(cur);
             self.dirty = true;
             self.meta_skip = true;
@@ -612,7 +644,9 @@ impl LeonApp {
     fn do_redo(&mut self) {
         self.finish_gesture();
         if let Some(p) = self.redo.pop() {
+            let brush = self.brush_data();
             let cur = std::mem::replace(&mut self.project, p);
+            self.restore_brush_data(brush);
             self.undo.push(cur);
             self.dirty = true;
             self.meta_skip = true;
@@ -767,6 +801,7 @@ impl LeonApp {
     }
 
     fn after_load(&mut self) {
+        self.adopt_project_brush();
         self.undo.clear();
         self.redo.clear();
         self.dirty = false;
@@ -910,6 +945,7 @@ impl LeonApp {
         self.dialogs(ctx);
         self.safety_dialogs(ctx);
         canvas::prune_raster_tex(ctx.cumulative_pass_nr());
+        self.sync_brush_to_project();
 
         // Los cambios hechos en los paneles (nombre, opacidad, claves, notas…) también se pueden deshacer.
         if !self.meta_skip {

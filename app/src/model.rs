@@ -670,6 +670,15 @@ pub struct Project {
     /// Salas abiertas (pestañas), en orden: tipo de sala y nombre propio si se renombró.
     #[serde(default)]
     pub rooms: Vec<RoomTab>,
+    /// Pinceles guardados del proyecto (los incluidos con el programa no se guardan aquí).
+    #[serde(default)]
+    pub brush_presets: Vec<crate::presets::BrushPreset>,
+    /// Imágenes de punta y de textura que usan el pincel y los presets.
+    #[serde(default)]
+    pub brush_images: Vec<crate::presets::BrushImage>,
+    /// Pincel que estaba en uso al guardar.
+    #[serde(default)]
+    pub brush_state: Option<crate::presets::BrushState>,
 }
 
 /// Una pestaña de sala guardada en el proyecto.
@@ -761,6 +770,9 @@ impl Project {
             palettes: default_palettes(),
             room_set: String::new(),
             rooms: Vec::new(),
+            brush_presets: Vec::new(),
+            brush_images: Vec::new(),
+            brush_state: None,
         }
     }
 
@@ -866,6 +878,8 @@ impl Project {
 
     /// Repara valores imposibles tras abrir un archivo.
     pub fn sanitize(&mut self) {
+        crate::presets::sanitize(&mut self.brush_presets, &mut self.brush_images);
+        crate::presets::sanitize_state(&mut self.brush_state, &self.brush_images);
         self.width = self.width.clamp(16, 8192);
         self.height = self.height.clamp(16, 8192);
         self.fps = self.fps.clamp(1, 120);
