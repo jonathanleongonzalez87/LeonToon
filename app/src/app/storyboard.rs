@@ -1,4 +1,4 @@
-﻿//! Sala StoryBoard: cuadrícula de planos con zoom (de miniaturas a detalle con notas),
+//! Sala StoryBoard: cuadrícula de planos con zoom (de miniaturas a detalle con notas),
 //! editor de detalle con pincel y borrador, tira de planos y «Animatic → Xsheet».
 
 use super::canvas::{paint_drawing, paint_stroke, paint_thumb};
@@ -304,6 +304,8 @@ impl LeonApp {
                             width: self.brush_size,
                             closed: false,
                             fill: None,
+                            pressure: Vec::new(),
+                            style: None,
                         });
                         if s.points.last().map_or(true, |l| (l[0] - q[0]).abs() + (l[1] - q[1]).abs() > 0.8 / z) {
                             s.points.push(q);

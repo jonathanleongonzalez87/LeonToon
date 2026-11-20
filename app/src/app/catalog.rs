@@ -166,6 +166,19 @@ impl Tool {
     pub(crate) fn draws(self) -> bool {
         matches!(self, Tool::Brush | Tool::Vector | Tool::Pen | Tool::Eraser | Tool::Shape)
     }
+    /// El motor de dibujo lo decide la capa activa, nunca se mezclan: el Lápiz y la Pluma vectoriales solo dibujan en
+    /// capas vectoriales (no convierten trazos en píxeles) y el Pincel de píxeles solo actúa en capas de mapa de bits.
+    /// Devuelve el motivo si la herramienta no se puede usar en esa clase de capa.
+    pub(crate) fn layer_block(self, kind: LayerKind) -> Option<&'static str> {
+        let paints = self.draws() || matches!(self, Tool::Fill);
+        if paints && matches!(kind, LayerKind::Camera | LayerKind::Light | LayerKind::Null | LayerKind::Text) {
+            return Some("Esta capa no contiene dibujos: elige una capa vectorial o de mapa de bits.");
+        }
+        if matches!(self, Tool::Vector | Tool::Pen) && kind == LayerKind::Bitmap {
+            return Some("El lápiz y la pluma vectoriales solo dibujan en capas vectoriales y esta es una capa de mapa de bits: usa el Pincel, o elige una capa vectorial.");
+        }
+        None
+    }
 }
 
 // ---------- Salas ----------

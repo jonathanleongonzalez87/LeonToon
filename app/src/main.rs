@@ -6,6 +6,7 @@ mod brush;
 mod model;
 mod presets;
 mod raster;
+mod vector;
 mod render;
 
 use std::path::PathBuf;

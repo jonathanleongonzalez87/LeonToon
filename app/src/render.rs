@@ -59,6 +59,35 @@ pub fn draw_drawing(pm: &mut Pixmap, d: &Drawing, tr: Transform) {
         }
     }
     for s in &d.strokes {
+        if !s.is_plain() && !s.points.is_empty() {
+            // Trazo vectorial de grosor variable: los polígonos se rellenan juntos (unión, sin doble mezcla).
+            if let (Some(f), true) = (s.fill, s.points.len() >= 3) {
+                let mut pb = PathBuilder::new();
+                pb.move_to(s.points[0][0], s.points[0][1]);
+                for p in &s.points[1..] {
+                    pb.line_to(p[0], p[1]);
+                }
+                pb.close();
+                if let Some(path) = pb.finish() {
+                    pm.fill_path(&path, &paint(f), FillRule::Winding, tr, None);
+                }
+            }
+            let mut pb = PathBuilder::new();
+            for poly in s.pieces() {
+                if poly.len() < 3 {
+                    continue;
+                }
+                pb.move_to(poly[0][0], poly[0][1]);
+                for v in &poly[1..] {
+                    pb.line_to(v[0], v[1]);
+                }
+                pb.close();
+            }
+            if let Some(path) = pb.finish() {
+                pm.fill_path(&path, &paint(s.color), FillRule::Winding, tr, None);
+            }
+            continue;
+        }
         if s.points.len() == 1 {
             let p = s.points[0];
             if let Some(path) = PathBuilder::from_circle(p[0], p[1], (s.width * 0.5).max(0.25)) {

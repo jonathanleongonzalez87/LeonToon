@@ -515,61 +515,71 @@ impl LeonApp {
                 row(ui, "Distancia Y", if l.is3d || l.kind == LayerKind::Camera { format!("{:.0}", l.depth) } else { "—".into() });
             }
             1 => {
-                // Los parámetros de la herramienta elegida se configuran aquí.
+                // Los parámetros de la herramienta elegida se configuran aquí. Los controles dependen de la capa activa y no
+                // se mezclan: los pinceles de píxeles solo aparecen en capas de mapa de bits, y el lápiz vectorial, en capas vectoriales.
                 let t = self.tool;
+                let kind = self.layer().kind;
+                let bitmap = kind == LayerKind::Bitmap;
                 panel_header(ui, t.name());
                 row(ui, "Atajo", t.letter().into());
-                if t == Tool::Brush {
-                    self.brush_presets_ui(ui);
-                }
-                if t.draws() {
-                    let size = match t {
-                        Tool::Brush => &mut self.brush_size,
-                        Tool::Vector => &mut self.pencil_size,
-                        Tool::Eraser => &mut self.eraser_size,
-                        _ => &mut self.shape_width,
-                    };
-                    param_row(ui, if t == Tool::Brush { "Tamaño" } else { "Grosor" }, |ui| {
-                        ui.add(egui::Slider::new(size, 1.0..=1000.0).logarithmic(true).max_decimals(0).suffix(" px"));
-                    });
-                    if t != Tool::Eraser {
-                        param_row(ui, "Opacidad", |ui| pct_slider(ui, &mut self.stroke_opacity, 15.0, 100.0));
+                if let Some(why) = t.layer_block(kind) {
+                    muted(ui, why);
+                } else {
+                    if t == Tool::Brush && bitmap {
+                        self.brush_presets_ui(ui);
                     }
-                    if t == Tool::Brush {
-                        param_row(ui, "Dureza", |ui| pct_slider(ui, &mut self.brush.hardness, 0.0, 100.0));
-                        param_row(ui, "Espaciado", |ui| {
-                            ui.add(egui::Slider::new(&mut self.brush.spacing, 1.0..=200.0).logarithmic(true).max_decimals(0).suffix(" %"));
+                    if t.draws() {
+                        let size = match t {
+                            Tool::Brush => &mut self.brush_size,
+                            Tool::Vector => &mut self.pencil_size,
+                            Tool::Eraser => &mut self.eraser_size,
+                            _ => &mut self.shape_width,
+                        };
+                        param_row(ui, if t == Tool::Brush && bitmap { "Tamaño" } else { "Grosor" }, |ui| {
+                            ui.add(egui::Slider::new(size, 1.0..=1000.0).logarithmic(true).max_decimals(0).suffix(" px"));
                         });
-                        param_row(ui, "Flujo", |ui| pct_slider(ui, &mut self.brush.flow, 1.0, 100.0));
-                        param_row(ui, "Redondez", |ui| pct_slider(ui, &mut self.brush.roundness, 5.0, 100.0));
-                        param_row(ui, "Ángulo", |ui| {
-                            ui.add(egui::Slider::new(&mut self.brush.angle, 0.0..=360.0).max_decimals(0).suffix("°"));
+                        if t != Tool::Eraser {
+                            param_row(ui, "Opacidad", |ui| pct_slider(ui, &mut self.stroke_opacity, 15.0, 100.0));
+                        }
+                        if t == Tool::Brush && bitmap {
+                            param_row(ui, "Dureza", |ui| pct_slider(ui, &mut self.brush.hardness, 0.0, 100.0));
+                            param_row(ui, "Espaciado", |ui| {
+                                ui.add(egui::Slider::new(&mut self.brush.spacing, 1.0..=200.0).logarithmic(true).max_decimals(0).suffix(" %"));
+                            });
+                            param_row(ui, "Flujo", |ui| pct_slider(ui, &mut self.brush.flow, 1.0, 100.0));
+                            param_row(ui, "Redondez", |ui| pct_slider(ui, &mut self.brush.roundness, 5.0, 100.0));
+                            param_row(ui, "Ángulo", |ui| {
+                                ui.add(egui::Slider::new(&mut self.brush.angle, 0.0..=360.0).max_decimals(0).suffix("°"));
+                            });
+                        }
+                        if t != Tool::Eraser {
+                            param_row(ui, "Suavizado", |ui| pct_slider(ui, &mut self.smoothing, 0.0, 85.0));
+                        }
+                        param_row(ui, "Presión", |ui| {
+                            ui.checkbox(&mut self.pressure, "Activa");
                         });
-                    }
-                    if t != Tool::Eraser {
-                        param_row(ui, "Suavizado", |ui| pct_slider(ui, &mut self.smoothing, 0.0, 85.0));
-                    }
-                    param_row(ui, "Presión", |ui| {
-                        ui.checkbox(&mut self.pressure, "Activa");
-                    });
-                    if t == Tool::Brush {
-                        self.brush_preview(ui);
-                        self.brush_sections(ui);
-                        if self.layer().kind != LayerKind::Bitmap {
-                            muted(ui, "Dureza, espaciado, flujo, redondez y ángulo actúan en capas de mapa de bits. En capas vectoriales el pincel solo usa tamaño, opacidad y suavizado.");
-                        }
-                        if ui.small_button("Restablecer pincel").on_hover_text("Vuelve a la punta redonda y dura").clicked() {
-                            self.brush = Default::default();
-                        }
-                    }
-                    if t == Tool::Shape {
-                        for (k, n) in [(ShapeKind::Line, "Línea"), (ShapeKind::Rect, "Rectángulo"), (ShapeKind::Ellipse, "Elipse")] {
-                            if pill(ui, n, self.shape_kind == k).clicked() {
-                                self.shape_kind = k;
+                        if t == Tool::Brush && bitmap {
+                            self.brush_preview(ui);
+                            self.brush_sections(ui);
+                            if ui.small_button("Restablecer pincel").on_hover_text("Vuelve a la punta redonda y dura").clicked() {
+                                self.brush = Default::default();
                             }
                         }
-                        if self.shape_kind != ShapeKind::Line {
-                            ui.checkbox(&mut self.fill_shapes, "Rellenar");
+                        if t == Tool::Brush && !bitmap {
+                            muted(ui, "Sobre una capa vectorial el Pincel dibuja un trazo vectorial simple (grosor, opacidad y suavizado). El motor con dureza, flujo, dinámicas y presets es solo para capas de mapa de bits; para trazos vectoriales con grosor variable usa el Lápiz vectorial (L).");
+                        }
+                        if matches!(t, Tool::Vector | Tool::Pen) {
+                            self.vector_style_ui(ui);
+                        }
+                        if t == Tool::Shape {
+                            for (k, n) in [(ShapeKind::Line, "Línea"), (ShapeKind::Rect, "Rectángulo"), (ShapeKind::Ellipse, "Elipse")] {
+                                if pill(ui, n, self.shape_kind == k).clicked() {
+                                    self.shape_kind = k;
+                                }
+                            }
+                            if self.shape_kind != ShapeKind::Line {
+                                ui.checkbox(&mut self.fill_shapes, "Rellenar");
+                            }
                         }
                     }
                 }
@@ -600,6 +610,65 @@ fn param_row(ui: &mut egui::Ui, label: &str, add: impl FnOnce(&mut egui::Ui)) {
     add(&mut c);
 }
 
+impl LeonApp {
+    /// Controles del Lápiz vectorial (capas vectoriales): grosor con la presión, perfil de grosor, extremos y uniones.
+    /// Son independientes de los pinceles de píxeles. Cada trazo nuevo guarda una copia de este estilo.
+    fn vector_style_ui(&mut self, ui: &mut egui::Ui) {
+        use crate::vector::{Cap, Join, Profile};
+        param_row(ui, "Con presión", |ui| {
+            ui.checkbox(&mut self.vstyle.pressure, "Grosor variable");
+        });
+        if self.vstyle.pressure {
+            param_row(ui, "Grosor mín.", |ui| pct_slider(ui, &mut self.vstyle.min_width, 0.0, 100.0));
+            param_row(ui, "Curva presión", |ui| {
+                ui.add(egui::Slider::new(&mut self.vstyle.curve, 0.2..=4.0).logarithmic(true).max_decimals(2));
+            });
+        }
+        param_row(ui, "Perfil", |ui| {
+            egui::ComboBox::from_id_salt("v_profile").selected_text(self.vstyle.profile.label()).width(ui.available_width() - 8.0).show_ui(ui, |ui| {
+                for k in Profile::ALL {
+                    ui.selectable_value(&mut self.vstyle.profile, k, k.label());
+                }
+            });
+        });
+        if self.vstyle.profile != Profile::Uniform {
+            param_row(ui, "Afilado", |ui| pct_slider(ui, &mut self.vstyle.taper, 2.0, 50.0));
+        }
+        param_row(ui, "Extremo", |ui| {
+            egui::ComboBox::from_id_salt("v_cap").selected_text(self.vstyle.cap.label()).width(ui.available_width() - 8.0).show_ui(ui, |ui| {
+                for k in Cap::ALL {
+                    ui.selectable_value(&mut self.vstyle.cap, k, k.label());
+                }
+            });
+        });
+        param_row(ui, "Unión", |ui| {
+            egui::ComboBox::from_id_salt("v_join").selected_text(self.vstyle.join.label()).width(ui.available_width() - 8.0).show_ui(ui, |ui| {
+                for k in Join::ALL {
+                    ui.selectable_value(&mut self.vstyle.join, k, k.label());
+                }
+            });
+        });
+        // Muestra hecha con el mismo motor que dibuja en la escena (con una presión que sube y baja).
+        let (r, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 64.0), Sense::hover());
+        ui.painter().rect_filled(r, 4.0, UI0);
+        ui.painter().rect_stroke(r, 4.0, stk(1.0, LINE), EStrokeKind::Inside);
+        let n = 60;
+        let points: Vec<[f32; 2]> = (0..=n)
+            .map(|i| {
+                let t = i as f32 / n as f32;
+                [14.0 + t * (r.width() - 28.0), r.height() * 0.5 + (t * std::f32::consts::TAU).sin() * r.height() * 0.2]
+            })
+            .collect();
+        let pressure: Vec<f32> = (0..=n).map(|i| ((i as f32 / n as f32) * std::f32::consts::PI).sin().clamp(0.05, 1.0)).collect();
+        let sample = Stroke { kind: ShapeKind::Free, points, color: [232, 232, 232, 255], width: self.pencil_size.clamp(2.0, 22.0), closed: false, fill: None, pressure, style: Some(self.vstyle.clone().clamped()) };
+        let painter = ui.painter().with_clip_rect(r);
+        super::canvas::paint_stroke(&painter, &sample, &|p| Pos2::new(r.min.x + p[0], r.min.y + p[1]), 1.0, None, self.stroke_opacity);
+        if ui.small_button("Restablecer lápiz").on_hover_text("Vuelve al trazo de grosor constante con extremos y uniones redondos").clicked() {
+            self.vstyle = Default::default();
+        }
+        muted(ui, "El grosor con presión usa el lápiz de tableta; con ratón el trazo sale de grosor constante. Cada trazo guarda su propio estilo: cambiar este panel no modifica los trazos ya dibujados. Es independiente de los pinceles de píxeles.");
+    }
+}
 /// Lista para elegir qué controla una propiedad dinámica del pincel.
 fn control_combo(ui: &mut egui::Ui, id: &str, c: &mut crate::brush::Control) {
     egui::ComboBox::from_id_salt(id).selected_text(c.label()).width(ui.available_width() - 8.0).show_ui(ui, |ui| {
