@@ -11,6 +11,8 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod library;
+
 /// Forma de los extremos del trazo.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
 pub enum Cap {

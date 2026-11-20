@@ -15,6 +15,7 @@ mod shell;
 mod storyboard;
 mod abrui;
 mod brushui;
+mod vectorui;
 mod hud;
 mod view3d;
 mod timebar;
@@ -253,6 +254,10 @@ pub struct LeonApp {
     brush_live: Option<crate::brush::LiveStroke>,
     /// Estilo del Lápiz vectorial (extremos, uniones, perfil de grosor y presión). Es independiente de los pinceles de píxeles.
     vstyle: crate::vector::VStyle,
+    /// Biblioteca de pinceles vectoriales (independiente de la de píxeles), el pincel elegido y el estado de su panel.
+    vlib: crate::vector::library::VLibrary,
+    vpreset: Option<String>,
+    vui: vectorui::VUi,
     /// Última presión leída del lápiz (1 si no hay lápiz).
     pen_pressure: f32,
     /// Imágenes cargadas para la punta y para la textura del pincel (nombre, máscara).
@@ -437,6 +442,7 @@ impl LeonApp {
             project.layers.insert(0, l);
             }
         }
+        // Para capturas de la biblioteca vectorial: LEONTOON_VPRESET=categoría/nombre elige un pincel; LEONTOON_VFAV=id marca un favorito.
         // Para capturas del lápiz vectorial: LEONTOON_VSTROKES=1 añade una capa vectorial con trazos de distinto estilo.
         if std::env::var("LEONTOON_VSTROKES").is_ok() {
             use crate::vector::{Cap, Join, Profile, VStyle};
@@ -511,6 +517,9 @@ impl LeonApp {
             brush: Default::default(),
             brush_live: None,
             vstyle: Default::default(),
+            vlib: if screenshot.is_some() { Default::default() } else { safety::data_dir().map(|d| crate::vector::library::load(&d)).unwrap_or_default() },
+            vpreset: None,
+            vui: Default::default(),
             pen_pressure: 1.0,
             brush_tip_img: None,
             brush_tex_img: None,
@@ -633,6 +642,14 @@ impl LeonApp {
                     app.apply_preset(&p);
                 }
             }
+        }
+        if let Ok(v) = std::env::var("LEONTOON_VFAV") {
+            for id in v.split(';') {
+                app.vlib.toggle_favorite(id);
+            }
+        }
+        if let Some(p) = std::env::var("LEONTOON_VPRESET").ok().and_then(|v| app.vlib.find(&v)) {
+            app.apply_vpreset(&p);
         }
         if let Ok(p) = std::env::var("LEONTOON_ABR") {
             app.abr_screenshot_demo(std::path::Path::new(&p));
