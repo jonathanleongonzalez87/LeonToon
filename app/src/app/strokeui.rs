@@ -35,7 +35,7 @@ const MIXED: &str = "Mixto";
 
 impl LeonApp {
     /// Aplica `f` a los trazos elegidos. Devuelve cuántos cambió. `undo`: guardar antes un paso de deshacer.
-    fn edit_picked(&mut self, undo: bool, f: impl Fn(&mut Stroke)) -> usize {
+    pub(super) fn edit_picked(&mut self, undo: bool, f: impl Fn(&mut Stroke)) -> usize {
         self.validate_pick();
         if self.picked.is_empty() || self.layer().locked {
             return 0;
@@ -68,7 +68,7 @@ impl LeonApp {
     }
 
     /// Los trazos elegidos del dibujo actual.
-    fn picked_strokes(&self) -> Vec<Stroke> {
+    pub(super) fn picked_strokes(&self) -> Vec<Stroke> {
         let Some(d) = self.layer().drawing_at(self.frame) else { return Vec::new() };
         self.picked.iter().filter_map(|i| d.strokes.get(*i).cloned()).collect()
     }

@@ -11,6 +11,7 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod bezier;
 pub mod edit;
 pub mod library;
 

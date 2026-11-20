@@ -137,7 +137,7 @@ impl Tool {
             Tool::Camera => "Orbita, desplaza y acerca la cámara activa. Pendiente.",
             Tool::Brush => "Dibujo a mano alzada, con suavizado.",
             Tool::Vector => "Trazos finos a mano alzada, editables, ideales para la limpieza.",
-            Tool::Pen => "Curvas Bézier por puntos y tiradores. Pendiente.",
+            Tool::Pen => "Curvas Bézier: clic = nodo de esquina, clic y arrastrar = nodo suave con tiradores. Clic en el primer nodo cierra; Intro termina; Esc cancela.",
             Tool::Text => "Crea o edita una capa de texto. Pendiente.",
             Tool::Shape => "Líneas, rectángulos y elipses (elige la forma en la cabecera). Mayús: 45° o proporción fija.",
             Tool::Eraser => "Borra trazos; las figuras rellenas se borran enteras.",
@@ -150,7 +150,7 @@ impl Tool {
     }
     /// Herramientas que aún no hacen nada (se ven en la barra para mostrar el plan).
     pub(crate) fn pending(self) -> bool {
-        matches!(self, Tool::Anchor | Tool::Camera | Tool::Pen | Tool::Text | Tool::RotateView)
+        matches!(self, Tool::Anchor | Tool::Camera | Tool::Text | Tool::RotateView)
     }
     /// Herramientas que solo miran (no cambian la capa).
     pub(crate) fn is_view(self) -> bool {

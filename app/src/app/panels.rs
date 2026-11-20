@@ -89,7 +89,7 @@ impl LeonApp {
                 ui.label(RichText::new("Grosor").color(MU));
                 let size = match t {
                     Tool::Brush => &mut self.brush_size,
-                    Tool::Vector => &mut self.pencil_size,
+                    Tool::Vector | Tool::Pen => &mut self.pencil_size,
                     Tool::Eraser => &mut self.eraser_size,
                     _ => &mut self.shape_width,
                 };
@@ -528,13 +528,13 @@ impl LeonApp {
                     if t == Tool::Brush && bitmap {
                         self.brush_presets_ui(ui);
                     }
-                    if t == Tool::Vector {
+                    if matches!(t, Tool::Vector | Tool::Pen) {
                         self.vector_presets_ui(ui);
                     }
                     if t.draws() {
                         let size = match t {
                             Tool::Brush => &mut self.brush_size,
-                            Tool::Vector => &mut self.pencil_size,
+                            Tool::Vector | Tool::Pen => &mut self.pencil_size,
                             Tool::Eraser => &mut self.eraser_size,
                             _ => &mut self.shape_width,
                         };
@@ -571,11 +571,11 @@ impl LeonApp {
                         if t == Tool::Brush && !bitmap {
                             muted(ui, "Sobre una capa vectorial el Pincel dibuja un trazo vectorial simple (grosor, opacidad y suavizado). El motor con dureza, flujo, dinámicas y presets es solo para capas de mapa de bits; para trazos vectoriales con grosor variable usa el Lápiz vectorial (L).");
                         }
-                        if t == Tool::Vector {
+                        if matches!(t, Tool::Vector | Tool::Pen) {
                             self.vector_style_ui(ui);
                         }
                         if t == Tool::Pen {
-                            muted(ui, "La Pluma vectorial (curvas Bézier y nodos) llegará en la fase 4 y usará los mismos pinceles vectoriales del Lápiz.");
+                            muted(ui, "La Pluma usa los mismos pinceles vectoriales que el Lápiz (grosor, perfil, extremos y uniones). No tiene presión: el grosor variable viene del perfil.");
                         }
                         if t == Tool::Shape {
                             for (k, n) in [(ShapeKind::Line, "Línea"), (ShapeKind::Rect, "Rectángulo"), (ShapeKind::Ellipse, "Elipse")] {
@@ -591,6 +591,7 @@ impl LeonApp {
                 }
                 if t == Tool::Select && kind == LayerKind::Vector {
                     self.stroke_props_ui(ui);
+                    self.node_panel_ui(ui);
                 }
                 muted(ui, t.tip());
             }
@@ -624,10 +625,13 @@ impl LeonApp {
     /// Son independientes de los pinceles de píxeles. Cada trazo nuevo guarda una copia de este estilo.
     fn vector_style_ui(&mut self, ui: &mut egui::Ui) {
         use crate::vector::{Cap, Join, Profile};
-        param_row(ui, "Con presión", |ui| {
-            ui.checkbox(&mut self.vstyle.pressure, "Grosor variable");
-        });
-        if self.vstyle.pressure {
+        let lapiz = self.tool != Tool::Pen;
+        if lapiz {
+            param_row(ui, "Con presión", |ui| {
+                ui.checkbox(&mut self.vstyle.pressure, "Grosor variable");
+            });
+        }
+        if self.vstyle.pressure && lapiz {
             param_row(ui, "Grosor mín.", |ui| pct_slider(ui, &mut self.vstyle.min_width, 0.0, 100.0));
             param_row(ui, "Curva presión", |ui| {
                 ui.add(egui::Slider::new(&mut self.vstyle.curve, 0.2..=4.0).logarithmic(true).max_decimals(2));
@@ -669,7 +673,7 @@ impl LeonApp {
             })
             .collect();
         let pressure: Vec<f32> = (0..=n).map(|i| ((i as f32 / n as f32) * std::f32::consts::PI).sin().clamp(0.05, 1.0)).collect();
-        let sample = Stroke { kind: ShapeKind::Free, points, color: [232, 232, 232, 255], width: self.pencil_size.clamp(2.0, 22.0), closed: false, fill: None, pressure, style: Some(self.vstyle.clone().clamped()), original: None };
+        let sample = Stroke { kind: ShapeKind::Free, points, color: [232, 232, 232, 255], width: self.pencil_size.clamp(2.0, 22.0), closed: false, fill: None, pressure, style: Some(self.vstyle.clone().clamped()), original: None, nodes: None };
         let painter = ui.painter().with_clip_rect(r);
         super::canvas::paint_stroke(&painter, &sample, &|p| Pos2::new(r.min.x + p[0], r.min.y + p[1]), 1.0, None, self.stroke_opacity);
         if ui.small_button("Restablecer lápiz").on_hover_text("Vuelve al trazo de grosor constante con extremos y uniones redondos").clicked() {

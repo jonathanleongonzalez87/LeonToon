@@ -35,6 +35,9 @@ pub struct Stroke {
     /// Aspecto con el que se dibujó, guardado la primera vez que se edita el trazo (para restaurarlo).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub original: Option<Box<crate::vector::Look>>,
+    /// Curva Bézier editable (nodos con tiradores). Si existe, points y pressure se calculan a partir de ella.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nodes: Option<Vec<crate::vector::bezier::Node>>,
 }
 
 fn dist_seg(p: [f32; 2], a: [f32; 2], b: [f32; 2]) -> f32 {
@@ -94,7 +97,28 @@ impl Stroke {
     pub fn shape(kind: ShapeKind, a: [f32; 2], b: [f32; 2], color: Rgba, width: f32, fill: Option<Rgba>) -> Self {
         let (points, closed) = shape_points(kind, a, b);
         let fill = if closed { fill } else { None };
-        Stroke { kind, points, color, width, closed, fill, pressure: Vec::new(), style: None, original: None }
+        Stroke { kind, points, color, width, closed, fill, pressure: Vec::new(), style: None, original: None, nodes: None }
+    }
+
+    /// Recalcula la polilínea (y la presión) a partir de los nodos, si el trazo es una curva.
+    pub fn regen(&mut self) {
+        if let Some(nodes) = &self.nodes {
+            let (pts, pr) = crate::vector::bezier::flatten(nodes, self.closed);
+            self.points = pts;
+            self.pressure = pr;
+        }
+    }
+
+    /// Aplica una transformación a los puntos y también a los nodos y tiradores de la curva.
+    fn map_geometry(&mut self, f: impl Fn([f32; 2]) -> [f32; 2]) {
+        for p in &mut self.points {
+            *p = f(*p);
+        }
+        if let Some(ns) = self.nodes.as_mut() {
+            for n in ns {
+                n.map(&f);
+            }
+        }
     }
 
     /// Aspecto actual (grosor, color y estilo).
@@ -125,6 +149,13 @@ impl Stroke {
         if let Some(s) = self.style.take() {
             self.style = Some(s.clamped());
         }
+        // Una curva dañada (nodos que no son números) vuelve a ser una polilínea; si no, se recalcula desde sus nodos.
+        if let Some(ns) = self.nodes.take() {
+            if ns.len() >= 2 && ns.iter().all(|n| n.is_finite()) {
+                self.nodes = Some(ns);
+                self.regen();
+            }
+        }
         if let Some(o) = self.original.as_mut() {
             o.width = if o.width.is_finite() { o.width.clamp(0.1, 500.0) } else { self.width };
             o.style = o.style.take().map(|s| s.clamped());
@@ -145,10 +176,7 @@ impl Stroke {
     }
 
     pub fn translate(&mut self, dx: f32, dy: f32) {
-        for p in &mut self.points {
-            p[0] += dx;
-            p[1] += dy;
-        }
+        self.map_geometry(|p| [p[0] + dx, p[1] + dy]);
     }
 
     /// Caja que envuelve el trazo (sin grosor): [x0, y0, x1, y1].
@@ -160,10 +188,7 @@ impl Stroke {
 
     /// Escala respecto a un punto fijo (el grosor sigue la escala media).
     pub fn scale_about(&mut self, c: [f32; 2], sx: f32, sy: f32) {
-        for p in &mut self.points {
-            p[0] = c[0] + (p[0] - c[0]) * sx;
-            p[1] = c[1] + (p[1] - c[1]) * sy;
-        }
+        self.map_geometry(|p| [c[0] + (p[0] - c[0]) * sx, c[1] + (p[1] - c[1]) * sy]);
         let k = (sx.abs() + sy.abs()) * 0.5;
         self.width = (self.width * k).clamp(0.1, 500.0);
         if let Some(o) = self.original.as_mut() {
@@ -174,10 +199,10 @@ impl Stroke {
     /// Gira `deg` grados alrededor de `c`.
     pub fn rotate_about(&mut self, c: [f32; 2], deg: f32) {
         let (s, co) = deg.to_radians().sin_cos();
-        for p in &mut self.points {
+        self.map_geometry(|p| {
             let (x, y) = (p[0] - c[0], p[1] - c[1]);
-            *p = [c[0] + x * co - y * s, c[1] + x * s + y * co];
-        }
+            [c[0] + x * co - y * s, c[1] + x * s + y * co]
+        });
     }
 
     /// Distancia del punto al contorno del trazo (sin contar el grosor).
@@ -278,7 +303,7 @@ impl Stroke {
                         fill: None,
                         pressure: if has_p { keep.iter().map(|&i| prs[i]).collect() } else { Vec::new() },
                         style: out_style.clone(),
-                        original: None,
+                        original: None, nodes: None,
                     }
                 })
                 .collect(),
@@ -962,7 +987,7 @@ impl Project {
                 fill: None,
                 pressure: Vec::new(),
                 style: None,
-                original: None,
+                original: None, nodes: None,
             });
             ball.keys.insert(i * 2, Arc::new(d));
         }
@@ -1174,7 +1199,7 @@ mod tests {
     #[test]
     fn eraser_splits() {
         let mut d = Drawing::default();
-        d.strokes.push(Stroke { kind: ShapeKind::Line, points: vec![[0.0, 0.0], [100.0, 0.0]], color: [0, 0, 0, 255], width: 2.0, closed: false, fill: None, pressure: Vec::new(), style: None, original: None });
+        d.strokes.push(Stroke { kind: ShapeKind::Line, points: vec![[0.0, 0.0], [100.0, 0.0]], color: [0, 0, 0, 255], width: 2.0, closed: false, fill: None, pressure: Vec::new(), style: None, original: None, nodes: None });
         assert!(d.erase([50.0, 0.0], 5.0));
         assert_eq!(d.strokes.len(), 2);
     }

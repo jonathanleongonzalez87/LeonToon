@@ -306,7 +306,7 @@ impl LeonApp {
                             fill: None,
                             pressure: Vec::new(),
                             style: None,
-                            original: None,
+                            original: None, nodes: None,
                         });
                         if s.points.last().map_or(true, |l| (l[0] - q[0]).abs() + (l[1] - q[1]).abs() > 0.8 / z) {
                             s.points.push(q);

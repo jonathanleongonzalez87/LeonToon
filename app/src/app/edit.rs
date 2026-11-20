@@ -389,7 +389,7 @@ impl LeonApp {
                 let pencil = self.tool == Tool::Vector;
                 let (pressure, style) = if pencil { (vec![self.cur_pen().pressure], Some(self.vstyle.clone().clamped())) } else { (Vec::new(), None) };
                 Gesture::Paint {
-                    stroke: Stroke { kind: ShapeKind::Free, points: vec![p], color, width, closed: false, fill: None, pressure, style, original: None },
+                    stroke: Stroke { kind: ShapeKind::Free, points: vec![p], color, width, closed: false, fill: None, pressure, style, original: None, nodes: None },
                     smooth: p,
                     last_raw: p,
                 }
@@ -408,7 +408,14 @@ impl LeonApp {
                 self.finish_gesture();
                 return;
             }
-            Tool::Select => self.select_begin(p, shift),
+            Tool::Pen => match self.pen_begin(p) {
+                Some(g) => g,
+                None => {
+                    self.pre = None;
+                    return;
+                }
+            },
+            Tool::Select => self.select_begin(p, shift, command),
             _ => {
                 self.pre = None;
                 return;
@@ -586,6 +593,14 @@ impl LeonApp {
                 }
                 self.gesture = Some(Gesture::Move { last: p });
             }
+            Some(Gesture::PenNode { idx }) => {
+                self.pen_drag(idx, p);
+                self.gesture = Some(Gesture::PenNode { idx });
+            }
+            Some(Gesture::NodeDrag { idx, part }) => {
+                self.node_drag(idx, part, p);
+                self.gesture = Some(Gesture::NodeDrag { idx, part });
+            }
             Some(g @ (Gesture::Marquee { .. } | Gesture::SelScale { .. } | Gesture::SelRotate { .. })) => {
                 let g = self.select_continue(g, p);
                 self.gesture = Some(g);
@@ -716,6 +731,10 @@ impl LeonApp {
             self.space_down = false;
             return;
         }
+        // Pluma con una curva en curso: Intro termina, Esc cancela, Retroceso quita el último nodo.
+        if self.pen_keys(ctx) {
+            return;
+        }
         // Espacio: si se pulsa y suelta sin arrastrar, reproduce / pausa (como en la versión web).
         let space = ctx.input(|i| i.key_down(Key::Space));
         if space && !self.space_down {
@@ -799,7 +818,10 @@ impl LeonApp {
                 self.picked.clear();
             }
             if !self.picked.is_empty() && (k(none, Key::Delete) || k(none, Key::Backspace)) {
-                self.picked_delete();
+                // Con un nodo elegido en una curva, Supr quita el nodo; si no, borra los trazos.
+                if !self.node_delete_key() {
+                    self.picked_delete();
+                }
             }
         }
         if k(sh, Key::F5) {
