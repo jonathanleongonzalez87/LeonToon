@@ -83,7 +83,7 @@ impl LeonApp {
                 ui.label(RichText::new("Esta herramienta está pendiente.").color(INK3));
             }
             if t.draws() {
-                if pill(ui, "Presión", self.pressure).on_hover_text("Sensibilidad a la presión del lápiz de tableta (pendiente: aún no se lee la presión)").clicked() {
+                if pill(ui, "Presión", self.pressure).on_hover_text("Usa la presión del lápiz de tableta en los controles de tamaño, opacidad y flujo del pincel (se configuran en el panel N)").clicked() {
                     self.pressure = !self.pressure;
                 }
                 ui.label(RichText::new("Grosor").color(MU));
@@ -551,6 +551,26 @@ impl LeonApp {
                     });
                     if t == Tool::Brush {
                         self.brush_preview(ui);
+                        panel_header(ui, "Dinámica de forma");
+                        param_row(ui, "Var. tamaño", |ui| pct_slider(ui, &mut self.brush.size_jitter, 0.0, 100.0));
+                        param_row(ui, "Ctrl. tamaño", |ui| control_combo(ui, "ctl_size", &mut self.brush.size_control));
+                        if self.brush.size_control != crate::brush::Control::Off {
+                            param_row(ui, "Tamaño mín.", |ui| pct_slider(ui, &mut self.brush.min_size, 0.0, 100.0));
+                        }
+                        param_row(ui, "Var. ángulo", |ui| pct_slider(ui, &mut self.brush.angle_jitter, 0.0, 100.0));
+                        param_row(ui, "Var. redond.", |ui| pct_slider(ui, &mut self.brush.roundness_jitter, 0.0, 100.0));
+                        if self.brush.roundness_jitter > 0.0 {
+                            param_row(ui, "Redond. mín.", |ui| pct_slider(ui, &mut self.brush.min_roundness, 5.0, 100.0));
+                        }
+                        panel_header(ui, "Transferencia");
+                        param_row(ui, "Var. opac.", |ui| pct_slider(ui, &mut self.brush.opacity_jitter, 0.0, 100.0));
+                        param_row(ui, "Ctrl. opac.", |ui| control_combo(ui, "ctl_opacity", &mut self.brush.opacity_control));
+                        param_row(ui, "Var. flujo", |ui| pct_slider(ui, &mut self.brush.flow_jitter, 0.0, 100.0));
+                        param_row(ui, "Ctrl. flujo", |ui| control_combo(ui, "ctl_flow", &mut self.brush.flow_control));
+                        if self.brush.has_dynamics() {
+                            ui.label(RichText::new("Dinámicas activas en este pincel").size(11.0).color(ACCENT2));
+                        }
+                        muted(ui, "El control por presión usa el lápiz de tableta (la vista previa simula una presión que sube y baja). La inclinación solo actúa si el dispositivo la entrega; hoy el programa no la recibe, y sin dato no cambia nada.");
                         if self.layer().kind != LayerKind::Bitmap {
                             muted(ui, "Dureza, espaciado, flujo, redondez y ángulo actúan en capas de mapa de bits. En capas vectoriales el pincel solo usa tamaño, opacidad y suavizado.");
                         }
@@ -588,12 +608,21 @@ impl LeonApp {
 fn param_row(ui: &mut egui::Ui, label: &str, add: impl FnOnce(&mut egui::Ui)) {
     let (r, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 26.0), Sense::hover());
     ui.painter().text(r.left_center() + Vec2::new(2.0, 0.0), Align2::LEFT_CENTER, label, FontId::proportional(11.5), MU);
-    let fw = (r.width() * 0.64).max(90.0);
+    let fw = (r.width() * 0.6).max(90.0);
     let fr = Rect::from_min_max(Pos2::new(r.max.x - fw, r.min.y + 1.0), Pos2::new(r.max.x, r.max.y - 1.0));
     let mut c = ui.new_child(egui::UiBuilder::new().max_rect(fr).layout(egui::Layout::left_to_right(egui::Align::Center)));
     c.spacing_mut().slider_width = (fw - 60.0).max(40.0);
     c.spacing_mut().interact_size.y = 22.0;
     add(&mut c);
+}
+
+/// Lista para elegir qué controla una propiedad dinámica del pincel.
+fn control_combo(ui: &mut egui::Ui, id: &str, c: &mut crate::brush::Control) {
+    egui::ComboBox::from_id_salt(id).selected_text(c.label()).width(ui.available_width() - 8.0).show_ui(ui, |ui| {
+        for k in crate::brush::Control::ALL {
+            ui.selectable_value(c, k, k.label());
+        }
+    });
 }
 
 /// Deslizador de un valor 0…1 que se muestra como porcentaje entre `lo` y `hi`.
@@ -607,7 +636,7 @@ fn pct_slider(ui: &mut egui::Ui, v: &mut f32, lo: f32, hi: f32) {
 impl LeonApp {
     /// Muestra un trazo de muestra con el pincel actual, hecho con el mismo motor que pinta en la escena.
     fn brush_preview(&mut self, ui: &mut egui::Ui) {
-        let spec = crate::brush::BrushSpec { size: self.brush_size.min(34.0), opacity: self.stroke_opacity, color: [232, 232, 232], params: self.brush };
+        let spec = crate::brush::BrushSpec { size: self.brush_size.min(34.0), opacity: self.stroke_opacity, color: [232, 232, 232], params: self.brush, seed: 7 };
         let key = format!("{:.2}|{:.2}|{:?}", spec.size, spec.opacity, spec.params);
         if self.brush_prev.as_ref().map(|(k, _)| k) != Some(&key) {
             let r = crate::brush::preview(spec, 240, 60);

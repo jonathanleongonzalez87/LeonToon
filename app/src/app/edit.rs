@@ -412,12 +412,38 @@ impl LeonApp {
         self.brush_live = None;
         self.brush_tex = None;
         if self.tool == Tool::Brush && self.layer().kind == LayerKind::Bitmap {
-            let spec = crate::brush::BrushSpec { size: self.brush_size, opacity: self.stroke_opacity, color: [color[0], color[1], color[2]], params: self.brush };
+            let seed = (self.now * 1000.0) as u64 ^ self.frame_no.wrapping_mul(2_654_435_761);
+            let spec = crate::brush::BrushSpec { size: self.brush_size, opacity: self.stroke_opacity, color: [color[0], color[1], color[2]], params: self.brush, seed };
             let mut ls = crate::brush::LiveStroke::new(self.project.width, self.project.height, spec);
-            ls.push(p);
+            ls.push_with(p, self.cur_pen());
             self.brush_live = Some(ls);
         }
         self.gesture = Some(g);
+    }
+
+    /// Lee la presión del lápiz de los eventos táctiles (egui no da inclinación). Sin lápiz, 1.
+    pub(super) fn read_pen(&mut self, ctx: &egui::Context) {
+        let mut pressure = self.pen_pressure;
+        ctx.input(|i| {
+            for e in &i.events {
+                if let egui::Event::Touch { phase, force, .. } = e {
+                    match phase {
+                        egui::TouchPhase::Start | egui::TouchPhase::Move => {
+                            if let Some(f) = force {
+                                pressure = f.clamp(0.0, 1.0);
+                            }
+                        }
+                        _ => pressure = 1.0,
+                    }
+                }
+            }
+        });
+        self.pen_pressure = pressure;
+    }
+
+    /// Entrada del lápiz para el motor de pinceles (con el interruptor «Presión»).
+    pub(super) fn cur_pen(&self) -> crate::brush::Pen {
+        crate::brush::Pen { pressure: if self.pressure { self.pen_pressure } else { 1.0 }, tilt: 1.0 }
     }
 
     /// Termina el trazo del motor de pinceles: lo compone sobre la capa con la opacidad del trazo.
@@ -513,8 +539,9 @@ impl LeonApp {
                 let last = *stroke.points.last().unwrap();
                 if ((smooth[0] - last[0]).powi(2) + (smooth[1] - last[1]).powi(2)).sqrt() >= min_step {
                     stroke.points.push(smooth);
+                    let pen = self.cur_pen();
                     if let Some(ls) = &mut self.brush_live {
-                        ls.push(smooth);
+                        ls.push_with(smooth, pen);
                     }
                 }
                 self.gesture = Some(Gesture::Paint { stroke, smooth, last_raw: p });
@@ -607,9 +634,10 @@ impl LeonApp {
         match self.gesture.take() {
             Some(Gesture::Paint { mut stroke, last_raw, .. }) if self.brush_live.is_some() => {
                 // Capa de mapa de bits con el motor de pinceles.
+                let pen = self.cur_pen();
                 if let Some(mut ls) = self.brush_live.take() {
                     if stroke.points.len() > 1 {
-                        ls.push(last_raw);
+                        ls.push_with(last_raw, pen);
                     }
                     self.commit_live(ls);
                 }

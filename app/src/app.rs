@@ -249,6 +249,8 @@ pub struct LeonApp {
     /// trazo en curso, su textura de vista previa y la imagen de muestra del panel N.
     brush: crate::brush::BrushParams,
     brush_live: Option<crate::brush::LiveStroke>,
+    /// Última presión leída del lápiz (1 si no hay lápiz).
+    pen_pressure: f32,
     brush_tex: Option<egui::TextureHandle>,
     brush_prev: Option<(String, egui::TextureHandle)>,
     view3d: bool,
@@ -374,19 +376,25 @@ impl LeonApp {
             l.kind = LayerKind::Bitmap;
             if std::env::var("LEONTOON_BRUSH").is_ok() {
                 // Tres pinceles del motor: duro, difuso con poco flujo y plano girado (caligráfico).
-                use crate::brush::{BrushParams, BrushSpec, LiveStroke};
+                use crate::brush::{BrushParams, BrushSpec, Control, LiveStroke, Pen};
+                let d = BrushParams::default();
                 let specs = [
-                    BrushSpec { size: 30.0, opacity: 1.0, color: [230, 60, 160], params: BrushParams::default() },
-                    BrushSpec { size: 46.0, opacity: 1.0, color: [30, 120, 230], params: BrushParams { hardness: 0.1, flow: 0.25, spacing: 6.0, ..Default::default() } },
-                    BrushSpec { size: 44.0, opacity: 1.0, color: [20, 150, 80], params: BrushParams { roundness: 0.25, angle: 40.0, spacing: 40.0, ..Default::default() } },
+                    BrushSpec { size: 26.0, opacity: 1.0, color: [230, 60, 160], params: d, seed: 1 },
+                    BrushSpec { size: 40.0, opacity: 1.0, color: [30, 120, 230], params: BrushParams { hardness: 0.1, flow: 0.25, spacing: 6.0, ..d }, seed: 2 },
+                    BrushSpec { size: 38.0, opacity: 1.0, color: [20, 150, 80], params: BrushParams { roundness: 0.25, angle: 40.0, spacing: 40.0, ..d }, seed: 3 },
+                    // Presión que sube y baja: controla el tamaño (afinado en los extremos) y el flujo.
+                    BrushSpec { size: 46.0, opacity: 1.0, color: [240, 150, 20], params: BrushParams { size_control: Control::Pressure, min_size: 0.08, flow_control: Control::Pressure, spacing: 8.0, ..d }, seed: 4 },
+                    // Variaciones al azar: tamaño, ángulo, redondez y flujo.
+                    BrushSpec { size: 40.0, opacity: 1.0, color: [140, 60, 200], params: BrushParams { size_jitter: 0.6, angle_jitter: 1.0, roundness: 0.5, roundness_jitter: 0.7, min_roundness: 0.15, flow_jitter: 0.5, spacing: 45.0, ..d }, seed: 5 },
                 ];
                 let mut r = crate::raster::Raster::new(project.width, project.height);
                 for (i, s) in specs.into_iter().enumerate() {
                     let mut ls = LiveStroke::new(project.width, project.height, s);
-                    let y = 180.0 + i as f32 * 130.0;
-                    for k in 0..=60 {
-                        let t = k as f32 / 60.0;
-                        ls.push([280.0 + t * 560.0, y + (t * 9.0).sin() * 36.0]);
+                    let y = 150.0 + i as f32 * 100.0;
+                    for k in 0..=70 {
+                        let t = k as f32 / 70.0;
+                        let pressure = (t * std::f32::consts::PI).sin().clamp(0.03, 1.0);
+                        ls.push_with([280.0 + t * 560.0, y + (t * 9.0).sin() * 24.0], Pen { pressure, tilt: 1.0 });
                     }
                     ls.finish_into(&mut r);
                 }
@@ -450,6 +458,7 @@ impl LeonApp {
             add_menu: if std::env::var("LEONTOON_ADDMENU").is_ok() { Some(Pos2::new(560.0, 260.0)) } else { None },
             brush: Default::default(),
             brush_live: None,
+            pen_pressure: 1.0,
             brush_tex: None,
             brush_prev: None,
             view3d: false,
@@ -881,6 +890,7 @@ impl LeonApp {
             self.splash(ctx);
             return;
         }
+        self.read_pen(ctx);
         self.handle_shortcuts(ctx);
         self.advance_playback(ctx);
         self.shell(ctx);
