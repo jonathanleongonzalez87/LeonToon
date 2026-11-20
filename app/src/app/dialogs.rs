@@ -6,6 +6,8 @@ impl LeonApp {
     pub(super) fn dialogs(&mut self, ctx: &egui::Context) {
         self.unsaved_dialog(ctx);
         self.add_layer_menu(ctx);
+        self.abr_dialogs(ctx);
+        self.library_dialog(ctx);
         self.new_dialog(ctx);
         self.help_window(ctx);
         self.about_window(ctx);

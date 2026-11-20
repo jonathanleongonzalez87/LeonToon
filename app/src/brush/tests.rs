@@ -533,3 +533,46 @@ fn preview_paints_something_inside_the_image_and_shows_pressure() {
     let ends = col_height(24).max(col_height(1).max(col_height(238)));
     assert!(col_height(120) > ends, "centro {} vs extremos {}", col_height(120), ends);
 }
+
+// ---------------- Pinceles de Photoshop: lo que el ABR real pidió al motor ----------------
+
+#[test]
+fn control_minimums_for_opacity_and_flow() {
+    // Con control por presión y mínimo del 50 %, presión 0 deja la mitad: no se apaga del todo, como en Photoshop.
+    let single = |params: BrushParams, pressure: f32| {
+        let mut ls = LiveStroke::new(80, 80, spec(30.0, BrushParams { spacing: 100.0, ..params }));
+        ls.push_with([40.0, 40.0], Pen { pressure, tilt: 1.0 });
+        alpha_at(&ls.buf, 40, 40)
+    };
+    let flow = BrushParams { flow_control: Control::Pressure, flow_min: 0.5, ..Default::default() };
+    assert!((single(flow, 0.0) as i32 - 128).abs() <= 2, "flujo con presión 0 y mínimo 50 %: {}", single(flow, 0.0));
+    assert_eq!(single(flow, 1.0), 255);
+    let opacity = BrushParams { opacity_control: Control::Pressure, opacity_min: 0.5, ..Default::default() };
+    assert!((single(opacity, 0.0) as i32 - 128).abs() <= 2);
+    // Sin control, el mínimo no cuenta.
+    assert_eq!(single(BrushParams { flow_min: 0.5, ..Default::default() }, 0.0), 255);
+    // El mínimo viaja con el preset y se mantiene en rango.
+    assert_eq!(BrushParams { opacity_min: 7.0, flow_min: -1.0, ..Default::default() }.clamped().opacity_min, 1.0);
+    assert_eq!(BrushParams { flow_min: -1.0, ..Default::default() }.clamped().flow_min, 0.0);
+}
+
+#[test]
+fn image_tips_keep_their_proportions_and_roundness_still_applies() {
+    // Una forma ancha (40×10): el lado mayor mide el diámetro y la marca no se estira a un cuadrado.
+    let wide = Arc::new(Gray { w: 40, h: 10, data: vec![255; 400] });
+    let dab = |size: f32, params: BrushParams| {
+        let mut ls = LiveStroke::new(200, 200, spec(size, BrushParams { use_tip_image: true, spacing: 100.0, ..params }).with_images(Some(wide.clone()), None));
+        ls.push([100.0, 100.0]);
+        (cols(&ls.buf), rows(&ls.buf))
+    };
+    let (c, r) = dab(80.0, BrushParams::default());
+    let (w, h) = (c.1 - c.0 + 1, r.1 - r.0 + 1);
+    assert!((78..=82).contains(&w), "ancho {w}");
+    assert!((18..=22).contains(&h), "alto {h}: debe ser un cuarto del ancho");
+    // Girada 90°, ancho y alto se intercambian.
+    let (c, r) = dab(80.0, BrushParams { angle: 90.0, ..Default::default() });
+    assert!((18..=22).contains(&(c.1 - c.0 + 1)) && (78..=82).contains(&(r.1 - r.0 + 1)));
+    // La redondez aplasta la forma, también la de imagen.
+    let (_, r) = dab(80.0, BrushParams { roundness: 0.5, ..Default::default() });
+    assert!((8..=12).contains(&(r.1 - r.0 + 1)), "alto con redondez 50 %: {}", r.1 - r.0 + 1);
+}
