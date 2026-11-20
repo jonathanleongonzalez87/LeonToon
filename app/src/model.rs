@@ -32,6 +32,9 @@ pub struct Stroke {
     /// de siempre: grosor constante con extremos y uniones redondos.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub style: Option<crate::vector::VStyle>,
+    /// Aspecto con el que se dibujó, guardado la primera vez que se edita el trazo (para restaurarlo).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub original: Option<Box<crate::vector::Look>>,
 }
 
 fn dist_seg(p: [f32; 2], a: [f32; 2], b: [f32; 2]) -> f32 {
@@ -91,7 +94,12 @@ impl Stroke {
     pub fn shape(kind: ShapeKind, a: [f32; 2], b: [f32; 2], color: Rgba, width: f32, fill: Option<Rgba>) -> Self {
         let (points, closed) = shape_points(kind, a, b);
         let fill = if closed { fill } else { None };
-        Stroke { kind, points, color, width, closed, fill, pressure: Vec::new(), style: None }
+        Stroke { kind, points, color, width, closed, fill, pressure: Vec::new(), style: None, original: None }
+    }
+
+    /// Aspecto actual (grosor, color y estilo).
+    pub fn look(&self) -> crate::vector::Look {
+        crate::vector::Look { width: self.width, color: self.color, style: self.style.clone() }
     }
 
     /// 	rue si se dibuja con el trazo rápido de siempre (grosor constante, extremos y uniones redondos).
@@ -116,6 +124,10 @@ impl Stroke {
         }
         if let Some(s) = self.style.take() {
             self.style = Some(s.clamped());
+        }
+        if let Some(o) = self.original.as_mut() {
+            o.width = if o.width.is_finite() { o.width.clamp(0.1, 500.0) } else { self.width };
+            o.style = o.style.take().map(|s| s.clamped());
         }
     }
 
@@ -152,7 +164,11 @@ impl Stroke {
             p[0] = c[0] + (p[0] - c[0]) * sx;
             p[1] = c[1] + (p[1] - c[1]) * sy;
         }
-        self.width = (self.width * ((sx.abs() + sy.abs()) * 0.5)).clamp(0.1, 500.0);
+        let k = (sx.abs() + sy.abs()) * 0.5;
+        self.width = (self.width * k).clamp(0.1, 500.0);
+        if let Some(o) = self.original.as_mut() {
+            o.width = (o.width * k).clamp(0.1, 500.0);
+        }
     }
 
     /// Gira `deg` grados alrededor de `c`.
@@ -262,6 +278,7 @@ impl Stroke {
                         fill: None,
                         pressure: if has_p { keep.iter().map(|&i| prs[i]).collect() } else { Vec::new() },
                         style: out_style.clone(),
+                        original: None,
                     }
                 })
                 .collect(),
@@ -945,6 +962,7 @@ impl Project {
                 fill: None,
                 pressure: Vec::new(),
                 style: None,
+                original: None,
             });
             ball.keys.insert(i * 2, Arc::new(d));
         }
@@ -1156,7 +1174,7 @@ mod tests {
     #[test]
     fn eraser_splits() {
         let mut d = Drawing::default();
-        d.strokes.push(Stroke { kind: ShapeKind::Line, points: vec![[0.0, 0.0], [100.0, 0.0]], color: [0, 0, 0, 255], width: 2.0, closed: false, fill: None, pressure: Vec::new(), style: None });
+        d.strokes.push(Stroke { kind: ShapeKind::Line, points: vec![[0.0, 0.0], [100.0, 0.0]], color: [0, 0, 0, 255], width: 2.0, closed: false, fill: None, pressure: Vec::new(), style: None, original: None });
         assert!(d.erase([50.0, 0.0], 5.0));
         assert_eq!(d.strokes.len(), 2);
     }

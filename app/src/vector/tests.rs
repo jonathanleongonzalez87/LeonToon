@@ -206,7 +206,7 @@ fn style_roundtrips_and_old_files_load() {
 use crate::model::{Drawing, ShapeKind, Stroke};
 
 fn pencil(points: Vec<[f32; 2]>, pressure: Vec<f32>, style: Option<VStyle>) -> Stroke {
-    Stroke { kind: ShapeKind::Free, points, color: [10, 20, 30, 255], width: 10.0, closed: false, fill: None, pressure, style }
+    Stroke { kind: ShapeKind::Free, points, color: [10, 20, 30, 255], width: 10.0, closed: false, fill: None, pressure, style, original: None }
 }
 
 fn straight(n: usize) -> Vec<[f32; 2]> {
@@ -350,4 +350,169 @@ fn export_draws_variable_width_strokes_and_plain_ones_stay_identical() {
     let tr = render(s);
     let center = alpha(&tr, 60, 20) as i32;
     assert!((center - 128).abs() <= 2, "alfa en el centro de un tramo: {center}");
+}
+
+// ---------- Edición de trazos existentes (Fase 3) ----------
+
+use super::edit::{self, Prop};
+use super::library::{self, VLibrary};
+
+fn drawn() -> Stroke {
+    let pts: Vec<[f32; 2]> = (0..20).map(|i| [i as f32 * 10.0, (i as f32 * 0.5).sin() * 30.0]).collect();
+    let pr: Vec<f32> = (0..20).map(|i| 0.2 + i as f32 * 0.04).collect();
+    pencil(pts, pr, Some(VStyle::default()))
+}
+
+#[test]
+fn editing_a_property_changes_only_that_property_and_never_the_geometry() {
+    let mut s = drawn();
+    let (pts, pr) = (s.points.clone(), s.pressure.clone());
+    edit::set_prop(&mut s, &Prop::Profile(Profile::TaperBoth));
+    assert_eq!(s.style.as_ref().unwrap().profile, Profile::TaperBoth);
+    assert_eq!((s.width, s.color), (10.0, [10, 20, 30, 255]));
+    edit::set_prop(&mut s, &Prop::Width(25.0));
+    edit::set_prop(&mut s, &Prop::Alpha(100));
+    edit::set_prop(&mut s, &Prop::Rgb([1, 2, 3]));
+    assert_eq!((s.width, s.color), (25.0, [1, 2, 3, 100]), "el color nuevo conserva la opacidad");
+    assert_eq!((s.points.clone(), s.pressure.clone()), (pts, pr), "trayectoria y presión intactas");
+    assert_eq!(s.style.as_ref().unwrap().profile, Profile::TaperBoth);
+}
+
+#[test]
+fn original_is_remembered_once_and_restores_exactly() {
+    let mut s = drawn();
+    let before = s.look();
+    edit::set_prop(&mut s, &Prop::Cap(Cap::Flat));
+    edit::set_prop(&mut s, &Prop::Width(50.0));
+    assert_eq!(s.original.as_deref(), Some(&before), "se guarda el primero, no el último");
+    assert!(edit::restore(&mut s));
+    assert_eq!(s.look(), before);
+    assert!(s.original.is_none() && !edit::restore(&mut s));
+}
+
+#[test]
+fn legacy_stroke_can_be_edited_and_stays_vector() {
+    let mut s = pencil(vec![[0.0, 0.0], [100.0, 0.0]], Vec::new(), None);
+    assert!(s.is_plain());
+    edit::set_prop(&mut s, &Prop::Profile(Profile::TaperEnd));
+    assert!(!s.is_plain());
+    assert!(!s.pieces().is_empty());
+    edit::restore(&mut s);
+    assert!(s.style.is_none() && s.is_plain(), "restaurar devuelve el trazo de siempre");
+}
+
+#[test]
+fn changing_style_changes_the_outline_without_moving_the_path() {
+    let mut s = drawn();
+    let a = s.pieces();
+    edit::set_prop(&mut s, &Prop::Profile(Profile::TaperBoth));
+    edit::set_prop(&mut s, &Prop::Cap(Cap::Flat));
+    assert_ne!(a, s.pieces());
+}
+
+#[test]
+fn common_values_and_mixed_ones() {
+    let mut a = drawn();
+    let mut b = drawn();
+    let c = edit::common(&[&a, &b]);
+    assert_eq!((c.n, c.width, c.profile, c.cap), (2, Some(10.0), Some(Profile::Uniform), Some(Cap::Round)));
+    edit::set_prop(&mut b, &Prop::Width(20.0));
+    edit::set_prop(&mut b, &Prop::Cap(Cap::Square));
+    edit::set_prop(&mut a, &Prop::Rgb([9, 9, 9]));
+    let c = edit::common(&[&a, &b]);
+    assert_eq!((c.width, c.cap, c.rgb), (None, None, None));
+    assert_eq!((c.profile, c.alpha, c.edited), (Some(Profile::Uniform), Some(255), 2));
+    // Un trazo sin estilo cuenta con el estilo de siempre.
+    let plain = pencil(vec![[0.0, 0.0], [5.0, 5.0]], Vec::new(), None);
+    assert_eq!(edit::common(&[&plain, &drawn()]).cap, Some(Cap::Round));
+    assert_eq!(edit::common(&[]).n, 0);
+}
+
+#[test]
+fn editing_many_strokes_only_touches_the_chosen_property() {
+    let mut a = drawn();
+    let mut b = drawn();
+    edit::set_prop(&mut a, &Prop::Width(5.0));
+    edit::set_prop(&mut b, &Prop::Width(40.0));
+    for s in [&mut a, &mut b] {
+        edit::set_prop(s, &Prop::Join(Join::Miter));
+    }
+    assert_eq!((a.width, b.width), (5.0, 40.0), "cada uno conserva su grosor");
+    assert!(a.style.as_ref().unwrap().join == Join::Miter && b.style.as_ref().unwrap().join == Join::Miter);
+}
+
+#[test]
+fn paste_look_copies_only_the_marked_groups() {
+    let mut src = drawn();
+    edit::set_prop(&mut src, &Prop::Profile(Profile::TaperStart));
+    edit::set_prop(&mut src, &Prop::Width(33.0));
+    edit::set_prop(&mut src, &Prop::Rgb([200, 0, 0]));
+    let look = src.look();
+    let mut dst = drawn();
+    edit::paste_look(&mut dst, &look, false, true, false);
+    assert_eq!((dst.width, dst.color), (10.0, [10, 20, 30, 255]));
+    assert_eq!(dst.style.as_ref().unwrap().profile, Profile::TaperStart);
+    edit::paste_look(&mut dst, &look, true, false, true);
+    assert_eq!((dst.width, dst.color), (33.0, [200, 0, 0, 255]));
+}
+
+#[test]
+fn assigning_a_brush_keeps_path_pressure_color_and_reports_incompatibilities() {
+    let lib = VLibrary::default();
+    let brush = lib.find("Tinta/Tinta afilada").unwrap();
+    let mut s = drawn();
+    edit::set_prop(&mut s, &Prop::Alpha(128));
+    let (pts, pr, col) = (s.points.clone(), s.pressure.clone(), s.color);
+    edit::apply_brush(&mut s, &brush, false);
+    assert_eq!((s.points.clone(), s.pressure.clone(), s.color), (pts, pr, col));
+    assert_eq!(s.width, 10.0, "sin «usar su grosor» se conserva el del trazo");
+    let st = s.style.as_ref().unwrap();
+    assert_eq!((st.profile, st.brush.as_deref()), (Profile::TaperBoth, Some("Tinta/Tinta afilada")));
+    edit::apply_brush(&mut s, &brush, true);
+    assert_eq!(s.width, brush.size);
+
+    // Un trazo hecho con ratón (sin presión) y uno cerrado: avisos claros.
+    let mouse = pencil(vec![[0.0, 0.0], [50.0, 0.0], [90.0, 20.0]], Vec::new(), None);
+    let mut closed = drawn();
+    closed.closed = true;
+    let notes = edit::brush_notes(&[&mouse, &closed, &drawn()], &brush);
+    assert_eq!(notes.len(), 2, "{notes:?}");
+    assert!(notes[0].contains("1 trazo está sin presión"));
+    assert!(edit::brush_notes(&[&drawn()], &lib.find("Básicos/Redondo").unwrap()).is_empty());
+}
+
+#[test]
+fn original_survives_save_and_old_projects_still_load() {
+    let mut s = drawn();
+    edit::set_prop(&mut s, &Prop::Width(77.0));
+    let json = serde_json::to_string(&s).unwrap();
+    let back: Stroke = serde_json::from_str(&json).unwrap();
+    assert_eq!(back.original.as_deref().map(|o| o.width), Some(10.0));
+    // Un trazo guardado antes de esta fase no trae `original`.
+    let old = r#"{"kind":"Free","points":[[0,0],[5,5]],"color":[0,0,0,255],"width":3.0}"#;
+    let o: Stroke = serde_json::from_str(old).unwrap();
+    assert!(o.original.is_none());
+    // Sin editar no se escribe nada extra.
+    assert!(!serde_json::to_string(&drawn()).unwrap().contains("original"));
+}
+
+#[test]
+fn scaling_a_stroke_scales_its_remembered_width() {
+    let mut s = drawn();
+    edit::set_prop(&mut s, &Prop::Width(20.0));
+    s.scale_about([0.0, 0.0], 2.0, 2.0);
+    assert_eq!(s.width, 40.0);
+    assert_eq!(s.original.as_ref().unwrap().width, 20.0);
+    edit::restore(&mut s);
+    assert_eq!(s.width, 20.0, "restaurar respeta la escala aplicada");
+}
+
+#[test]
+fn damaged_original_is_repaired() {
+    let mut s = drawn();
+    s.original = Some(Box::new(Look { width: f32::NAN, color: [0, 0, 0, 255], style: Some(VStyle { curve: 0.0, ..Default::default() }) }));
+    s.fix_attrs();
+    let o = s.original.unwrap();
+    assert!(o.width.is_finite() && o.style.unwrap().curve >= 0.2);
+    let _ = library::USER_CATEGORY;
 }

@@ -11,7 +11,16 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod edit;
 pub mod library;
+
+/// Aspecto de un trazo que se puede editar después de dibujarlo (para restaurarlo y para copiar propiedades).
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub struct Look {
+    pub width: f32,
+    pub color: crate::model::Rgba,
+    pub style: Option<VStyle>,
+}
 
 /// Forma de los extremos del trazo.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]

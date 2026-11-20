@@ -589,6 +589,9 @@ impl LeonApp {
                         }
                     }
                 }
+                if t == Tool::Select && kind == LayerKind::Vector {
+                    self.stroke_props_ui(ui);
+                }
                 muted(ui, t.tip());
             }
             _ => {
@@ -605,7 +608,7 @@ impl LeonApp {
 }
 
 /// Fila de parámetro de herramienta: etiqueta a la izquierda y control dentro de un campo (panel N).
-fn param_row(ui: &mut egui::Ui, label: &str, add: impl FnOnce(&mut egui::Ui)) {
+pub(super) fn param_row(ui: &mut egui::Ui, label: &str, add: impl FnOnce(&mut egui::Ui)) {
     let (r, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 26.0), Sense::hover());
     ui.painter().text(r.left_center() + Vec2::new(2.0, 0.0), Align2::LEFT_CENTER, label, FontId::proportional(11.5), MU);
     let fw = (r.width() * 0.6).max(90.0);
@@ -666,7 +669,7 @@ impl LeonApp {
             })
             .collect();
         let pressure: Vec<f32> = (0..=n).map(|i| ((i as f32 / n as f32) * std::f32::consts::PI).sin().clamp(0.05, 1.0)).collect();
-        let sample = Stroke { kind: ShapeKind::Free, points, color: [232, 232, 232, 255], width: self.pencil_size.clamp(2.0, 22.0), closed: false, fill: None, pressure, style: Some(self.vstyle.clone().clamped()) };
+        let sample = Stroke { kind: ShapeKind::Free, points, color: [232, 232, 232, 255], width: self.pencil_size.clamp(2.0, 22.0), closed: false, fill: None, pressure, style: Some(self.vstyle.clone().clamped()), original: None };
         let painter = ui.painter().with_clip_rect(r);
         super::canvas::paint_stroke(&painter, &sample, &|p| Pos2::new(r.min.x + p[0], r.min.y + p[1]), 1.0, None, self.stroke_opacity);
         if ui.small_button("Restablecer lápiz").on_hover_text("Vuelve al trazo de grosor constante con extremos y uniones redondos").clicked() {
@@ -685,7 +688,7 @@ fn control_combo(ui: &mut egui::Ui, id: &str, c: &mut crate::brush::Control) {
 }
 
 /// Deslizador de un valor 0…1 que se muestra como porcentaje entre `lo` y `hi`.
-fn pct_slider(ui: &mut egui::Ui, v: &mut f32, lo: f32, hi: f32) {
+pub(super) fn pct_slider(ui: &mut egui::Ui, v: &mut f32, lo: f32, hi: f32) {
     let mut p = (*v * 100.0).clamp(lo, hi);
     if ui.add(egui::Slider::new(&mut p, lo..=hi).max_decimals(0).suffix(" %")).changed() {
         *v = p / 100.0;

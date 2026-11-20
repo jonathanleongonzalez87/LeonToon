@@ -16,6 +16,7 @@ mod storyboard;
 mod abrui;
 mod brushui;
 mod vectorui;
+mod strokeui;
 mod hud;
 mod view3d;
 mod timebar;
@@ -258,6 +259,8 @@ pub struct LeonApp {
     vlib: crate::vector::library::VLibrary,
     vpreset: Option<String>,
     vui: vectorui::VUi,
+    /// Edición de trazos vectoriales ya dibujados (panel contextual de la Selección).
+    sui: strokeui::StrokeUi,
     /// Última presión leída del lápiz (1 si no hay lápiz).
     pen_pressure: f32,
     /// Imágenes cargadas para la punta y para la textura del pincel (nombre, máscara).
@@ -434,7 +437,7 @@ impl LeonApp {
                 let mut r = crate::raster::Raster::new(project.width, project.height);
                 for (i, c) in [[230, 60, 160, 255], [30, 120, 230, 255]].into_iter().enumerate() {
                     let y = 220.0 + dy + i as f32 * 90.0;
-                    let s = Stroke { kind: crate::model::ShapeKind::Free, points: vec![[300.0, y], [450.0, y - 60.0], [600.0, y + 40.0], [800.0, y - 30.0]], color: c, width: 28.0, closed: false, fill: None, pressure: Vec::new(), style: None };
+                    let s = Stroke { kind: crate::model::ShapeKind::Free, points: vec![[300.0, y], [450.0, y - 60.0], [600.0, y + 40.0], [800.0, y - 30.0]], color: c, width: 28.0, closed: false, fill: None, pressure: Vec::new(), style: None, original: None };
                     crate::render::stamp_stroke(&mut r, &s);
                 }
                 l.keys.insert(f, std::sync::Arc::new(Drawing { strokes: vec![], raster: Some(std::sync::Arc::new(r)) }));
@@ -449,7 +452,7 @@ impl LeonApp {
             let mut l = Layer::new("Trazos vectoriales");
             let wave = |y: f32, amp: f32, n: usize| -> Vec<[f32; 2]> { (0..=n).map(|i| { let t = i as f32 / n as f32; [250.0 + t * 640.0, y + (t * 7.0).sin() * amp] }).collect() };
             let ramp = |n: usize| -> Vec<f32> { (0..=n).map(|i| ((i as f32 / n as f32) * std::f32::consts::PI).sin().clamp(0.04, 1.0)).collect() };
-            let mk = |points: Vec<[f32; 2]>, pressure: Vec<f32>, width: f32, color: [u8; 4], style: Option<VStyle>| Stroke { kind: crate::model::ShapeKind::Free, points, color, width, closed: false, fill: None, pressure, style };
+            let mk = |points: Vec<[f32; 2]>, pressure: Vec<f32>, width: f32, color: [u8; 4], style: Option<VStyle>| Stroke { kind: crate::model::ShapeKind::Free, points, color, width, closed: false, fill: None, pressure, style, original: None };
             let d = VStyle::default();
             let mut strokes = vec![
                 // 1 de siempre (sin estilo)
@@ -520,6 +523,7 @@ impl LeonApp {
             vlib: if screenshot.is_some() { Default::default() } else { safety::data_dir().map(|d| crate::vector::library::load(&d)).unwrap_or_default() },
             vpreset: None,
             vui: Default::default(),
+            sui: Default::default(),
             pen_pressure: 1.0,
             brush_tip_img: None,
             brush_tex_img: None,
@@ -548,7 +552,7 @@ impl LeonApp {
             hover_area: 0,
             tab_drag: None,
             tab_rename: None,
-            tool: match std::env::var("LEONTOON_TOOL").as_deref() { Ok("lapiz") => Tool::Vector, Ok("pluma") => Tool::Pen, Ok("borrador") => Tool::Eraser, _ => Tool::Brush },
+            tool: match std::env::var("LEONTOON_TOOL").as_deref() { Ok("lapiz") => Tool::Vector, Ok("pluma") => Tool::Pen, Ok("seleccion") => Tool::Select, Ok("borrador") => Tool::Eraser, _ => Tool::Brush },
             color: Color32::from_rgb(20, 20, 24),
             fill_color: Color32::from_rgb(253, 216, 53),
             fill_shapes: false,
@@ -650,6 +654,11 @@ impl LeonApp {
         }
         if let Some(p) = std::env::var("LEONTOON_VPRESET").ok().and_then(|v| app.vlib.find(&v)) {
             app.apply_vpreset(&p);
+        }
+        // Para capturas de la edición de trazos: LEONTOON_VPICK=0,1,2 elige trazos del dibujo actual.
+        if let Ok(v) = std::env::var("LEONTOON_VPICK") {
+            app.picked = v.split(',').filter_map(|n| n.trim().parse().ok()).collect();
+            app.picked_owner = app.layer().key_at_or_before(app.frame).map(|k| (app.cl, k));
         }
         if let Ok(p) = std::env::var("LEONTOON_ABR") {
             app.abr_screenshot_demo(std::path::Path::new(&p));

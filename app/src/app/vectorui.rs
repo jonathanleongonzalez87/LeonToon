@@ -45,7 +45,7 @@ pub(super) fn sample_stroke(r: Rect, size: f32, style: &VStyle) -> Stroke {
         })
         .collect();
     let pressure: Vec<f32> = (0..=n).map(|i| ((i as f32 / n as f32) * std::f32::consts::PI).sin().clamp(0.05, 1.0)).collect();
-    Stroke { kind: ShapeKind::Free, points, color: [232, 232, 232, 255], width: size.clamp(1.0, r.height() * 0.45), closed: false, fill: None, pressure, style: Some(style.clone().clamped()) }
+    Stroke { kind: ShapeKind::Free, points, color: [232, 232, 232, 255], width: size.clamp(1.0, r.height() * 0.45), closed: false, fill: None, pressure, style: Some(style.clone().clamped()), original: None }
 }
 
 fn paint_sample(painter: &egui::Painter, r: Rect, size: f32, opacity: f32, style: &VStyle) {
