@@ -37,13 +37,18 @@ impl LeonApp {
     }
 
     /// Escala de la vista para la capa actual (píxeles de pantalla por unidad del dibujo).
-    fn view_scale(&self) -> f32 {
+    pub(super) fn view_scale(&self) -> f32 {
         (self.zoom * self.layer().transform_at(self.frame).s.abs()).max(0.01)
     }
 
     /// Qué hacer al pulsar con la Selección en el punto `p` (del dibujo).
-    pub(super) fn select_begin(&mut self, p: [f32; 2], shift: bool) -> Gesture {
+    pub(super) fn select_begin(&mut self, p: [f32; 2], shift: bool, command: bool) -> Gesture {
         self.validate_pick();
+        // Con una curva de nodos elegida, un clic en un nodo o tirador lo edita antes que mover el trazo.
+        if let Some(g) = self.node_begin(p, command) {
+            return g;
+        }
+        self.sel_node = None;
         let tol = HANDLE_PX / self.view_scale();
         if let Some(b) = self.picked_bounds() {
             let c = [(b[0] + b[2]) * 0.5, (b[1] + b[3]) * 0.5];

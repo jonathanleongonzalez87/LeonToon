@@ -206,7 +206,7 @@ fn style_roundtrips_and_old_files_load() {
 use crate::model::{Drawing, ShapeKind, Stroke};
 
 fn pencil(points: Vec<[f32; 2]>, pressure: Vec<f32>, style: Option<VStyle>) -> Stroke {
-    Stroke { kind: ShapeKind::Free, points, color: [10, 20, 30, 255], width: 10.0, closed: false, fill: None, pressure, style, original: None }
+    Stroke { kind: ShapeKind::Free, points, color: [10, 20, 30, 255], width: 10.0, closed: false, fill: None, pressure, style, original: None, nodes: None }
 }
 
 fn straight(n: usize) -> Vec<[f32; 2]> {
@@ -515,4 +515,192 @@ fn damaged_original_is_repaired() {
     let o = s.original.unwrap();
     assert!(o.width.is_finite() && o.style.unwrap().curve >= 0.2);
     let _ = library::USER_CATEGORY;
+}
+
+// ---------- Curvas Bézier (Fase 4) ----------
+
+use super::bezier::{self, Node};
+
+fn arc() -> Vec<Node> {
+    // Dos nodos suaves que forman un arco.
+    vec![
+        Node { p: [0.0, 0.0], hin: [0.0, 0.0], hout: [0.0, -60.0], pr: 1.0, smooth: true },
+        Node { p: [100.0, 0.0], hin: [100.0, -60.0], hout: [100.0, 0.0], pr: 1.0, smooth: true },
+    ]
+}
+
+fn curve(nodes: Vec<Node>, closed: bool) -> Stroke {
+    let mut s = pencil(Vec::new(), Vec::new(), Some(VStyle::default()));
+    s.closed = closed;
+    s.nodes = Some(nodes);
+    s.regen();
+    s
+}
+
+#[test]
+fn flatten_passes_through_nodes_and_follows_the_curve() {
+    let n = arc();
+    let (pts, pr) = bezier::flatten(&n, false);
+    assert_eq!(pts.first(), Some(&[0.0, 0.0]));
+    assert_eq!(pts.last(), Some(&[100.0, 0.0]));
+    assert!(pts.len() > 10 && pr.is_empty());
+    let top = pts.iter().map(|p| p[1]).fold(0.0f32, f32::min);
+    assert!((top + 45.0).abs() < 1.0, "la cima de un arco cúbico así llega a -45: {top}");
+    // Sin tiradores es una recta.
+    let (line, _) = bezier::flatten(&[Node::corner([0.0, 0.0]), Node::corner([50.0, 20.0])], false);
+    assert_eq!(line.len(), 2);
+}
+
+#[test]
+fn closed_curve_does_not_repeat_the_first_point() {
+    let tri = vec![Node::corner([0.0, 0.0]), Node::corner([50.0, 0.0]), Node::corner([25.0, 40.0])];
+    let (pts, _) = bezier::flatten(&tri, true);
+    assert_eq!(pts.len(), 3);
+    assert_ne!(pts.first(), pts.last());
+    assert_eq!(bezier::segments(3, true), 3);
+    assert_eq!(bezier::segments(3, false), 2);
+}
+
+#[test]
+fn inserting_a_node_keeps_the_shape() {
+    let mut n = arc();
+    let (before, _) = bezier::flatten(&n, false);
+    let i = bezier::insert(&mut n, false, 0, 0.4);
+    assert_eq!((i, n.len()), (1, 3));
+    let (after, _) = bezier::flatten(&n, false);
+    // Cada punto de la curva nueva está sobre la curva vieja.
+    let old = arc();
+    for p in &after {
+        let (_, _, d) = bezier::nearest(&old, false, *p).unwrap();
+        assert!(d < 0.6, "se separó {d}");
+    }
+    assert!(before.len() > 2 && after.len() > 2);
+}
+
+#[test]
+fn nearest_finds_the_segment_and_parameter() {
+    let n = vec![Node::corner([0.0, 0.0]), Node::corner([100.0, 0.0]), Node::corner([100.0, 100.0])];
+    let (seg, t, d) = bezier::nearest(&n, false, [100.0, 50.0]).unwrap();
+    assert_eq!(seg, 1);
+    assert!((t - 0.5).abs() < 0.03 && d < 0.5);
+}
+
+#[test]
+fn delete_keeps_the_minimum_nodes() {
+    let mut n = vec![Node::corner([0.0, 0.0]), Node::corner([10.0, 0.0]), Node::corner([20.0, 5.0])];
+    assert!(bezier::delete(&mut n, false, 1));
+    assert!(!bezier::delete(&mut n, false, 0), "una curva abierta necesita 2");
+    let mut c = vec![Node::corner([0.0, 0.0]), Node::corner([10.0, 0.0]), Node::corner([20.0, 5.0])];
+    assert!(!bezier::delete(&mut c, true, 0), "una cerrada necesita 3");
+}
+
+#[test]
+fn smooth_and_corner_conversion() {
+    let mut n = vec![Node::corner([0.0, 0.0]), Node::corner([50.0, 30.0]), Node::corner([100.0, 0.0])];
+    bezier::set_smooth(&mut n, false, 1, true);
+    assert!(n[1].smooth && n[1].has_in() && n[1].has_out());
+    // Los tiradores quedan alineados con el nodo (tangente paralela a vecino-siguiente).
+    let (a, b) = ([n[1].p[0] - n[1].hin[0], n[1].p[1] - n[1].hin[1]], [n[1].hout[0] - n[1].p[0], n[1].hout[1] - n[1].p[1]]);
+    assert!((a[0] * b[1] - a[1] * b[0]).abs() < 1e-3);
+    bezier::set_smooth(&mut n, false, 1, false);
+    assert!(!n[1].smooth && !n[1].has_in() && !n[1].has_out());
+}
+
+#[test]
+fn moving_a_smooth_handle_turns_the_opposite_one() {
+    let mut n = vec![Node { p: [50.0, 50.0], hin: [30.0, 50.0], hout: [80.0, 50.0], pr: 1.0, smooth: true }, Node::corner([200.0, 50.0])];
+    bezier::move_handle(&mut n, 0, true, [50.0, 100.0]);
+    assert_eq!(n[0].hout, [50.0, 100.0]);
+    // El de entrada apunta al lado contrario y conserva su largo (20).
+    assert!((n[0].hin[0] - 50.0).abs() < 1e-3 && (n[0].hin[1] - 30.0).abs() < 1e-3, "{:?}", n[0].hin);
+    let mut c = vec![Node { smooth: false, ..n[0] }, n[1]];
+    let hin = c[0].hin;
+    bezier::move_handle(&mut c, 0, true, [0.0, 0.0]);
+    assert_eq!(c[0].hin, hin, "en una esquina los tiradores son independientes");
+}
+
+#[test]
+fn moving_an_anchor_carries_its_handles() {
+    let mut n = arc();
+    let (hi, ho) = (n[1].hin, n[1].hout);
+    bezier::move_anchor(&mut n, 1, [110.0, 10.0]);
+    assert_eq!(n[1].p, [110.0, 10.0]);
+    assert_eq!((n[1].hin, n[1].hout), ([hi[0] + 10.0, hi[1] + 10.0], [ho[0] + 10.0, ho[1] + 10.0]));
+}
+
+#[test]
+fn fit_keeps_the_shape_and_pressure() {
+    let pts: Vec<[f32; 2]> = (0..=60).map(|i| { let t = i as f32 / 60.0 * std::f32::consts::PI; [t.cos() * 100.0, t.sin() * 100.0] }).collect();
+    let pr: Vec<f32> = (0..=60).map(|i| 0.3 + i as f32 / 100.0).collect();
+    let nodes = bezier::fit(&pts, &pr, false, 1.5, 10.0);
+    assert!(nodes.len() >= 3 && nodes.len() < 30, "{}", nodes.len());
+    assert!((nodes[0].pr - 0.3).abs() < 1e-5 && (nodes.last().unwrap().pr - 0.9).abs() < 1e-5);
+    let (flat, fp) = bezier::flatten(&nodes, false);
+    assert_eq!(fp.len(), flat.len(), "la presión sigue a la curva");
+    // La curva ajustada no se aleja de la semicircunferencia original.
+    for p in &flat {
+        assert!(((p[0] * p[0] + p[1] * p[1]).sqrt() - 100.0).abs() < 6.0, "se aleja en {p:?}");
+    }
+    // Un giro marcado queda como esquina.
+    let corner = bezier::fit(&[[0.0, 0.0], [50.0, 0.0], [50.0, 50.0], [100.0, 50.0]], &[], false, 0.5, 4.0);
+    assert!(corner.iter().skip(1).take(corner.len() - 2).all(|n| !n.smooth || !n.has_in()), "{corner:?}");
+}
+
+#[test]
+fn curve_strokes_move_scale_and_rotate_with_their_nodes() {
+    let mut s = curve(arc(), false);
+    s.translate(10.0, 5.0);
+    assert_eq!(s.nodes.as_ref().unwrap()[0].p, [10.0, 5.0]);
+    s.scale_about([0.0, 0.0], 2.0, 2.0);
+    s.rotate_about([0.0, 0.0], 90.0);
+    // Los puntos transformados siguen sobre la curva de los nodos transformados (cambia el muestreo, no la forma).
+    let nodes = s.nodes.clone().unwrap();
+    for p in &s.points {
+        let (_, _, d) = bezier::nearest(&nodes, false, *p).unwrap();
+        assert!(d < 0.6, "los puntos y los nodos se separaron: {d}");
+    }
+}
+
+#[test]
+fn curve_survives_save_and_old_strokes_still_load() {
+    let s = curve(arc(), false);
+    let back: Stroke = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
+    assert_eq!(back.nodes, s.nodes);
+    assert_eq!(back.points.len(), s.points.len());
+    assert!(!serde_json::to_string(&drawn()).unwrap().contains("nodes"));
+    let old: Stroke = serde_json::from_str(r#"{"kind":"Free","points":[[0,0],[5,5]],"color":[0,0,0,255],"width":3.0}"#).unwrap();
+    assert!(old.nodes.is_none());
+}
+
+#[test]
+fn damaged_curve_becomes_a_plain_polyline() {
+    let mut s = curve(arc(), false);
+    s.nodes.as_mut().unwrap()[1].p = [f32::NAN, 0.0];
+    s.points = vec![[0.0, 0.0], [10.0, 0.0]];
+    s.fix_attrs();
+    assert!(s.nodes.is_none());
+    assert_eq!(s.points.len(), 2);
+    let mut ok = curve(arc(), false);
+    ok.points.clear();
+    ok.fix_attrs();
+    assert!(ok.points.len() > 2, "una curva sana se recalcula al cargar");
+}
+
+#[test]
+fn style_edits_apply_to_curves_without_touching_nodes() {
+    let mut s = curve(arc(), false);
+    let nodes = s.nodes.clone();
+    edit::set_prop(&mut s, &Prop::Profile(Profile::TaperBoth));
+    edit::set_prop(&mut s, &Prop::Width(30.0));
+    assert_eq!(s.nodes, nodes);
+    assert!(!s.is_plain() && !s.pieces().is_empty());
+}
+
+#[test]
+fn erasing_a_curve_bakes_it_into_plain_pieces() {
+    let mut d = crate::model::Drawing::default();
+    d.strokes.push(curve(arc(), false));
+    let mid = d.strokes[0].points[d.strokes[0].points.len() / 2];
+    assert!(d.erase(mid, 6.0));
+    assert!(d.strokes.len() >= 2 && d.strokes.iter().all(|s| s.nodes.is_none()));
 }

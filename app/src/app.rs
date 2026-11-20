@@ -17,6 +17,7 @@ mod abrui;
 mod brushui;
 mod vectorui;
 mod strokeui;
+mod penui;
 mod hud;
 mod view3d;
 mod timebar;
@@ -135,6 +136,10 @@ enum Gesture {
     SelRotate { center: [f32; 2], last: f32 },
     Animate { start: [f32; 2], base: XKey, mode: u8 },
     Pick,
+    /// Pluma: arrastre tras el clic que puso el nodo idx.
+    PenNode { idx: usize },
+    /// Edición de nodos: arrastre del nodo idx (part 0) o de su tirador (1 entrada, 2 salida).
+    NodeDrag { idx: usize, part: u8 },
 }
 
 #[derive(Clone)]
@@ -261,6 +266,9 @@ pub struct LeonApp {
     vui: vectorui::VUi,
     /// Edición de trazos vectoriales ya dibujados (panel contextual de la Selección).
     sui: strokeui::StrokeUi,
+    /// Curva de la Pluma en curso y nodo elegido al editar una curva.
+    pen_path: Option<penui::PenPath>,
+    sel_node: Option<usize>,
     /// Última presión leída del lápiz (1 si no hay lápiz).
     pen_pressure: f32,
     /// Imágenes cargadas para la punta y para la textura del pincel (nombre, máscara).
@@ -437,7 +445,7 @@ impl LeonApp {
                 let mut r = crate::raster::Raster::new(project.width, project.height);
                 for (i, c) in [[230, 60, 160, 255], [30, 120, 230, 255]].into_iter().enumerate() {
                     let y = 220.0 + dy + i as f32 * 90.0;
-                    let s = Stroke { kind: crate::model::ShapeKind::Free, points: vec![[300.0, y], [450.0, y - 60.0], [600.0, y + 40.0], [800.0, y - 30.0]], color: c, width: 28.0, closed: false, fill: None, pressure: Vec::new(), style: None, original: None };
+                    let s = Stroke { kind: crate::model::ShapeKind::Free, points: vec![[300.0, y], [450.0, y - 60.0], [600.0, y + 40.0], [800.0, y - 30.0]], color: c, width: 28.0, closed: false, fill: None, pressure: Vec::new(), style: None, original: None, nodes: None };
                     crate::render::stamp_stroke(&mut r, &s);
                 }
                 l.keys.insert(f, std::sync::Arc::new(Drawing { strokes: vec![], raster: Some(std::sync::Arc::new(r)) }));
@@ -452,7 +460,7 @@ impl LeonApp {
             let mut l = Layer::new("Trazos vectoriales");
             let wave = |y: f32, amp: f32, n: usize| -> Vec<[f32; 2]> { (0..=n).map(|i| { let t = i as f32 / n as f32; [250.0 + t * 640.0, y + (t * 7.0).sin() * amp] }).collect() };
             let ramp = |n: usize| -> Vec<f32> { (0..=n).map(|i| ((i as f32 / n as f32) * std::f32::consts::PI).sin().clamp(0.04, 1.0)).collect() };
-            let mk = |points: Vec<[f32; 2]>, pressure: Vec<f32>, width: f32, color: [u8; 4], style: Option<VStyle>| Stroke { kind: crate::model::ShapeKind::Free, points, color, width, closed: false, fill: None, pressure, style, original: None };
+            let mk = |points: Vec<[f32; 2]>, pressure: Vec<f32>, width: f32, color: [u8; 4], style: Option<VStyle>| Stroke { kind: crate::model::ShapeKind::Free, points, color, width, closed: false, fill: None, pressure, style, original: None, nodes: None };
             let d = VStyle::default();
             let mut strokes = vec![
                 // 1 de siempre (sin estilo)
@@ -468,6 +476,20 @@ impl LeonApp {
                 // 6 el mismo zigzag con unión de bisel y extremo plano
                 mk(vec![[250.0, 520.0], [350.0, 480.0], [450.0, 530.0], [560.0, 475.0], [660.0, 535.0], [780.0, 482.0]], vec![], 18.0, [230, 140, 20, 255], Some(VStyle { cap: Cap::Flat, join: Join::Bevel, ..d })),
             ];
+            // 7 (solo con LEONTOON_VCURVE=1): curva Bézier editable con nodos suaves y una esquina.
+            if std::env::var("LEONTOON_VCURVE").is_ok() {
+                use crate::vector::bezier::Node;
+                let n = |p: [f32; 2], hin: [f32; 2], hout: [f32; 2], smooth: bool| Node { p, hin, hout, pr: 1.0, smooth };
+                let nodes = vec![
+                    n([300.0, 560.0], [300.0, 560.0], [340.0, 470.0], true),
+                    n([520.0, 520.0], [470.0, 590.0], [570.0, 450.0], true),
+                    n([700.0, 600.0], [700.0, 600.0], [700.0, 600.0], false),
+                    n([860.0, 500.0], [800.0, 640.0], [860.0, 500.0], true),
+                ];
+                let mut s = mk(vec![], vec![], 16.0, [30, 30, 120, 255], Some(VStyle { profile: Profile::TaperBoth, taper: 0.25, ..VStyle::default() }));
+                s.nodes = Some(nodes);
+                strokes.push(s);
+            }
             for s in &mut strokes {
                 s.fix_attrs();
             }
@@ -524,6 +546,8 @@ impl LeonApp {
             vpreset: None,
             vui: Default::default(),
             sui: Default::default(),
+            pen_path: None,
+            sel_node: None,
             pen_pressure: 1.0,
             brush_tip_img: None,
             brush_tex_img: None,
@@ -660,6 +684,16 @@ impl LeonApp {
             app.picked = v.split(',').filter_map(|n| n.trim().parse().ok()).collect();
             app.picked_owner = app.layer().key_at_or_before(app.frame).map(|k| (app.cl, k));
         }
+        // LEONTOON_VNODE=<n> elige ese nodo de la curva elegida (captura de la edición de nodos).
+        if let Some(n) = std::env::var("LEONTOON_VNODE").ok().and_then(|v| v.parse().ok()) {
+            app.sel_node = Some(n);
+        }
+        // LEONTOON_PENDEMO=1: curva de la Pluma en curso (captura).
+        if std::env::var("LEONTOON_PENDEMO").is_ok() {
+            use crate::vector::bezier::Node;
+            let k = |p: [f32; 2], o: [f32; 2]| Node { p, hin: [2.0 * p[0] - o[0], 2.0 * p[1] - o[1]], hout: o, pr: 1.0, smooth: true };
+            app.pen_path = Some(penui::PenPath { nodes: vec![k([300.0, 400.0], [350.0, 330.0]), k([520.0, 380.0], [570.0, 450.0]), Node::corner([720.0, 330.0]), k([860.0, 420.0], [900.0, 480.0])], owner: (app.cl, app.frame) });
+        }
         if let Ok(p) = std::env::var("LEONTOON_ABR") {
             app.abr_screenshot_demo(std::path::Path::new(&p));
         }
@@ -700,6 +734,7 @@ impl LeonApp {
 
     fn do_undo(&mut self) {
         self.finish_gesture();
+        self.pen_path = None;
         if let Some(p) = self.undo.pop() {
             let brush = self.brush_data();
             let cur = std::mem::replace(&mut self.project, p);
@@ -716,6 +751,7 @@ impl LeonApp {
 
     fn do_redo(&mut self) {
         self.finish_gesture();
+        self.pen_path = None;
         if let Some(p) = self.redo.pop() {
             let brush = self.brush_data();
             let cur = std::mem::replace(&mut self.project, p);

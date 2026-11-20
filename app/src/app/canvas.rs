@@ -8,6 +8,7 @@ impl LeonApp {
         if self.test_panic_frame != 0 && self.frame_no == self.test_panic_frame {
             panic!("fallo de prueba provocado a propósito");
         }
+        self.pen_housekeeping();
         let rect = ui.available_rect_before_wrap();
         let resp = ui.allocate_rect(rect, Sense::click_and_drag());
         // Zona útil para centrar la hoja: sin la barra lateral N.
@@ -110,6 +111,8 @@ impl LeonApp {
         }
         self.paint_guides(&scene, cam);
         self.paint_selection(&painter, origin, z);
+        self.paint_node_overlay(&painter, origin, z);
+        self.paint_pen_overlay(&painter, origin, z);
 
         // Rótulo (como «Modo edición | Pelota | 1» del prototipo)
         let hud = format!(
@@ -141,7 +144,7 @@ impl LeonApp {
                 ctx.set_cursor_icon(egui::CursorIcon::None);
             } else {
                 ctx.set_cursor_icon(match self.tool {
-                    Tool::Shape | Tool::Picker | Tool::Fill => egui::CursorIcon::Crosshair,
+                    Tool::Shape | Tool::Picker | Tool::Fill | Tool::Pen => egui::CursorIcon::Crosshair,
                     Tool::Select | Tool::RotateObj => egui::CursorIcon::Move,
                     t if t.pending() => egui::CursorIcon::NotAllowed,
                     Tool::Zoom => egui::CursorIcon::ZoomIn,
@@ -246,6 +249,9 @@ impl LeonApp {
                     paint_tex_quad(painter, tex.id(), ls.buf.w, ls.buf.h, &map, alpha * ls.spec.opacity);
                 } else if let Some(Gesture::Paint { stroke, .. }) | Some(Gesture::Shape { stroke, .. }) = &self.gesture {
                     paint_stroke(painter, stroke, &map, zs, None, alpha);
+                }
+                if let Some(s) = self.pen_preview() {
+                    paint_stroke(painter, &s, &map, zs, None, alpha);
                 }
             }
         }
