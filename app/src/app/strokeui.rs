@@ -93,11 +93,8 @@ impl LeonApp {
         let c = edit::common(&refs);
         let mixed_note = |m: bool| if m { " (mixto)" } else { "" };
         ui.label(RichText::new(format!("{} {}{}", c.n, if c.n == 1 { "trazo" } else { "trazos" }, if c.edited > 0 { format!(" · {} editado{}", c.edited, if c.edited == 1 { "" } else { "s" }) } else { String::new() })).size(11.5).color(MU));
-        match &c.brush {
-            Some(Some(id)) => muted(ui, &format!("Pincel: {}", id.replace('/', " · "))),
-            Some(None) => muted(ui, "Pincel: ninguno (trazo propio)"),
-            None => muted(ui, "Pincel: varios"),
-        }
+        // Un solo panel para el Lápiz y la selección: la misma lista con vista previa; aquí asigna a lo elegido.
+        self.vector_presets_ui(ui, true);
 
         // Grosor
         let mut w = c.width.or(strokes.first().map(|s| s.width)).unwrap_or(4.0);
@@ -210,30 +207,7 @@ impl LeonApp {
             }
         });
 
-        // Asignar otro pincel de la biblioteca (conserva trayectoria, presión, color y opacidad).
-        param_row(ui, "Asignar pincel", |ui| {
-            let mut chosen: Option<VPreset> = None;
-            egui::ComboBox::from_id_salt("sp_brush").selected_text("Elegir…").width(ui.available_width() - 8.0).show_ui(ui, |ui| {
-                let all = self.vlib.all();
-                for cat in self.vlib.categories() {
-                    let list: Vec<&VPreset> = all.iter().filter(|p| p.category.eq_ignore_ascii_case(&cat)).collect();
-                    if list.is_empty() {
-                        continue;
-                    }
-                    ui.label(RichText::new(&cat).size(11.0).color(INK3));
-                    for p in list {
-                        if ui.selectable_label(c.brush == Some(Some(p.id())), &p.name).clicked() {
-                            chosen = Some(p.clone());
-                        }
-                    }
-                }
-            });
-            if let Some(p) = chosen {
-                self.assign_brush_to_picked(&p);
-            }
-        });
         ui.horizontal_wrapped(|ui| {
-            ui.checkbox(&mut self.sui.brush_width, "Usar también su grosor").on_hover_text("Si no, cada trazo conserva su grosor");
             if ui.small_button("Con el pincel del lápiz").on_hover_text("Asigna el pincel que tienes configurado en el Lápiz vectorial").clicked() {
                 let p = VPreset { size: self.pencil_size, opacity: self.stroke_opacity, smoothing: self.smoothing, style: self.vstyle.clone(), name: "Lápiz".into(), ..Default::default() };
                 self.assign_brush_to_picked(&p);
@@ -241,6 +215,11 @@ impl LeonApp {
         });
         for n in self.sui.notes.clone() {
             ui.label(RichText::new(format!("⚠ {n}")).size(11.0).color(ACCENT2));
+        }
+
+        // Vista previa del primer trazo elegido, con el mismo motor que lo dibuja.
+        if let Some(s) = strokes.first() {
+            super::vectorui::style_preview(ui, s.width, s.color[3] as f32 / 255.0, &s.style.clone().unwrap_or_default());
         }
 
         // Copiar, pegar y restaurar
@@ -275,7 +254,24 @@ impl LeonApp {
         muted(ui, "Los cambios afectan solo a la propiedad que tocas y se ven al instante. La trayectoria y la presión capturada no se modifican, y puedes deshacer con Ctrl+Z.");
     }
 
-    fn assign_brush_to_picked(&mut self, p: &VPreset) {
+    /// Identificador del pincel de la biblioteca que comparten todos los trazos elegidos.
+    pub(super) fn sel_brush_id(&self) -> Option<String> {
+        let strokes = self.picked_strokes();
+        let refs: Vec<&Stroke> = strokes.iter().collect();
+        edit::common(&refs).brush.flatten()
+    }
+
+    /// Texto de la lista cuando los trazos elegidos no tienen un pincel común de la biblioteca.
+    pub(super) fn sel_brush_label(&self) -> String {
+        let strokes = self.picked_strokes();
+        let refs: Vec<&Stroke> = strokes.iter().collect();
+        match edit::common(&refs).brush {
+            None => "Varios pinceles".to_string(),
+            Some(_) => "Sin pincel de la biblioteca (trazo propio)".to_string(),
+        }
+    }
+
+    pub(super) fn assign_brush_to_picked(&mut self, p: &VPreset) {
         let strokes = self.picked_strokes();
         let refs: Vec<&Stroke> = strokes.iter().collect();
         self.sui.notes = edit::brush_notes(&refs, p);
