@@ -349,6 +349,7 @@ pub struct LeonApp {
 impl LeonApp {
     pub fn new(cc: &eframe::CreationContext<'_>, screenshot: Option<PathBuf>, open: Option<PathBuf>) -> Self {
         setup_style(&cc.egui_ctx);
+        start::init_iso(&cc.egui_ctx);
         let safety = safety::Safety::start(screenshot.is_none());
         let mut project = Project::demo();
         project.room_set = "trad".into();
