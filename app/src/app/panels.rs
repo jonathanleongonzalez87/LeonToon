@@ -268,7 +268,9 @@ impl LeonApp {
             if ui.small_button("+ Vector").on_hover_text("Nueva capa vectorial (Mayús+N)").clicked() {
                 self.add_layer();
             }
-            ui.add_enabled(false, egui::Button::new("+ Mapa de bits").small()).on_disabled_hover_text("Capas de mapa de bits: pendiente");
+            if ui.small_button("+ Mapa de bits").on_hover_text("Nueva capa de píxeles: pincel, lápiz, formas y borrador pintan píxeles").clicked() {
+                self.add_layer_kind(LayerKind::Bitmap);
+            }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.add_space(6.0);
                 if ui.small_button("Eliminar").on_hover_text("Eliminar capa").clicked() {

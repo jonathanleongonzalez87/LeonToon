@@ -408,7 +408,9 @@ impl LeonApp {
             if item(ui, "Nueva capa vectorial", "Mayús+N") {
                 self.add_layer();
             }
-            ui.add_enabled(false, egui::Button::new("Nueva capa de mapa de bits (pendiente)"));
+            if item(ui, "Nueva capa de mapa de bits", "") {
+                self.add_layer_kind(LayerKind::Bitmap);
+            }
             ui.separator();
             if item(ui, "Limpiar cuadro", "") {
                 self.clear_drawing();

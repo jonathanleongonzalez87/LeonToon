@@ -362,6 +362,21 @@ impl LeonApp {
             c.depth = -crate::model::CAM_DIST;
             project.layers.insert(0, c);
         }
+        // Para capturas de capas de mapa de bits: LEONTOON_BITMAP=1 añade una con trazos en los cuadros 1 y 3.
+        if std::env::var("LEONTOON_BITMAP").is_ok() {
+            let mut l = Layer::new("Píxeles");
+            l.kind = LayerKind::Bitmap;
+            for (f, dy) in [(0u32, 0.0f32), (2, 120.0)] {
+                let mut r = crate::raster::Raster::new(project.width, project.height);
+                for (i, c) in [[230, 60, 160, 255], [30, 120, 230, 255]].into_iter().enumerate() {
+                    let y = 220.0 + dy + i as f32 * 90.0;
+                    let s = Stroke { kind: crate::model::ShapeKind::Free, points: vec![[300.0, y], [450.0, y - 60.0], [600.0, y + 40.0], [800.0, y - 30.0]], color: c, width: 28.0, closed: false, fill: None };
+                    crate::render::stamp_stroke(&mut r, &s);
+                }
+                l.keys.insert(f, std::sync::Arc::new(Drawing { strokes: vec![], raster: Some(std::sync::Arc::new(r)) }));
+            }
+            project.layers.insert(0, l);
+        }
         // Para pruebas y capturas: LEONTOON_SALA=<nombre de sala> abre esa sala.
         let room_idx = std::env::var("LEONTOON_SALA")
             .ok()
@@ -842,6 +857,7 @@ impl LeonApp {
         }
         self.dialogs(ctx);
         self.safety_dialogs(ctx);
+        canvas::prune_raster_tex(ctx.cumulative_pass_nr());
 
         // Los cambios hechos en los paneles (nombre, opacidad, claves, notas…) también se pueden deshacer.
         if !self.meta_skip {

@@ -2,6 +2,7 @@
 
 mod app;
 mod model;
+mod raster;
 mod render;
 
 use std::path::PathBuf;

@@ -1,8 +1,38 @@
 //! Dibujo "fuera de pantalla" para exportar: PNG, secuencias, hoja de sprites y GIF animado.
 
-use crate::model::{Drawing, Project, Rgba, XKey};
+use crate::model::{Drawing, Project, Rgba, Stroke, XKey};
+use crate::raster::Raster;
 use std::path::Path;
-use tiny_skia::{Color, FillRule, LineCap, LineJoin, Paint, PathBuilder, Pixmap, PixmapPaint, Transform};
+use tiny_skia::{BlendMode, Color, FillRule, FilterQuality, LineCap, LineJoin, Paint, PathBuilder, Pixmap, PixmapPaint, PixmapRef, Transform};
+
+/// Pinta un trazo en los píxeles de una capa de mapa de bits (mismo aspecto que el trazo vectorial).
+pub fn stamp_stroke(r: &mut Raster, s: &Stroke) {
+    let d = Drawing { strokes: vec![s.clone()], raster: None };
+    r.edit(|pm| draw_drawing(pm, &d, Transform::identity()));
+}
+
+/// Borra con un pincel redondo de diámetro `width` a lo largo del segmento a→b.
+pub fn erase_segment(r: &mut Raster, a: [f32; 2], b: [f32; 2], width: f32) {
+    r.edit(|pm| {
+        let mut p = Paint::default();
+        p.set_color(Color::BLACK);
+        p.blend_mode = BlendMode::Clear;
+        p.anti_alias = true;
+        if a == b {
+            if let Some(path) = PathBuilder::from_circle(a[0], a[1], (width * 0.5).max(0.5)) {
+                pm.fill_path(&path, &p, FillRule::Winding, Transform::identity(), None);
+            }
+            return;
+        }
+        let mut pb = PathBuilder::new();
+        pb.move_to(a[0], a[1]);
+        pb.line_to(b[0], b[1]);
+        if let Some(path) = pb.finish() {
+            let st = tiny_skia::Stroke { width: width.max(1.0), line_cap: LineCap::Round, line_join: LineJoin::Round, ..Default::default() };
+            pm.stroke_path(&path, &p, &st, Transform::identity(), None);
+        }
+    });
+}
 
 fn paint(c: Rgba) -> Paint<'static> {
     let mut p = Paint::default();
@@ -21,6 +51,13 @@ pub fn layer_transform(t: &XKey, w: f32, h: f32, scale: f32) -> Transform {
 }
 
 pub fn draw_drawing(pm: &mut Pixmap, d: &Drawing, tr: Transform) {
+    // Capas de mapa de bits: los píxeles van debajo de los trazos.
+    if let Some(r) = &d.raster {
+        if let Some(pr) = PixmapRef::from_bytes(&r.data, r.w, r.h) {
+            let pp = PixmapPaint { quality: FilterQuality::Bilinear, ..Default::default() };
+            pm.draw_pixmap(0, 0, pr, &pp, tr, None);
+        }
+    }
     for s in &d.strokes {
         if s.points.len() == 1 {
             let p = s.points[0];

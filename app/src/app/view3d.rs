@@ -393,6 +393,7 @@ impl LeonApp {
                 };
                 let sc = v.p(c.0, c.1, z).1 * v.k * ls * t.s.abs();
                 let alpha = l.opacity * t.o * op;
+                super::canvas::paint_raster(&painter, d, &map, alpha, 0);
                 for s in &d.strokes {
                     paint_stroke(&painter, s, &map, sc, None, alpha);
                 }

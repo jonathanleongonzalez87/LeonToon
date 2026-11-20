@@ -243,7 +243,7 @@ impl LeonApp {
         }
         let Some(d) = self.layer().drawing_at(self.frame) else { return false };
         let strokes = self.picked.iter().filter_map(|i| d.strokes.get(*i).cloned()).collect();
-        self.clipboard = Some(Drawing { strokes });
+        self.clipboard = Some(Drawing { strokes, ..Default::default() });
         self.say(format!("{} trazos copiados", self.picked.len()));
         true
     }
