@@ -18,6 +18,7 @@ mod brushui;
 mod vectorui;
 mod strokeui;
 mod penui;
+mod papers;
 mod hud;
 mod view3d;
 mod timebar;
@@ -267,6 +268,8 @@ pub struct LeonApp {
     /// Edición de trazos vectoriales ya dibujados (panel contextual de la Selección).
     sui: strokeui::StrokeUi,
     /// Curva de la Pluma en curso y nodo elegido al editar una curva.
+    /// Texturas de grano de los papeles de estudio (se suben una vez).
+    paper_tex: std::collections::HashMap<crate::paper::Grain, egui::TextureHandle>,
     pen_path: Option<penui::PenPath>,
     sel_node: Option<usize>,
     /// Última presión leída del lápiz (1 si no hay lápiz).
@@ -558,6 +561,7 @@ impl LeonApp {
             vpreset: None,
             vui: Default::default(),
             sui: Default::default(),
+            paper_tex: Default::default(),
             pen_path: None,
             sel_node: None,
             pen_pressure: 1.0,
@@ -695,6 +699,13 @@ impl LeonApp {
         if let Ok(v) = std::env::var("LEONTOON_VPICK") {
             app.picked = v.split(',').filter_map(|n| n.trim().parse().ok()).collect();
             app.picked_owner = app.layer().key_at_or_before(app.frame).map(|k| (app.cl, k));
+        }
+        // Capturas de los papeles de estudio: LEONTOON_PAPEL=<id> elige uno y LEONTOON_LUZ=<0-100> fija la luz de la mesa.
+        if let Some(pp) = std::env::var("LEONTOON_PAPEL").ok().and_then(|v| crate::paper::PAPERS.iter().find(|p| p.id == v)) {
+            app.project.background = [pp.rgb[0], pp.rgb[1], pp.rgb[2], 255];
+        }
+        if let Some(l) = std::env::var("LEONTOON_LUZ").ok().and_then(|v| v.parse::<f32>().ok()) {
+            app.light_amt = l;
         }
         // LEONTOON_VNODE=<n> elige ese nodo de la curva elegida (captura de la edición de nodos).
         if let Some(n) = std::env::var("LEONTOON_VNODE").ok().and_then(|v| v.parse().ok()) {

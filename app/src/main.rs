@@ -4,6 +4,7 @@ mod app;
 mod abr;
 mod brush;
 mod model;
+mod paper;
 mod presets;
 mod raster;
 mod vector;

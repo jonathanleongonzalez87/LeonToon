@@ -89,6 +89,7 @@ impl LeonApp {
 
         // ---- Dibujo ----
         self.sync_brush_tex(&ctx);
+        self.ensure_active_paper_texture(&ctx);
         let painter = ui.painter_at(rect);
         // Mesa de luz: el gris del fondo va de 0 (negro) a 100 (blanco).
         let g = (self.light_gray / 100.0 * 255.0).round().clamp(0.0, 255.0) as u8;
@@ -254,6 +255,10 @@ impl LeonApp {
                     paint_stroke(painter, &s, &map, zs, None, alpha);
                 }
             }
+        }
+        // Grano del papel de estudio sobre toda la hoja (como la fibra del papel bajo el dibujo): la fuerza la marca la luz.
+        if view {
+            self.paint_paper_grain(painter, cam, z);
         }
     }
 
