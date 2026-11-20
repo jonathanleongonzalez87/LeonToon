@@ -58,7 +58,25 @@ pub(crate) fn load_recent() -> Vec<PathBuf> {
 }
 
 /// El icono del programa (hexágono del isotipo), dibujado.
+/// Textura del isotipo oficial (blanco sobre transparente) para teñirlo del color que se pida.
+static ISO_TEX: std::sync::OnceLock<egui::TextureId> = std::sync::OnceLock::new();
+
+/// Carga el isotipo del kit de UI del prototipo (isotipo en 128 px, RGBA sin comprimir).
+pub(crate) fn init_iso(ctx: &egui::Context) {
+    const RGBA: &[u8] = include_bytes!("../../assets/iso_128.rgba");
+    let ci = egui::ColorImage::from_rgba_unmultiplied([128, 128], RGBA);
+    let h = ctx.load_texture("iso", ci, egui::TextureOptions::LINEAR);
+    let _ = ISO_TEX.set(h.id());
+    // La textura vive todo el programa: se deja la referencia sin soltar.
+    std::mem::forget(h);
+}
+
 pub(crate) fn draw_iso(p: &egui::Painter, c: Pos2, r: f32, col: Color32) {
+    if let Some(id) = ISO_TEX.get() {
+        let rect = Rect::from_center_size(c, Vec2::splat(r * 3.0));
+        p.image(*id, rect, Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)), col);
+        return;
+    }
     let pts: Vec<Pos2> = (0..6)
         .map(|i| {
             let a = std::f32::consts::FRAC_PI_3 * i as f32 - std::f32::consts::FRAC_PI_2;
