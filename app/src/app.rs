@@ -251,6 +251,8 @@ pub struct LeonApp {
     /// trazo en curso, su textura de vista previa y la imagen de muestra del panel N.
     brush: crate::brush::BrushParams,
     brush_live: Option<crate::brush::LiveStroke>,
+    /// Estilo del Lápiz vectorial (extremos, uniones, perfil de grosor y presión). Es independiente de los pinceles de píxeles.
+    vstyle: crate::vector::VStyle,
     /// Última presión leída del lápiz (1 si no hay lápiz).
     pen_pressure: f32,
     /// Imágenes cargadas para la punta y para la textura del pincel (nombre, máscara).
@@ -427,13 +429,41 @@ impl LeonApp {
                 let mut r = crate::raster::Raster::new(project.width, project.height);
                 for (i, c) in [[230, 60, 160, 255], [30, 120, 230, 255]].into_iter().enumerate() {
                     let y = 220.0 + dy + i as f32 * 90.0;
-                    let s = Stroke { kind: crate::model::ShapeKind::Free, points: vec![[300.0, y], [450.0, y - 60.0], [600.0, y + 40.0], [800.0, y - 30.0]], color: c, width: 28.0, closed: false, fill: None };
+                    let s = Stroke { kind: crate::model::ShapeKind::Free, points: vec![[300.0, y], [450.0, y - 60.0], [600.0, y + 40.0], [800.0, y - 30.0]], color: c, width: 28.0, closed: false, fill: None, pressure: Vec::new(), style: None };
                     crate::render::stamp_stroke(&mut r, &s);
                 }
                 l.keys.insert(f, std::sync::Arc::new(Drawing { strokes: vec![], raster: Some(std::sync::Arc::new(r)) }));
             }
             project.layers.insert(0, l);
             }
+        }
+        // Para capturas del lápiz vectorial: LEONTOON_VSTROKES=1 añade una capa vectorial con trazos de distinto estilo.
+        if std::env::var("LEONTOON_VSTROKES").is_ok() {
+            use crate::vector::{Cap, Join, Profile, VStyle};
+            let mut l = Layer::new("Trazos vectoriales");
+            let wave = |y: f32, amp: f32, n: usize| -> Vec<[f32; 2]> { (0..=n).map(|i| { let t = i as f32 / n as f32; [250.0 + t * 640.0, y + (t * 7.0).sin() * amp] }).collect() };
+            let ramp = |n: usize| -> Vec<f32> { (0..=n).map(|i| ((i as f32 / n as f32) * std::f32::consts::PI).sin().clamp(0.04, 1.0)).collect() };
+            let mk = |points: Vec<[f32; 2]>, pressure: Vec<f32>, width: f32, color: [u8; 4], style: Option<VStyle>| Stroke { kind: crate::model::ShapeKind::Free, points, color, width, closed: false, fill: None, pressure, style };
+            let d = VStyle::default();
+            let mut strokes = vec![
+                // 1 de siempre (sin estilo)
+                mk(wave(120.0, 18.0, 60), vec![], 12.0, [20, 20, 24, 255], None),
+                // 2 afilado en ambos extremos
+                mk(wave(200.0, 18.0, 60), vec![], 26.0, [200, 60, 50, 255], Some(VStyle { profile: Profile::TaperBoth, taper: 0.3, ..d.clone() })),
+                // 3 grosor con la presión (sube y baja)
+                mk(wave(285.0, 18.0, 60), ramp(60), 34.0, [30, 100, 190, 255], Some(VStyle { min_width: 0.06, ..d.clone() })),
+                // 4 afilado al final con extremo plano
+                mk(wave(370.0, 18.0, 60), vec![], 26.0, [40, 140, 80, 255], Some(VStyle { profile: Profile::TaperEnd, cap: Cap::Flat, taper: 0.5, ..d.clone() })),
+                // 5 zigzag con extremo cuadrado e unión de inglete
+                mk(vec![[250.0, 450.0], [350.0, 410.0], [450.0, 460.0], [560.0, 405.0], [660.0, 465.0], [780.0, 412.0]], vec![], 18.0, [120, 60, 160, 255], Some(VStyle { cap: Cap::Square, join: Join::Miter, ..d.clone() })),
+                // 6 el mismo zigzag con unión de bisel y extremo plano
+                mk(vec![[250.0, 520.0], [350.0, 480.0], [450.0, 530.0], [560.0, 475.0], [660.0, 535.0], [780.0, 482.0]], vec![], 18.0, [230, 140, 20, 255], Some(VStyle { cap: Cap::Flat, join: Join::Bevel, ..d })),
+            ];
+            for s in &mut strokes {
+                s.fix_attrs();
+            }
+            l.keys.insert(0, std::sync::Arc::new(Drawing { strokes, raster: None }));
+            project.layers.insert(0, l);
         }
         // Para pruebas y capturas: LEONTOON_SALA=<nombre de sala> abre esa sala.
         let room_idx = std::env::var("LEONTOON_SALA")
@@ -480,6 +510,7 @@ impl LeonApp {
             add_menu: if std::env::var("LEONTOON_ADDMENU").is_ok() { Some(Pos2::new(560.0, 260.0)) } else { None },
             brush: Default::default(),
             brush_live: None,
+            vstyle: Default::default(),
             pen_pressure: 1.0,
             brush_tip_img: None,
             brush_tex_img: None,
@@ -508,7 +539,7 @@ impl LeonApp {
             hover_area: 0,
             tab_drag: None,
             tab_rename: None,
-            tool: Tool::Brush,
+            tool: match std::env::var("LEONTOON_TOOL").as_deref() { Ok("lapiz") => Tool::Vector, Ok("pluma") => Tool::Pen, Ok("borrador") => Tool::Eraser, _ => Tool::Brush },
             color: Color32::from_rgb(20, 20, 24),
             fill_color: Color32::from_rgb(253, 216, 53),
             fill_shapes: false,
@@ -988,6 +1019,37 @@ impl LeonApp {
 
 #[cfg(test)]
 mod tests {
+    /// El motor de dibujo lo decide la capa activa: el lápiz y la pluma vectoriales no se mezclan con las capas de
+    /// mapa de bits, y el Pincel de píxeles no se usa como motor vectorial.
+    #[test]
+    fn tools_and_layer_kinds_never_mix() {
+        use crate::model::LayerKind::*;
+        // Lápiz y Pluma vectoriales: solo en capas vectoriales.
+        for t in [Tool::Vector, Tool::Pen] {
+            assert!(t.layer_block(Vector).is_none(), "{t:?} en capa vectorial");
+            assert!(t.layer_block(Bitmap).unwrap().contains("capas vectoriales"), "{t:?} en capa de mapa de bits");
+        }
+        // El Pincel y el Borrador trabajan en las dos clases, cada una con su motor.
+        for t in [Tool::Brush, Tool::Eraser] {
+            assert!(t.layer_block(Vector).is_none() && t.layer_block(Bitmap).is_none(), "{t:?}");
+        }
+        // Las formas y el relleno siguen como estaban en las dos.
+        assert!(Tool::Shape.layer_block(Bitmap).is_none() && Tool::Shape.layer_block(Vector).is_none());
+        // Las capas que no guardan dibujos (cámara, luz, nulo, texto) no admiten ninguna herramienta de dibujo.
+        for k in [Camera, Light, Null, Text] {
+            for t in [Tool::Brush, Tool::Vector, Tool::Pen, Tool::Eraser, Tool::Shape, Tool::Fill] {
+                assert!(t.layer_block(k).is_some(), "{t:?} no debe dibujar en {k:?}");
+            }
+        }
+        // Las herramientas que solo miran o seleccionan no se bloquean.
+        for t in [Tool::Select, Tool::Hand, Tool::Zoom, Tool::Picker, Tool::RotateObj] {
+            for k in [Vector, Bitmap, Camera, Solid] {
+                assert!(t.layer_block(k).is_none(), "{t:?} en {k:?}");
+            }
+        }
+        // Una capa de color sólido no queda bloqueada.
+        assert!(Tool::Vector.layer_block(Solid).is_none());
+    }
     use super::*;
 
     #[test]

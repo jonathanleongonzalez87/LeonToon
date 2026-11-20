@@ -349,6 +349,10 @@ impl LeonApp {
         if self.tool.is_view() {
             return;
         }
+        if let Some(why) = self.tool.layer_block(self.layer().kind) {
+            self.say(why);
+            return;
+        }
         let (locked, visible, base, shown) = {
             let l = self.layer();
             (l.locked, l.visible, l.transform_at(self.frame), l.key_at_or_before(self.frame))
@@ -381,8 +385,11 @@ impl LeonApp {
         let g = match self.tool {
             Tool::Brush | Tool::Vector => {
                 let width = if self.tool == Tool::Brush { self.brush_size } else { self.pencil_size };
+                // El Lápiz vectorial guarda la presión de cada punto y su propio estilo en el trazo (edición no destructiva).
+                let pencil = self.tool == Tool::Vector;
+                let (pressure, style) = if pencil { (vec![self.cur_pen().pressure], Some(self.vstyle.clone().clamped())) } else { (Vec::new(), None) };
                 Gesture::Paint {
-                    stroke: Stroke { kind: ShapeKind::Free, points: vec![p], color, width, closed: false, fill: None },
+                    stroke: Stroke { kind: ShapeKind::Free, points: vec![p], color, width, closed: false, fill: None, pressure, style },
                     smooth: p,
                     last_raw: p,
                 }
@@ -540,6 +547,9 @@ impl LeonApp {
                 if ((smooth[0] - last[0]).powi(2) + (smooth[1] - last[1]).powi(2)).sqrt() >= min_step {
                     stroke.points.push(smooth);
                     let pen = self.cur_pen();
+                    if stroke.style.is_some() {
+                        stroke.pressure.push(pen.pressure);
+                    }
                     if let Some(ls) = &mut self.brush_live {
                         ls.push_with(smooth, pen);
                     }
@@ -648,8 +658,11 @@ impl LeonApp {
                 let last = *stroke.points.last().unwrap();
                 if last != last_raw && stroke.points.len() > 1 {
                     stroke.points.push(last_raw);
+                    if stroke.style.is_some() {
+                        stroke.pressure.push(self.cur_pen().pressure);
+                    }
                 }
-                stroke.points = crate::model::simplify(&stroke.points, 0.2 / self.zoom.max(0.05));
+                stroke.simplify_in_place(0.2 / self.zoom.max(0.05));
                 // Un trazo que vuelve a su inicio queda cerrado: así se puede rellenar.
                 let n = stroke.points.len();
                 if n >= 6 {

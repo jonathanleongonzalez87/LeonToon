@@ -1,4 +1,4 @@
-﻿//! Datos del proyecto: escena, capas, fotogramas clave y trazos vectoriales.
+//! Datos del proyecto: escena, capas, fotogramas clave y trazos vectoriales.
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -24,6 +24,14 @@ pub struct Stroke {
     pub closed: bool,
     #[serde(default)]
     pub fill: Option<Rgba>,
+    /// Presión del lápiz en cada punto, de 0 a 1 (vacía si no se capturó). Es parte de la geometría: sirve para
+    /// recalcular el grosor si cambia el estilo.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub pressure: Vec<f32>,
+    /// Estilo del trazo vectorial (extremos, uniones, perfil de grosor, respuesta a la presión). None es el trazo
+    /// de siempre: grosor constante con extremos y uniones redondos.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub style: Option<crate::vector::VStyle>,
 }
 
 fn dist_seg(p: [f32; 2], a: [f32; 2], b: [f32; 2]) -> f32 {
@@ -83,7 +91,45 @@ impl Stroke {
     pub fn shape(kind: ShapeKind, a: [f32; 2], b: [f32; 2], color: Rgba, width: f32, fill: Option<Rgba>) -> Self {
         let (points, closed) = shape_points(kind, a, b);
         let fill = if closed { fill } else { None };
-        Stroke { kind, points, color, width, closed, fill }
+        Stroke { kind, points, color, width, closed, fill, pressure: Vec::new(), style: None }
+    }
+
+    /// 	rue si se dibuja con el trazo rápido de siempre (grosor constante, extremos y uniones redondos).
+    pub fn is_plain(&self) -> bool {
+        crate::vector::is_plain(self.style.as_ref(), &self.pressure)
+    }
+
+    /// Polígonos convexos del trazo de grosor variable, en las coordenadas del dibujo (vectorial: no se rasteriza).
+    pub fn pieces(&self) -> Vec<Vec<[f32; 2]>> {
+        let st = self.style.clone().unwrap_or_default().clamped();
+        let w = crate::vector::widths(&self.points, &self.pressure, self.width, &st, self.closed);
+        crate::vector::pieces(&self.points, &w, self.closed, st.cap, st.join)
+    }
+
+    /// Deja la presión y el estilo en un estado válido (largo igual al de los puntos, valores en rango).
+    pub fn fix_attrs(&mut self) {
+        if self.pressure.len() != self.points.len() {
+            self.pressure.clear();
+        }
+        for p in &mut self.pressure {
+            *p = if p.is_finite() { p.clamp(0.0, 1.0) } else { 1.0 };
+        }
+        if let Some(s) = self.style.take() {
+            self.style = Some(s.clamped());
+        }
+    }
+
+    /// Simplifica la línea sin perder la presión de los puntos que se quedan.
+    pub fn simplify_in_place(&mut self, eps: f32) {
+        let keep = if self.pressure.len() == self.points.len() {
+            simplify_idx_attr(&self.points, Some((&self.pressure, self.width * 0.5)), eps)
+        } else {
+            simplify_idx(&self.points, eps)
+        };
+        if self.pressure.len() == self.points.len() {
+            self.pressure = keep.iter().map(|&i| self.pressure[i]).collect();
+        }
+        self.points = keep.iter().map(|&i| self.points[i]).collect();
     }
 
     pub fn translate(&mut self, dx: f32, dy: f32) {
@@ -153,27 +199,42 @@ impl Stroke {
         if self.fill.is_some() || self.points.len() <= 1 {
             return Some(Vec::new());
         }
+        // Presión de cada punto. Si el trazo tenía perfil de grosor (afilado) o respuesta a la presión, se «hornea» en
+        // la presión de los trozos que quedan, para que se vean igual que antes de borrar y no se afilen de nuevo.
+        let (src_p, out_style): (Option<Vec<f32>>, Option<crate::vector::VStyle>) = match &self.style {
+            Some(st) if !self.is_plain() => {
+                let f = crate::vector::widths(&self.points, &self.pressure, 1.0, st, self.closed);
+                (Some(f), Some(crate::vector::VStyle { pressure: true, min_width: 0.0, curve: 1.0, profile: crate::vector::Profile::Uniform, ..st.clone() }))
+            }
+            _ if self.pressure.len() == self.points.len() => (Some(self.pressure.clone()), self.style.clone()),
+            _ => (None, self.style.clone()),
+        };
+        let has_p = src_p.is_some();
+        let pr = |i: usize| src_p.as_ref().map_or(1.0, |v| v[i % v.len()]);
         // Densificar la línea para poder cortar en cualquier punto.
         let mut src = self.points.clone();
+        let mut idx: Vec<usize> = (0..self.points.len()).collect();
         if self.closed {
             src.push(self.points[0]);
+            idx.push(0);
         }
         let step = (r * 0.4).max(0.5);
-        let mut dense: Vec<[f32; 2]> = Vec::with_capacity(src.len() * 2);
-        for w in src.windows(2) {
+        let mut dense: Vec<([f32; 2], f32)> = Vec::with_capacity(src.len() * 2);
+        for (k, w) in src.windows(2).enumerate() {
             let (a, b) = (w[0], w[1]);
+            let (pa, pb) = (pr(idx[k]), pr(idx[k + 1]));
             let n = (dist(a, b) / step).ceil().max(1.0) as usize;
             for i in 0..n {
                 let t = i as f32 / n as f32;
-                dense.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+                dense.push(([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], pa + (pb - pa) * t));
             }
         }
-        dense.push(*src.last().unwrap());
+        dense.push((*src.last().unwrap(), pr(*idx.last().unwrap())));
         let limit = r + self.width * 0.5;
-        let mut out = Vec::new();
-        let mut run: Vec<[f32; 2]> = Vec::new();
+        let mut out: Vec<Vec<([f32; 2], f32)>> = Vec::new();
+        let mut run: Vec<([f32; 2], f32)> = Vec::new();
         for q in dense {
-            if dist(q, p) <= limit {
+            if dist(q.0, p) <= limit {
                 if run.len() >= 2 {
                     out.push(std::mem::take(&mut run));
                 } else {
@@ -188,13 +249,20 @@ impl Stroke {
         }
         Some(
             out.into_iter()
-                .map(|pts| Stroke {
-                    kind: ShapeKind::Free,
-                    points: simplify(&pts, 0.35),
-                    color: self.color,
-                    width: self.width,
-                    closed: false,
-                    fill: None,
+                .map(|run| {
+                    let pts: Vec<[f32; 2]> = run.iter().map(|q| q.0).collect();
+                    let prs: Vec<f32> = run.iter().map(|q| q.1).collect();
+                    let keep = if has_p { simplify_idx_attr(&pts, Some((&prs, self.width * 0.5)), 0.35) } else { simplify_idx(&pts, 0.35) };
+                    Stroke {
+                        kind: ShapeKind::Free,
+                        points: keep.iter().map(|&i| pts[i]).collect(),
+                        color: self.color,
+                        width: self.width,
+                        closed: false,
+                        fill: None,
+                        pressure: if has_p { keep.iter().map(|&i| prs[i]).collect() } else { Vec::new() },
+                        style: out_style.clone(),
+                    }
                 })
                 .collect(),
         )
@@ -203,9 +271,22 @@ impl Stroke {
 
 /// Simplificación sencilla (Ramer–Douglas–Peucker).
 pub fn simplify(pts: &[[f32; 2]], eps: f32) -> Vec<[f32; 2]> {
+    simplify_idx(pts, eps).into_iter().map(|i| pts[i]).collect()
+}
+
+/// Igual que simplify, pero devuelve los índices de los puntos que se quedan (para llevar datos aparte, como la presión).
+pub fn simplify_idx(pts: &[[f32; 2]], eps: f32) -> Vec<usize> {
+    simplify_idx_attr(pts, None, eps)
+}
+
+/// Ramer–Douglas–Peucker que también cuida un valor por punto (la presión o el grosor): un punto se conserva si se
+/// desvía de la línea, o si su valor, multiplicado por scale (el grosor en px), se desvía de lo que daría la
+/// interpolación entre los puntos que lo rodean. Así un trazo afilado o con presión no pierde su perfil.
+pub fn simplify_idx_attr(pts: &[[f32; 2]], attr: Option<(&[f32], f32)>, eps: f32) -> Vec<usize> {
     if pts.len() < 3 {
-        return pts.to_vec();
+        return (0..pts.len()).collect();
     }
+    let attr = attr.filter(|(a, _)| a.len() == pts.len());
     let mut keep = vec![false; pts.len()];
     keep[0] = true;
     keep[pts.len() - 1] = true;
@@ -213,7 +294,14 @@ pub fn simplify(pts: &[[f32; 2]], eps: f32) -> Vec<[f32; 2]> {
     while let Some((s, e)) = stack.pop() {
         let mut best = (0.0f32, 0usize);
         for i in s + 1..e {
-            let d = dist_seg(pts[i], pts[s], pts[e]);
+            let mut d = dist_seg(pts[i], pts[s], pts[e]);
+            if let Some((a, scale)) = attr {
+                // Valor esperado en i si el valor cambiara de forma lineal a lo largo de la línea entre s y e.
+                let (ls, le) = (dist(pts[s], pts[i]), dist(pts[i], pts[e]));
+                let t = if ls + le > 1e-9 { ls / (ls + le) } else { 0.0 };
+                let want = a[s] + (a[e] - a[s]) * t;
+                d = d.max((a[i] - want).abs() * scale);
+            }
             if d > best.0 {
                 best = (d, i);
             }
@@ -224,7 +312,7 @@ pub fn simplify(pts: &[[f32; 2]], eps: f32) -> Vec<[f32; 2]> {
             stack.push((best.1, e));
         }
     }
-    pts.iter().zip(keep).filter(|(_, k)| *k).map(|(p, _)| *p).collect()
+    keep.iter().enumerate().filter(|(_, k)| **k).map(|(i, _)| i).collect()
 }
 
 #[derive(Clone, Default, Serialize, Deserialize, Debug)]
@@ -855,6 +943,8 @@ impl Project {
                 width: 7.0,
                 closed: false,
                 fill: None,
+                pressure: Vec::new(),
+                style: None,
             });
             ball.keys.insert(i * 2, Arc::new(d));
         }
@@ -902,6 +992,7 @@ impl Project {
                         s.width = 1.0;
                     }
                     s.width = s.width.clamp(0.1, 500.0);
+                s.fix_attrs();
                 }
             }
         }
@@ -1065,7 +1156,7 @@ mod tests {
     #[test]
     fn eraser_splits() {
         let mut d = Drawing::default();
-        d.strokes.push(Stroke { kind: ShapeKind::Line, points: vec![[0.0, 0.0], [100.0, 0.0]], color: [0, 0, 0, 255], width: 2.0, closed: false, fill: None });
+        d.strokes.push(Stroke { kind: ShapeKind::Line, points: vec![[0.0, 0.0], [100.0, 0.0]], color: [0, 0, 0, 255], width: 2.0, closed: false, fill: None, pressure: Vec::new(), style: None });
         assert!(d.erase([50.0, 0.0], 5.0));
         assert_eq!(d.strokes.len(), 2);
     }

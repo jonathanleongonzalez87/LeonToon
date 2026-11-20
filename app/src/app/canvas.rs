@@ -448,6 +448,30 @@ pub(super) fn paint_stroke(
     if pts.is_empty() {
         return;
     }
+    if !s.is_plain() {
+        // Trazo vectorial de grosor variable (lápiz con presión, afilado, extremos o uniones propios).
+        if let (Some(f), true) = (s.fill, pts.len() >= 3) {
+            let fc = match tint {
+                Some(t) => with_alpha(t, alpha * 0.35),
+                None => with_alpha(c32(f), alpha),
+            };
+            fill_polygon(p, &pts, fc);
+        }
+        let mut mesh = egui::Mesh::default();
+        for poly in s.pieces() {
+            let base = mesh.vertices.len() as u32;
+            for v in &poly {
+                mesh.colored_vertex(to_screen(*v), col);
+            }
+            for i in 1..poly.len().saturating_sub(1) as u32 {
+                mesh.add_triangle(base, base + i, base + i + 1);
+            }
+        }
+        if !mesh.is_empty() {
+            p.add(Shape::mesh(mesh));
+        }
+        return;
+    }
     if pts.len() == 1 {
         p.circle_filled(pts[0], width * 0.5, col);
         return;
