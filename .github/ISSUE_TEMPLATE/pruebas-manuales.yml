@@ -1,0 +1,35 @@
+name: Pruebas manuales
+description: Lista de comprobación que hace la persona (ratón, teclado, tableta, otro programa)
+title: "[Pruebas] "
+labels: ["tipo:verificacion", "prueba-manual"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Aquí se registra lo que las pruebas automáticas y las capturas NO pueden comprobar.
+        Cada casilla se marca solo cuando la persona lo probó. No cierra el Issue de la función.
+  - type: input
+    id: funcion
+    attributes:
+      label: Issue de la función que se prueba
+      placeholder: "#31"
+    validations:
+      required: true
+  - type: textarea
+    id: lista
+    attributes:
+      label: Comprobaciones
+      description: Una casilla por comprobación, con el paso a paso y el resultado esperado.
+      placeholder: "- [ ] Pluma: clic y arrastrar crea un nodo suave con tiradores simétricos.\n- [ ] ..."
+    validations:
+      required: true
+  - type: textarea
+    id: entorno
+    attributes:
+      label: Entorno necesario
+      description: Tableta (marca y modelo), versión del programa, programa externo (por ejemplo, Photoshop para .abr).
+  - type: textarea
+    id: hallazgos
+    attributes:
+      label: Hallazgos
+      description: Qué falló o se sintió raro. Cada hallazgo se convierte en un Issue de error si hace falta.
