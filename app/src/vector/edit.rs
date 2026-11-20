@@ -24,6 +24,8 @@ pub enum Prop {
     Pressure(bool),
     MinWidth(f32),
     Curve(f32),
+    /// Perfil de grosor personalizado (puntos posición–grosor). También pone el perfil en «Personalizado».
+    Shape(Vec<[f32; 2]>),
 }
 
 /// Guarda el aspecto actual como original, si todavía no se había guardado.
@@ -40,17 +42,22 @@ fn style_mut(s: &mut Stroke) -> &mut VStyle {
 /// Cambia una propiedad del trazo (recordando su aspecto original).
 pub fn set_prop(s: &mut Stroke, p: &Prop) {
     remember(s);
-    match *p {
+    match p {
         Prop::Width(w) => s.width = if w.is_finite() { w.clamp(0.1, 500.0) } else { s.width },
-        Prop::Alpha(a) => s.color[3] = a,
+        Prop::Alpha(a) => s.color[3] = *a,
         Prop::Rgb(c) => s.color = [c[0], c[1], c[2], s.color[3]],
-        Prop::Cap(c) => style_mut(s).cap = c,
-        Prop::Join(j) => style_mut(s).join = j,
-        Prop::Profile(pr) => style_mut(s).profile = pr,
-        Prop::Taper(t) => style_mut(s).taper = t,
-        Prop::Pressure(b) => style_mut(s).pressure = b,
-        Prop::MinWidth(m) => style_mut(s).min_width = m,
-        Prop::Curve(c) => style_mut(s).curve = c,
+        Prop::Cap(c) => style_mut(s).cap = *c,
+        Prop::Join(j) => style_mut(s).join = *j,
+        Prop::Profile(pr) => style_mut(s).profile = *pr,
+        Prop::Taper(t) => style_mut(s).taper = *t,
+        Prop::Pressure(b) => style_mut(s).pressure = *b,
+        Prop::MinWidth(m) => style_mut(s).min_width = *m,
+        Prop::Curve(c) => style_mut(s).curve = *c,
+        Prop::Shape(v) => {
+            let st = style_mut(s);
+            st.profile = Profile::Custom;
+            st.shape = v.clone();
+        }
     }
     if let Some(st) = s.style.take() {
         s.style = Some(st.clamped());
@@ -133,6 +140,7 @@ pub struct Common {
     pub pressure: Option<bool>,
     pub min_width: Option<f32>,
     pub curve: Option<f32>,
+    pub shape: Option<Vec<[f32; 2]>>,
     pub brush: Option<Option<String>>,
 }
 
@@ -166,6 +174,7 @@ pub fn common(list: &[&Stroke]) -> Common {
         pressure: same(st.iter().map(|s| s.pressure)),
         min_width: same_f(st.iter().map(|s| s.min_width)),
         curve: same_f(st.iter().map(|s| s.curve)),
+        shape: if st.is_empty() || !st.iter().all(|s| s.shape == st[0].shape) { None } else { Some(st[0].shape.clone()) },
         brush: if brush.is_empty() || !brush.iter().all(|b| *b == brush[0]) { None } else { Some(brush[0].clone()) },
     }
 }

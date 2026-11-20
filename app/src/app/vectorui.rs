@@ -65,7 +65,7 @@ impl LeonApp {
         self.pencil_size = p.size;
         self.stroke_opacity = p.opacity;
         self.smoothing = p.smoothing;
-        self.vstyle = VStyle { brush: Some(p.id()), ..p.style };
+        self.vstyle = VStyle { brush: Some(p.id()), ..p.style.clone() };
         self.vpreset = Some(p.id());
     }
 
@@ -142,7 +142,7 @@ impl LeonApp {
         let user_sel = selected.as_ref().map_or(false, |p| !p.builtin);
         let edited_sel = cur.as_ref().map_or(false, |k| self.vlib.is_edited(k));
 
-        egui::CollapsingHeader::new(RichText::new("Pinceles vectoriales").font(semi(12.0)).color(TX)).id_salt("fold_vpresets").default_open(true).show(ui, |ui| {
+        egui::CollapsingHeader::new(RichText::new("Pinceles vectoriales").font(semi(12.0)).color(TX)).id_salt("fold_vpresets").default_open(std::env::var("LEONTOON_VHIDE").is_err()).show(ui, |ui| {
             let label = match &selected {
                 Some(p) => format!("{} · {}{}", p.category, p.name, if modified { "   (modificado)" } else { "" }),
                 None => "Sin preset: configuración propia".to_string(),
@@ -403,4 +403,88 @@ impl LeonApp {
             Err(e) => self.say(format!("No se pudo guardar el paquete: {e}")),
         }
     }
+}
+
+/// Editor gráfico del perfil de grosor personalizado: eje horizontal = posición a lo largo del trazo (inicio → final),
+/// vertical = grosor. Arrastra un punto para moverlo, clic en un hueco para añadir uno, clic derecho sobre un punto
+/// interior para quitarlo. Los dos puntos de los extremos solo suben y bajan. Devuelve true si cambió algo.
+pub(super) fn shape_editor(ui: &mut egui::Ui, shape: &mut Vec<[f32; 2]>) -> bool {
+    use crate::vector::{clean_shape, default_shape, shape_at, MAX_SHAPE_POINTS};
+    if shape.len() < 2 {
+        *shape = default_shape();
+    }
+    let (r, resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 84.0), Sense::click_and_drag());
+    let inner = r.shrink2(Vec2::new(12.0, 10.0));
+    let to_px = |p: [f32; 2]| Pos2::new(inner.min.x + p[0] * inner.width(), inner.max.y - p[1] * inner.height());
+    let from_px = |q: Pos2| [((q.x - inner.min.x) / inner.width()).clamp(0.0, 1.0), ((inner.max.y - q.y) / inner.height()).clamp(0.0, 1.0)];
+    let pick = |q: Pos2, s: &[[f32; 2]]| s.iter().position(|p| to_px(*p).distance(q) <= 9.0);
+    let key = resp.id.with("drag_idx");
+    let mut changed = false;
+
+    if resp.drag_started() {
+        if let Some(pos) = resp.interact_pointer_pos() {
+            let idx = match pick(pos, shape) {
+                Some(i) => Some(i),
+                None if shape.len() < MAX_SHAPE_POINTS => {
+                    shape.push(from_px(pos));
+                    *shape = clean_shape(shape);
+                    changed = true;
+                    pick(pos, shape)
+                }
+                None => None,
+            };
+            ui.memory_mut(|m| m.data.insert_temp(key, idx));
+        }
+    } else if resp.clicked() {
+        if let Some(pos) = resp.interact_pointer_pos() {
+            if pick(pos, shape).is_none() && shape.len() < MAX_SHAPE_POINTS {
+                shape.push(from_px(pos));
+                *shape = clean_shape(shape);
+                changed = true;
+            }
+        }
+    }
+    if resp.dragged() {
+        let idx: Option<usize> = ui.memory(|m| m.data.get_temp::<Option<usize>>(key)).flatten();
+        if let (Some(i), Some(pos)) = (idx, resp.interact_pointer_pos()) {
+            if i < shape.len() {
+                let mut v = from_px(pos);
+                let last = shape.len() - 1;
+                if i == 0 || i == last {
+                    v[0] = shape[i][0];
+                } else {
+                    v[0] = v[0].clamp(shape[i - 1][0] + 0.01, shape[i + 1][0] - 0.01);
+                }
+                if v != shape[i] {
+                    shape[i] = v;
+                    changed = true;
+                }
+            }
+        }
+    }
+    if resp.secondary_clicked() {
+        if let Some(pos) = resp.interact_pointer_pos() {
+            if let Some(i) = pick(pos, shape) {
+                if i > 0 && i + 1 < shape.len() {
+                    shape.remove(i);
+                    changed = true;
+                }
+            }
+        }
+    }
+
+    let p = ui.painter();
+    p.rect_filled(r, 4.0, UI0);
+    p.rect_stroke(r, 4.0, stk(1.0, LINE), EStrokeKind::Inside);
+    for w in [0.0, 0.5, 1.0] {
+        p.line_segment([to_px([0.0, w]), to_px([1.0, w])], stk(1.0, if w == 0.5 { LINE } else { LINE_STRONG }));
+    }
+    let curve: Vec<Pos2> = (0..=80).map(|i| { let t = i as f32 / 80.0; to_px([t, shape_at(shape, t)]) }).collect();
+    p.add(Shape::line(curve, stk(1.6, ACCENT2)));
+    for pt in shape.iter() {
+        p.circle_filled(to_px(*pt), 4.0, Color32::WHITE);
+        p.circle_stroke(to_px(*pt), 4.0, stk(1.2, ACCENT));
+    }
+    resp.on_hover_text("Arrastra los puntos. Clic en un hueco: añadir un punto. Clic derecho en un punto: quitarlo.");
+    changed
 }

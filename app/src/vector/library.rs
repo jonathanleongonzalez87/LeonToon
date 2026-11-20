@@ -93,7 +93,12 @@ fn p(category: &str, name: &str, size: f32, opacity: f32, smoothing: f32, style:
 }
 
 fn st(cap: Cap, join: Join, profile: Profile, taper: f32, pressure: bool, min_width: f32, curve: f32) -> VStyle {
-    VStyle { cap, join, profile, taper, pressure, min_width, curve, brush: None, version: 1 }
+    VStyle { cap, join, profile, taper, pressure, min_width, curve, shape: Vec::new(), brush: None, version: 1 }
+}
+
+/// Estilo con perfil de grosor personalizado.
+fn stc(cap: Cap, join: Join, shape: &[[f32; 2]]) -> VStyle {
+    VStyle { cap, join, profile: Profile::Custom, taper: 0.25, pressure: false, min_width: 0.2, curve: 1.0, shape: shape.to_vec(), brush: None, version: 1 }
 }
 
 /// Pinceles incluidos, por categoría.
@@ -115,12 +120,14 @@ pub fn builtin() -> Vec<VPreset> {
         p("Tinta", "Tinta afilada", 9.0, 1.0, 0.4, st(Round, JR, TaperBoth, 0.35, true, 0.05, 1.0)),
         p("Entintado", "Entintado limpio", 4.0, 1.0, 0.55, st(Round, JR, Uniform, 0.25, false, 0.2, 1.0)),
         p("Entintado", "Entintado con remate", 5.0, 1.0, 0.5, st(Round, JR, TaperEnd, 0.3, true, 0.25, 1.0)),
+        p("Entintado", "Entintado con carga", 7.0, 1.0, 0.5, stc(Round, JR, &[[0.0, 0.15], [0.12, 1.0], [0.55, 0.75], [1.0, 0.05]])),
         p("Ilustración", "Ilustración", 7.0, 1.0, 0.35, st(Round, JR, TaperStart, 0.15, true, 0.2, 1.0)),
         p("Ilustración", "Silueta", 14.0, 1.0, 0.3, st(Round, JR, Uniform, 0.25, true, 0.5, 1.0)),
         p("Caligrafía", "Plumín", 8.0, 1.0, 0.4, st(Flat, Miter, Uniform, 0.25, true, 0.2, 1.6)),
         p("Caligrafía", "Pincel de caligrafía", 12.0, 1.0, 0.45, st(Round, JR, TaperBoth, 0.4, true, 0.05, 1.2)),
         p("Contornos", "Contorno fino", 2.0, 1.0, 0.5, st(Round, JR, Uniform, 0.25, false, 0.2, 1.0)),
         p("Contornos", "Contorno grueso", 6.0, 1.0, 0.5, st(Round, JR, TaperBoth, 0.12, false, 0.2, 1.0)),
+        p("Pinceles artísticos", "Gota", 14.0, 1.0, 0.3, stc(Round, JR, &[[0.0, 0.05], [0.35, 1.0], [0.75, 0.55], [1.0, 0.2]])),
         p("Pinceles artísticos", "Orgánico", 10.0, 0.9, 0.25, st(Round, JR, TaperBoth, 0.25, true, 0.0, 0.6)),
         p("Pinceles artísticos", "Trazo seco", 9.0, 0.75, 0.15, st(Square, Bevel, TaperEnd, 0.45, true, 0.1, 0.7)),
     ]

@@ -166,7 +166,13 @@ impl LeonApp {
                 self.set_picked_prop(true, Prop::Profile(k));
             }
         });
-        if c.profile != Some(Profile::Uniform) {
+        if c.profile == Some(Profile::Custom) {
+            let mut shape = c.shape.clone().or_else(|| strokes.first().and_then(|s| s.style.as_ref().map(|st| st.shape.clone()))).unwrap_or_default();
+            if super::vectorui::shape_editor(ui, &mut shape) {
+                self.set_picked_prop(true, Prop::Shape(shape));
+            }
+        }
+        if c.profile.map_or(true, |p| p.is_taper()) {
             let mut t = c.taper.unwrap_or(0.25);
             param_row(ui, &format!("Afilado{}", mixed_note(c.taper.is_none())), |ui| {
                 let before = t;

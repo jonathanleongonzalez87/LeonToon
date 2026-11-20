@@ -75,16 +75,24 @@ pub enum Profile {
     TaperEnd,
     /// Punta en los dos extremos.
     TaperBoth,
+    /// Perfil dibujado por el usuario con puntos (VStyle::shape).
+    Custom,
 }
 
 impl Profile {
-    pub const ALL: [Profile; 4] = [Profile::Uniform, Profile::TaperStart, Profile::TaperEnd, Profile::TaperBoth];
+    pub const ALL: [Profile; 5] = [Profile::Uniform, Profile::TaperStart, Profile::TaperEnd, Profile::TaperBoth, Profile::Custom];
+
+    /// ¿Es uno de los perfiles que se controlan con el largo del afilado?
+    pub fn is_taper(self) -> bool {
+        matches!(self, Profile::TaperStart | Profile::TaperEnd | Profile::TaperBoth)
+    }
     pub fn label(self) -> &'static str {
         match self {
             Profile::Uniform => "Uniforme",
             Profile::TaperStart => "Afilado al inicio",
             Profile::TaperEnd => "Afilado al final",
             Profile::TaperBoth => "Afilado en ambos",
+            Profile::Custom => "Personalizado",
         }
     }
 }
@@ -104,6 +112,9 @@ pub struct VStyle {
     pub min_width: f32,
     /// Curva de respuesta de la presión: 1 lineal, menos de 1 más sensible, más de 1 más dura.
     pub curve: f32,
+    /// Puntos (posición 0…1 a lo largo del trazo, grosor 0…1) del perfil personalizado. Vacío si no se usa.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub shape: Vec<[f32; 2]>,
     /// Nombre del pincel vectorial del que viene (para la biblioteca de la Fase 2).
     pub brush: Option<String>,
     /// Versión del estilo, para poder reproducir trazos antiguos si el motor cambia.
@@ -112,8 +123,43 @@ pub struct VStyle {
 
 impl Default for VStyle {
     fn default() -> Self {
-        VStyle { cap: Cap::Round, join: Join::Round, profile: Profile::Uniform, taper: 0.25, pressure: true, min_width: 0.2, curve: 1.0, brush: None, version: 1 }
+        VStyle { cap: Cap::Round, join: Join::Round, profile: Profile::Uniform, taper: 0.25, pressure: true, min_width: 0.2, curve: 1.0, shape: Vec::new(), brush: None, version: 1 }
     }
+}
+
+/// Perfil personalizado de partida: punta fina, cuerpo pleno y punta fina.
+pub fn default_shape() -> Vec<[f32; 2]> {
+    vec![[0.0, 0.1], [0.2, 1.0], [0.8, 1.0], [1.0, 0.1]]
+}
+
+/// Máximo de puntos de un perfil personalizado.
+pub const MAX_SHAPE_POINTS: usize = 16;
+
+/// Deja un perfil personalizado válido: números finitos, ordenado por posición, sin posiciones repetidas.
+pub fn clean_shape(shape: &[[f32; 2]]) -> Vec<[f32; 2]> {
+    let mut v: Vec<[f32; 2]> = shape.iter().filter(|p| p[0].is_finite() && p[1].is_finite()).map(|p| [p[0].clamp(0.0, 1.0), p[1].clamp(0.0, 1.0)]).collect();
+    v.sort_by(|a, b| a[0].total_cmp(&b[0]));
+    v.dedup_by(|b, a| (b[0] - a[0]).abs() < 1e-4);
+    v.truncate(MAX_SHAPE_POINTS);
+    v
+}
+
+/// Grosor (0…1) del perfil personalizado en la posición 	 (0…1): suave entre puntos y constante fuera de ellos.
+pub fn shape_at(shape: &[[f32; 2]], t: f32) -> f32 {
+    let (Some(first), Some(last)) = (shape.first(), shape.last()) else { return 1.0 };
+    if t <= first[0] {
+        return first[1];
+    }
+    if t >= last[0] {
+        return last[1];
+    }
+    for w in shape.windows(2) {
+        if t <= w[1][0] {
+            let span = (w[1][0] - w[0][0]).max(1e-6);
+            return w[0][1] + (w[1][1] - w[0][1]) * smooth((t - w[0][0]) / span);
+        }
+    }
+    last[1]
 }
 
 impl VStyle {
@@ -123,6 +169,10 @@ impl VStyle {
         self.taper = f(self.taper, 0.02, 0.5, 0.25);
         self.min_width = f(self.min_width, 0.0, 1.0, 0.2);
         self.curve = f(self.curve, 0.2, 4.0, 1.0);
+        self.shape = clean_shape(&self.shape);
+        if self.profile == Profile::Custom && self.shape.len() < 2 {
+            self.shape = default_shape();
+        }
         self
     }
 }
@@ -164,6 +214,7 @@ pub fn widths(points: &[[f32; 2]], pressure: &[f32], base: f32, style: &VStyle, 
                     Profile::TaperStart => smooth(t[i] / st.taper),
                     Profile::TaperEnd => smooth((1.0 - t[i]) / st.taper),
                     Profile::TaperBoth => smooth(t[i] / st.taper).min(smooth((1.0 - t[i]) / st.taper)),
+                    Profile::Custom => shape_at(&st.shape, t[i]),
                 }
             };
             let pf = if use_pressure {
