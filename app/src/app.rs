@@ -489,6 +489,18 @@ impl LeonApp {
                 let mut s = mk(vec![], vec![], 16.0, [30, 30, 120, 255], Some(VStyle { profile: Profile::TaperBoth, taper: 0.25, ..VStyle::default() }));
                 s.nodes = Some(nodes);
                 strokes.push(s);
+                // 8: curva cerrada con perfil afilado (se afila en el punto donde se cerró, arriba).
+                let (cx, cy, r, k) = (1010.0f32, 330.0f32, 90.0f32, 0.5523f32 * 90.0);
+                let ring = vec![
+                    n([cx, cy - r], [cx - k, cy - r], [cx + k, cy - r], true),
+                    n([cx + r, cy], [cx + r, cy - k], [cx + r, cy + k], true),
+                    n([cx, cy + r], [cx + k, cy + r], [cx - k, cy + r], true),
+                    n([cx - r, cy], [cx - r, cy + k], [cx - r, cy - k], true),
+                ];
+                let mut c = mk(vec![], vec![], 30.0, [150, 40, 90, 255], Some(VStyle { profile: Profile::TaperBoth, taper: 0.4, ..VStyle::default() }));
+                c.nodes = Some(ring);
+                c.closed = true;
+                strokes.push(c);
             }
             for s in &mut strokes {
                 s.fix_attrs();

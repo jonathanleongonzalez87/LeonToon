@@ -112,10 +112,6 @@ pub fn brush_notes(list: &[&Stroke], p: &VPreset) -> Vec<String> {
             ));
         }
     }
-    let closed = list.iter().filter(|s| s.closed).count();
-    if closed > 0 && p.style.profile != Profile::Uniform {
-        notes.push(format!("{closed} {} cerrado{}: el afilado de los extremos no se aplica.", if closed == 1 { "trazo es" } else { "trazos son" }, if closed == 1 { "" } else { "s" }));
-    }
     notes
 }
 

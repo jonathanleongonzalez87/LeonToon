@@ -58,8 +58,9 @@ fn widths_follow_profile_and_pressure() {
     assert!(both[0].abs() < 1e-5 && both[10].abs() < 1e-5 && (both[5] - 8.0).abs() < 1e-5);
     // El afilado es progresivo, sin saltos.
     assert!(both.windows(2).take(5).all(|w| w[1] >= w[0]));
-    // Un trazo cerrado no se afila (no tiene extremos).
-    assert!(widths(&pts, &[], 8.0, &VStyle { profile: Profile::TaperBoth, ..Default::default() }, true).iter().all(|w| (*w - 8.0).abs() < 1e-5));
+    // Un trazo cerrado también se afila: el perfil recorre toda la vuelta desde el primer punto.
+    let closed = widths(&pts, &[], 8.0, &VStyle { profile: Profile::TaperBoth, taper: 0.25, ..Default::default() }, true);
+    assert!(closed[0].abs() < 1e-5 && closed.iter().any(|w| (*w - 8.0).abs() < 1e-5));
     // Presión: con el mínimo en 20 %, presión 0 deja 1,6 y presión 1 deja 8.
     let pr: Vec<f32> = (0..=10).map(|i| i as f32 / 10.0).collect();
     let w = widths(&pts, &pr, 8.0, &VStyle { pressure: true, min_width: 0.2, ..Default::default() }, false);
@@ -476,7 +477,7 @@ fn assigning_a_brush_keeps_path_pressure_color_and_reports_incompatibilities() {
     let mut closed = drawn();
     closed.closed = true;
     let notes = edit::brush_notes(&[&mouse, &closed, &drawn()], &brush);
-    assert_eq!(notes.len(), 2, "{notes:?}");
+    assert_eq!(notes.len(), 1, "los trazos cerrados ya no dan aviso: {notes:?}");
     assert!(notes[0].contains("1 trazo está sin presión"));
     assert!(edit::brush_notes(&[&drawn()], &lib.find("Básicos/Redondo").unwrap()).is_empty());
 }
@@ -727,8 +728,8 @@ fn custom_profile_shapes_the_stroke_width() {
     assert!((w[0] - 20.0).abs() < 1e-3 && (w[40] - 20.0).abs() < 1e-3);
     assert!((w[20] - 4.0).abs() < 0.3, "al centro queda estrecho: {}", w[20]);
     assert!(!is_plain(Some(&style), &[]));
-    // Un trazo cerrado no usa el perfil (no tiene extremos).
-    assert!(widths(&pts, &[], 20.0, &style, true).iter().all(|v| (*v - 20.0).abs() < 1e-3));
+    // Un trazo cerrado usa el perfil recorriendo toda la vuelta (ver las pruebas de trazos cerrados).
+    assert!(widths(&pts, &[], 20.0, &style, true).iter().any(|v| *v < 19.0));
 }
 
 #[test]
@@ -797,4 +798,69 @@ fn many_strokes_build_quickly() {
     assert!(n > 3000 * 100);
     assert!(ms < 3000, "{ms} ms para 3000 trazos");
     eprintln!("3000 trazos × 120 puntos: {ms} ms ({n} piezas)");
+}
+
+// ---------- Perfil en trazos cerrados (#41) ----------
+
+fn square_loop() -> Vec<[f32; 2]> {
+    // Cuadrado de 100 de lado con un punto cada 10 (40 puntos), empezando en la esquina superior izquierda.
+    let mut v = Vec::new();
+    for i in 0..10 { v.push([i as f32 * 10.0, 0.0]); }
+    for i in 0..10 { v.push([100.0, i as f32 * 10.0]); }
+    for i in 0..10 { v.push([100.0 - i as f32 * 10.0, 100.0]); }
+    for i in 0..10 { v.push([0.0, 100.0 - i as f32 * 10.0]); }
+    v
+}
+
+#[test]
+fn closed_stroke_pinches_at_the_seam_and_is_full_elsewhere() {
+    let pts = square_loop();
+    let style = VStyle { profile: Profile::TaperBoth, taper: 0.2, pressure: false, ..Default::default() };
+    let w = widths(&pts, &[], 20.0, &style, true);
+    assert!(w[0] < 0.5, "pellizco en el punto de cierre: {}", w[0]);
+    assert!((w[20] - 20.0).abs() < 1e-3, "grosor pleno en el lado opuesto: {}", w[20]);
+    assert!(w[39] < 20.0, "el tramo final también se afila: {}", w[39]);
+    // El mismo trazo abierto da el mismo perfil en los puntos centrales.
+    let open = widths(&pts, &[], 20.0, &style, false);
+    assert!((open[20] - 20.0).abs() < 1e-3);
+}
+
+#[test]
+fn closed_stroke_length_includes_the_closing_segment() {
+    // Dos puntos opuestos de un cuadrado: con el tramo de cierre, la posición del último punto no llega a 1.
+    let pts = square_loop();
+    let style = VStyle { profile: Profile::Custom, shape: vec![[0.0, 0.0], [1.0, 1.0]], pressure: false, ..Default::default() };
+    let w = widths(&pts, &[], 100.0, &style, true);
+    let last = w[39];
+    assert!(last < 100.0 && last > 80.0, "el último punto está cerca, pero antes del final de la vuelta: {last}");
+    // Un trazo cerrado con perfil uniforme sigue igual que antes.
+    let plain = widths(&pts, &[], 20.0, &VStyle { pressure: false, ..Default::default() }, true);
+    assert!(plain.iter().all(|v| (*v - 20.0).abs() < 1e-3));
+}
+
+#[test]
+fn closed_stroke_with_profile_builds_a_continuous_ribbon() {
+    let mut s = pencil(square_loop(), Vec::new(), Some(VStyle { profile: Profile::TaperBoth, taper: 0.25, pressure: false, ..Default::default() }));
+    s.closed = true;
+    assert!(!s.is_plain());
+    let pieces = s.pieces();
+    assert!(!pieces.is_empty());
+    assert!(pieces.iter().all(|poly| poly.iter().all(|p| p[0].is_finite() && p[1].is_finite())));
+    // Cambiar el perfil de un trazo cerrado ya dibujado cambia su contorno sin mover los puntos.
+    let (before, pts) = (s.pieces(), s.points.clone());
+    edit::set_prop(&mut s, &Prop::Shape(vec![[0.0, 1.0], [0.5, 0.2], [1.0, 1.0]]));
+    assert_eq!(s.points, pts);
+    assert_ne!(s.pieces(), before);
+}
+
+#[test]
+fn closing_a_curve_keeps_its_brush_profile() {
+    let style = VStyle { profile: Profile::Custom, shape: default_shape(), ..Default::default() };
+    let mut s = pencil(Vec::new(), Vec::new(), Some(style.clone()));
+    s.nodes = Some(vec![Node::corner([0.0, 0.0]), Node::corner([100.0, 0.0]), Node::corner([100.0, 100.0]), Node::corner([0.0, 100.0])]);
+    s.closed = true;
+    s.regen();
+    assert_eq!(s.style.as_ref().unwrap().profile, Profile::Custom);
+    let w = widths(&s.points, &s.pressure, 10.0, s.style.as_ref().unwrap(), true);
+    assert!(w.iter().any(|v| *v < 5.0) && w.iter().any(|v| *v > 9.0), "el perfil se ve en la figura cerrada");
 }
