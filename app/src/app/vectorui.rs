@@ -48,7 +48,7 @@ pub(super) fn sample_stroke(r: Rect, size: f32, style: &VStyle) -> Stroke {
     Stroke { kind: ShapeKind::Free, points, color: [232, 232, 232, 255], width: size.clamp(1.0, r.height() * 0.45), closed: false, fill: None, pressure, style: Some(style.clone().clamped()), original: None, nodes: None }
 }
 
-fn paint_sample(painter: &egui::Painter, r: Rect, size: f32, opacity: f32, style: &VStyle) {
+pub(super) fn paint_sample(painter: &egui::Painter, r: Rect, size: f32, opacity: f32, style: &VStyle) {
     let s = sample_stroke(r, size, style);
     super::canvas::paint_stroke(&painter.with_clip_rect(r), &s, &|p| Pos2::new(r.min.x + p[0], r.min.y + p[1]), 1.0, None, opacity);
 }
@@ -57,6 +57,14 @@ impl LeonApp {
     /// Receta del lápiz vectorial tal como está en pantalla.
     fn vrecipe_now(&self) -> VPreset {
         VPreset { size: self.pencil_size, opacity: self.stroke_opacity, smoothing: self.smoothing, style: self.vstyle.clone(), ..Default::default() }
+    }
+
+    /// Receta con el aspecto del primer trazo elegido.
+    fn vrecipe_from_selection(&self) -> VPreset {
+        match self.picked_strokes().first() {
+            Some(s) => VPreset { size: s.width, opacity: (s.color[3] as f32 / 255.0).max(0.15), smoothing: self.smoothing, style: s.style.clone().unwrap_or_default(), ..Default::default() },
+            None => self.vrecipe_now(),
+        }
     }
 
     /// Pone el pincel en pantalla. Cada trazo nuevo copiará este estilo y recordará el identificador del pincel.
@@ -88,7 +96,7 @@ impl LeonApp {
         let need = || "Elige primero un pincel de la lista".to_string();
         let res: Result<(String, &str), String> = match self.vui.edit {
             VEdit::SaveAs => {
-                let mut r = self.vrecipe_now();
+                let mut r = if self.tool == Tool::Select { self.vrecipe_from_selection() } else { self.vrecipe_now() };
                 r.name = name;
                 r.category = if cat.trim().is_empty() { USER_CATEGORY.into() } else { cat };
                 Ok((self.vlib.save_new(r), "guardado"))
@@ -135,16 +143,19 @@ impl LeonApp {
     }
 
     /// Lista, buscador y acciones de la biblioteca de pinceles vectoriales.
-    pub(super) fn vector_presets_ui(&mut self, ui: &mut egui::Ui) {
-        let cur = self.vpreset.clone();
+    /// sel: modo de la Selección. La misma lista y vista previa, pero un clic asigna el pincel a los trazos elegidos
+    /// (y «Guardar como…» guarda el aspecto del primer trazo elegido) en vez de cambiar el Lápiz.
+    pub(super) fn vector_presets_ui(&mut self, ui: &mut egui::Ui, sel: bool) {
+        let cur = if sel { self.sel_brush_id() } else { self.vpreset.clone() };
         let selected = cur.as_ref().and_then(|k| self.vlib.find(k));
-        let modified = selected.as_ref().map_or(false, |p| !p.same_recipe(self.pencil_size, self.stroke_opacity, self.smoothing, &self.vstyle));
+        let modified = !sel && selected.as_ref().map_or(false, |p| !p.same_recipe(self.pencil_size, self.stroke_opacity, self.smoothing, &self.vstyle));
         let user_sel = selected.as_ref().map_or(false, |p| !p.builtin);
         let edited_sel = cur.as_ref().map_or(false, |k| self.vlib.is_edited(k));
 
         egui::CollapsingHeader::new(RichText::new("Pinceles vectoriales").font(semi(12.0)).color(TX)).id_salt("fold_vpresets").default_open(std::env::var("LEONTOON_VHIDE").is_err()).show(ui, |ui| {
             let label = match &selected {
                 Some(p) => format!("{} · {}{}", p.category, p.name, if modified { "   (modificado)" } else { "" }),
+                None if sel => self.sel_brush_label(),
                 None => "Sin preset: configuración propia".to_string(),
             };
             ui.label(RichText::new(label).size(11.5).color(if modified { ACCENT2 } else { MU }));
@@ -197,12 +208,26 @@ impl LeonApp {
                 self.save_vlib();
             }
             if let Some(p) = apply {
-                self.apply_vpreset(&p);
                 self.vui.edit = VEdit::None;
                 self.vui.confirm = VConfirm::None;
-                self.say(format!("Pincel vectorial «{}» aplicado", p.name));
+                if sel {
+                    self.assign_brush_to_picked(&p);
+                } else {
+                    self.apply_vpreset(&p);
+                    self.say(format!("Pincel vectorial «{}» aplicado", p.name));
+                }
             }
 
+            if sel {
+                ui.horizontal_wrapped(|ui| {
+                    ui.checkbox(&mut self.sui.brush_width, "Usar también su grosor").on_hover_text("Si no, cada trazo conserva su grosor");
+                    if ui.small_button("Guardar como…").on_hover_text("Guarda el aspecto del primer trazo elegido como un pincel nuevo").clicked() {
+                        self.vui.edit = VEdit::SaveAs;
+                        self.vui.name = "Pincel nuevo".to_string();
+                        self.vui.category = USER_CATEGORY.to_string();
+                    }
+                });
+            } else {
             // Acciones
             ui.horizontal_wrapped(|ui| {
                 if ui.small_button("Guardar como…").on_hover_text("Guarda el lápiz actual como un pincel nuevo").clicked() {
@@ -286,6 +311,7 @@ impl LeonApp {
                 }
             });
 
+            }
             // Confirmaciones
             match self.vui.confirm {
                 VConfirm::Delete => {
@@ -487,4 +513,12 @@ pub(super) fn shape_editor(ui: &mut egui::Ui, shape: &mut Vec<[f32; 2]>) -> bool
     }
     resp.on_hover_text("Arrastra los puntos. Clic en un hueco: añadir un punto. Clic derecho en un punto: quitarlo.");
     changed
+}
+
+/// Vista previa de un estilo (el mismo cuadro que el panel del Lápiz): una onda con presión que sube y baja.
+pub(super) fn style_preview(ui: &mut egui::Ui, size: f32, opacity: f32, style: &VStyle) {
+    let (r, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 64.0), Sense::hover());
+    ui.painter().rect_filled(r, 4.0, UI0);
+    ui.painter().rect_stroke(r, 4.0, stk(1.0, LINE), EStrokeKind::Inside);
+    paint_sample(ui.painter(), r, size, opacity, style);
 }

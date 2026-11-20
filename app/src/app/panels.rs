@@ -529,7 +529,7 @@ impl LeonApp {
                         self.brush_presets_ui(ui);
                     }
                     if matches!(t, Tool::Vector | Tool::Pen) {
-                        self.vector_presets_ui(ui);
+                        self.vector_presets_ui(ui, false);
                     }
                     if t.draws() {
                         let size = match t {
