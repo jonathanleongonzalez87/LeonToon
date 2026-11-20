@@ -1,0 +1,670 @@
+{
+  "id": "ev_b3e9c87f3fee00d4a4966fefae9ce677b9ce2b5fde4aaf31978b2807695ca4dc",
+  "subject": {
+    "kind": "pe",
+    "sha256": "3444bc3c18f29168512fb92e5f56bfa466df99bbe5e937201cf448d99482897a",
+    "name": "HarmonyPremium.exe"
+  },
+  "operation": "native_strings_find",
+  "params": {
+    "case_sensitive": false,
+    "limit": 80,
+    "mode": "regex",
+    "offset": 0,
+    "pattern": "^\\d+(\\.\\d+)?%$|ZOOM_LEVEL|ZoomLevel|zoomLevel|PLAYBACK_|DEFAULT_FRAME_RATE|FRAME_RATE|SCENE_.*FPS|LOOP"
+  },
+  "result": {
+    "matches": [
+      {
+        "address": "0x140b375c0",
+        "references": [
+          {
+            "from": "0x14004dfa9",
+            "function": "sub_14004de70"
+          }
+        ],
+        "section": ".rdata",
+        "text": "1setLoop(bool)"
+      },
+      {
+        "address": "0x140b375d0",
+        "references": [
+          {
+            "from": "0x14004dfb8",
+            "function": "sub_14004de70"
+          }
+        ],
+        "section": ".rdata",
+        "text": "2loopChanged(bool)"
+      },
+      {
+        "address": "0x140b37740",
+        "references": [
+          {
+            "from": "0x14004ec6d",
+            "function": "sub_14004e2c0"
+          },
+          {
+            "from": "0x140178e1d",
+            "function": "sub_140178570"
+          },
+          {
+            "from": "0x1407f0f9d",
+            "function": "sub_1407f0960"
+          }
+        ],
+        "section": ".rdata",
+        "text": "loop"
+      },
+      {
+        "address": "0x140b378f8",
+        "references": [
+          {
+            "from": "0x14004f76d",
+            "function": "sub_14004e2c0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "1easyFlipLoop(bool)"
+      },
+      {
+        "address": "0x140b3cba1",
+        "references": [],
+        "section": ".rdata",
+        "text": "soloOpenScene"
+      },
+      {
+        "address": "0x140b3d21c",
+        "references": [],
+        "section": ".rdata",
+        "text": "setLoop"
+      },
+      {
+        "address": "0x140b3d224",
+        "references": [],
+        "section": ".rdata",
+        "text": "loop"
+      },
+      {
+        "address": "0x140b3d642",
+        "references": [],
+        "section": ".rdata",
+        "text": "easyFlipLoop"
+      },
+      {
+        "address": "0x140b3f14a",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionMainToggleLoopPlay"
+      },
+      {
+        "address": "0x140b3f165",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionMainToggleLoopPlayValidate"
+      },
+      {
+        "address": "0x140b6dc9a",
+        "references": [],
+        "section": ".rdata",
+        "text": "unitZoomLevel"
+      },
+      {
+        "address": "0x140bc4f38",
+        "references": [
+          {
+            "from": "0x140359ff7",
+            "function": "sub_140359bd0"
+          },
+          {
+            "from": "0x1403a992a",
+            "function": "sub_1403a8ea0"
+          },
+          {
+            "from": "0x140459957",
+            "function": "sub_140459100"
+          },
+          {
+            "from": "0x1404710c3",
+            "function": "sub_140470590"
+          }
+        ],
+        "section": ".rdata",
+        "text": "play/loop.png"
+      },
+      {
+        "address": "0x140bc4ff0",
+        "references": [
+          {
+            "from": "0x140358d62",
+            "function": "sub_140358a40"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Number of Loops:"
+      },
+      {
+        "address": "0x140bc5008",
+        "references": [
+          {
+            "from": "0x140358e6b",
+            "function": "sub_140358a40"
+          }
+        ],
+        "section": ".rdata",
+        "text": "1OnLoopingChange()"
+      },
+      {
+        "address": "0x140bcc688",
+        "references": [
+          {
+            "from": "0x14037ceba",
+            "function": "sub_14037cd50"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Change Sound Clip Loops"
+      },
+      {
+        "address": "0x140bcc989",
+        "references": [],
+        "section": ".rdata",
+        "text": "OnLoopingChange"
+      },
+      {
+        "address": "0x140bcea00",
+        "references": [
+          {
+            "from": "0x140388a2c",
+            "function": "sub_140388a27"
+          }
+        ],
+        "section": ".rdata",
+        "text": "TLOOP_BEGIN"
+      },
+      {
+        "address": "0x140bcea10",
+        "references": [
+          {
+            "from": "0x140388a4c",
+            "function": "sub_140388a27"
+          }
+        ],
+        "section": ".rdata",
+        "text": "TLOOP_END"
+      },
+      {
+        "address": "0x140bcea78",
+        "references": [
+          {
+            "from": "0x14038ae6e",
+            "function": "sub_14038aa70"
+          }
+        ],
+        "section": ".rdata",
+        "text": "MakeTriSubNets: Cannot create storage for triloop subnets"
+      },
+      {
+        "address": "0x140bceab8",
+        "references": [
+          {
+            "from": "0x14038acd7",
+            "function": "sub_14038aa70"
+          }
+        ],
+        "section": ".rdata",
+        "text": "MakeTriLoop: Incorrectly formed tri-loop detected"
+      },
+      {
+        "address": "0x140bd8910",
+        "references": [
+          {
+            "from": "0x1403a98fe",
+            "function": "sub_1403a8ea0"
+          },
+          {
+            "from": "0x140471076",
+            "function": "sub_140470590"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Loop"
+      },
+      {
+        "address": "0x140bd89f0",
+        "references": [
+          {
+            "from": "0x1403aa410",
+            "function": "sub_1403a8ea0"
+          },
+          {
+            "from": "0x14047119b",
+            "function": "sub_140470590"
+          }
+        ],
+        "section": ".rdata",
+        "text": "1loop(bool)"
+      },
+      {
+        "address": "0x140bdfe30",
+        "references": [
+          {
+            "from": "0x1403d9fd8",
+            "function": "sub_1403d9200"
+          }
+        ],
+        "section": ".rdata",
+        "text": "1zoomLevelChanged(int)"
+      },
+      {
+        "address": "0x140be77d0",
+        "references": [
+          {
+            "from": "0x140418141",
+            "function": "sub_1404180b0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "PLAY_ENABLE_LOOP"
+      },
+      {
+        "address": "0x140be7848",
+        "references": [
+          {
+            "from": "0x14041a472",
+            "function": "sub_14041a1f0"
+          },
+          {
+            "from": "0x14041a78d",
+            "function": "sub_14041a1f0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "PLAY_DELAY_END_OF_LOOP"
+      },
+      {
+        "address": "0x140be8c68",
+        "references": [
+          {
+            "from": "0x140421495",
+            "function": "sub_140420780"
+          }
+        ],
+        "section": ".rdata",
+        "text": "1onZoomLevelChanged(int)"
+      },
+      {
+        "address": "0x140beb958",
+        "references": [
+          {
+            "from": "0x14042c90e",
+            "function": "sub_14042c650"
+          }
+        ],
+        "section": ".rdata",
+        "text": "1setCurrentZoomLevel(int)"
+      },
+      {
+        "address": "0x140beb978",
+        "references": [
+          {
+            "from": "0x14042c921",
+            "function": "sub_14042c650"
+          }
+        ],
+        "section": ".rdata",
+        "text": "2zoomLevelChanged(int)"
+      },
+      {
+        "address": "0x140beb990",
+        "references": [
+          {
+            "from": "0x14042fd5b",
+            "function": "sub_14042fd10"
+          }
+        ],
+        "section": ".rdata",
+        "text": "PLAYBACK_FRAME_HEIGHT"
+      },
+      {
+        "address": "0x140bec35b",
+        "references": [],
+        "section": ".rdata",
+        "text": "loopChanged"
+      },
+      {
+        "address": "0x140bec435",
+        "references": [],
+        "section": ".rdata",
+        "text": "loop"
+      },
+      {
+        "address": "0x140bfbaf2",
+        "references": [],
+        "section": ".rdata",
+        "text": "zoomLevelChanged"
+      },
+      {
+        "address": "0x140bfbb03",
+        "references": [],
+        "section": ".rdata",
+        "text": "newZoomLevel"
+      },
+      {
+        "address": "0x140c00dee",
+        "references": [],
+        "section": ".rdata",
+        "text": "onZoomLevelChanged"
+      },
+      {
+        "address": "0x140c0384a",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionLoop"
+      },
+      {
+        "address": "0x140c09db5",
+        "references": [],
+        "section": ".rdata",
+        "text": "zoomLevelChanged"
+      },
+      {
+        "address": "0x140c0a14f",
+        "references": [],
+        "section": ".rdata",
+        "text": "loopChanged"
+      },
+      {
+        "address": "0x140c0a1e5",
+        "references": [],
+        "section": ".rdata",
+        "text": "loop"
+      },
+      {
+        "address": "0x140c0a2b5",
+        "references": [],
+        "section": ".rdata",
+        "text": "setCurrentZoomLevel"
+      },
+      {
+        "address": "0x140c1b840",
+        "references": [],
+        "section": ".rdata",
+        "text": "1.0%"
+      },
+      {
+        "address": "0x140c1b848",
+        "references": [],
+        "section": ".rdata",
+        "text": "1.25%"
+      },
+      {
+        "address": "0x140c1b850",
+        "references": [],
+        "section": ".rdata",
+        "text": "1.6%"
+      },
+      {
+        "address": "0x140c1b858",
+        "references": [],
+        "section": ".rdata",
+        "text": "2.0%"
+      },
+      {
+        "address": "0x140c1b860",
+        "references": [],
+        "section": ".rdata",
+        "text": "2.5%"
+      },
+      {
+        "address": "0x140c1b868",
+        "references": [],
+        "section": ".rdata",
+        "text": "3.3%"
+      },
+      {
+        "address": "0x140c1b870",
+        "references": [],
+        "section": ".rdata",
+        "text": "4.0%"
+      },
+      {
+        "address": "0x140c1b878",
+        "references": [],
+        "section": ".rdata",
+        "text": "5.0%"
+      },
+      {
+        "address": "0x140c1b880",
+        "references": [],
+        "section": ".rdata",
+        "text": "6.3%"
+      },
+      {
+        "address": "0x140c1b890",
+        "references": [],
+        "section": ".rdata",
+        "text": "12.5%"
+      },
+      {
+        "address": "0x140c1b8b8",
+        "references": [],
+        "section": ".rdata",
+        "text": "100%"
+      },
+      {
+        "address": "0x140c1b8c0",
+        "references": [],
+        "section": ".rdata",
+        "text": "125%"
+      },
+      {
+        "address": "0x140c1b8c8",
+        "references": [],
+        "section": ".rdata",
+        "text": "160%"
+      },
+      {
+        "address": "0x140c1b8d0",
+        "references": [],
+        "section": ".rdata",
+        "text": "200%"
+      },
+      {
+        "address": "0x140c1b8d8",
+        "references": [],
+        "section": ".rdata",
+        "text": "250%"
+      },
+      {
+        "address": "0x140c1b8e0",
+        "references": [],
+        "section": ".rdata",
+        "text": "320%"
+      },
+      {
+        "address": "0x140c1b8e8",
+        "references": [],
+        "section": ".rdata",
+        "text": "400%"
+      },
+      {
+        "address": "0x140c1b8f0",
+        "references": [],
+        "section": ".rdata",
+        "text": "500%"
+      },
+      {
+        "address": "0x140c1b8f8",
+        "references": [],
+        "section": ".rdata",
+        "text": "630%"
+      },
+      {
+        "address": "0x140c1b900",
+        "references": [],
+        "section": ".rdata",
+        "text": "800%"
+      },
+      {
+        "address": "0x140c1b908",
+        "references": [],
+        "section": ".rdata",
+        "text": "1000%"
+      },
+      {
+        "address": "0x140c1b910",
+        "references": [],
+        "section": ".rdata",
+        "text": "1250%"
+      },
+      {
+        "address": "0x140c1b918",
+        "references": [],
+        "section": ".rdata",
+        "text": "1600%"
+      },
+      {
+        "address": "0x140c1b920",
+        "references": [],
+        "section": ".rdata",
+        "text": "2000%"
+      },
+      {
+        "address": "0x140c1b928",
+        "references": [],
+        "section": ".rdata",
+        "text": "2500%"
+      },
+      {
+        "address": "0x140c1b930",
+        "references": [],
+        "section": ".rdata",
+        "text": "3200%"
+      },
+      {
+        "address": "0x140c1b938",
+        "references": [],
+        "section": ".rdata",
+        "text": "4000%"
+      },
+      {
+        "address": "0x140c1b940",
+        "references": [],
+        "section": ".rdata",
+        "text": "5000%"
+      },
+      {
+        "address": "0x140c1b948",
+        "references": [],
+        "section": ".rdata",
+        "text": "6300%"
+      },
+      {
+        "address": "0x140c1b950",
+        "references": [],
+        "section": ".rdata",
+        "text": "8000%"
+      },
+      {
+        "address": "0x140c1b958",
+        "references": [],
+        "section": ".rdata",
+        "text": "10000%"
+      },
+      {
+        "address": "0x140c1b960",
+        "references": [],
+        "section": ".rdata",
+        "text": "12500%"
+      },
+      {
+        "address": "0x140c1b968",
+        "references": [],
+        "section": ".rdata",
+        "text": "16000%"
+      },
+      {
+        "address": "0x140c1b970",
+        "references": [],
+        "section": ".rdata",
+        "text": "20000%"
+      },
+      {
+        "address": "0x140c1b978",
+        "references": [],
+        "section": ".rdata",
+        "text": "25000%"
+      },
+      {
+        "address": "0x140c1b980",
+        "references": [],
+        "section": ".rdata",
+        "text": "32000%"
+      },
+      {
+        "address": "0x140c1b988",
+        "references": [],
+        "section": ".rdata",
+        "text": "40000%"
+      },
+      {
+        "address": "0x140c1b990",
+        "references": [],
+        "section": ".rdata",
+        "text": "50000%"
+      },
+      {
+        "address": "0x140c1b998",
+        "references": [],
+        "section": ".rdata",
+        "text": "63000%"
+      },
+      {
+        "address": "0x140c1b9a0",
+        "references": [],
+        "section": ".rdata",
+        "text": "80000%"
+      },
+      {
+        "address": "0x140c86528",
+        "references": [
+          {
+            "from": "0x14086263e",
+            "function": "sub_14085d860"
+          },
+          {
+            "from": "0x140862691",
+            "function": "sub_14085d860"
+          }
+        ],
+        "section": ".rdata",
+        "text": "OPENGL_PLAYBACK_CACHE_SIZE_MB"
+      }
+    ],
+    "total": 93
+  },
+  "summary": "93 strings match \"^\\d+(\\.\\d+)?%$|ZOOM_LEVEL|ZoomLevel|zoomLevel|PLAYBACK_|DEFAULT_FRAME_RATE|FRAME_RATE|SCENE_.*FPS|LOOP\".",
+  "confidence": "observed",
+  "authority": "original-files",
+  "environment": {
+    "clean_room": false,
+    "engine": "builtin",
+    "engine_version": "0.5.0",
+    "host": "windows-x86_64"
+  },
+  "limitations": [
+    {
+      "code": "data_sections_only",
+      "message": "only strings stored in the file are searched (absence is not proof)"
+    }
+  ],
+  "coverage": {
+    "status": "partial",
+    "examined": 80,
+    "total": 93,
+    "next_offset": 80
+  },
+  "locations": [],
+  "links": []
+}

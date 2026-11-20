@@ -1,0 +1,42 @@
+{
+  "id": "ev_7dd7e47a503a7c04a83abb7d19f46e03b3cf04b12992d57c42aa19b4131acbb6",
+  "subject": {
+    "kind": "pe",
+    "sha256": "3444bc3c18f29168512fb92e5f56bfa466df99bbe5e937201cf448d99482897a",
+    "name": "HarmonyPremium.exe"
+  },
+  "operation": "native_bytes_show",
+  "params": {
+    "address": "0x140bd7150",
+    "length": 8
+  },
+  "result": {
+    "address": "0x140bd7150",
+    "ascii": "$.......",
+    "file_offset": 12408144,
+    "hex": "2400000000000000",
+    "length": 8
+  },
+  "summary": "8 bytes at 0x140bd7150.",
+  "confidence": "observed",
+  "authority": "original-files",
+  "environment": {
+    "clean_room": false,
+    "engine": "builtin",
+    "engine_version": "0.5.0",
+    "host": "windows-x86_64"
+  },
+  "limitations": [],
+  "coverage": {
+    "status": "complete",
+    "examined": 8,
+    "total": 8
+  },
+  "locations": [
+    {
+      "kind": "address",
+      "value": "0x140bd7150"
+    }
+  ],
+  "links": []
+}

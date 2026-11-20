@@ -1,0 +1,75 @@
+{
+  "id": "ev_6f3b8ee00ac504067ff4c3123b29dbe3545ac4daf0112c8929ea1687cc0b2bdf",
+  "subject": {
+    "kind": "pe",
+    "sha256": "3444bc3c18f29168512fb92e5f56bfa466df99bbe5e937201cf448d99482897a",
+    "name": "HarmonyPremium.exe"
+  },
+  "operation": "native_function_pseudocode",
+  "params": {
+    "function": "0x14047b850"
+  },
+  "result": {
+    "calls": [
+      "??0QString@@QEAA@PEBD@Z",
+      "??1QString@@QEAA@XZ",
+      "?getIntValue@PR_Preference@@QEBAHAEBVQString@@H@Z",
+      "sub_14047b990",
+      "sub_1409e65f4",
+      "sub_1409e6654"
+    ],
+    "engine": "clean-room lifter",
+    "entry": "0x14047b850",
+    "function": "sub_14047b850",
+    "gotos": 0,
+    "inline_asm": 2,
+    "pseudo_code": "int64_t sub_14047b850(int64_t rcx, int64_t r9)\n{\n    stack_8 = rbx;\n    stack_10 = rsi;\n    edi = r9d;\n    rsi = rcx;\n    edx = *(uint32_t*)0x140ff8fd8;\n    rax = gs:[0x58];\n    ecx = 4;\n    rdx = *(uint64_t*)(rax + rdx * 8);\n    eax = *(uint32_t*)(rcx + rdx);\n    if (*(uint32_t*)0x140fb91d0 > eax) {\n        sub_1409e6654(&data_140fb91d0);\n        if (*(uint32_t*)0x140fb91d0 == -1) {\n            rax = __imp_?tuPref@@3PEAVPR_Preference@@EA;\n            rbx = *(uint64_t*)(rax);\n            ??0QString@@QEAA@PEBD@Z(&stack_20, \"WHEEL_ZOOM_THRESHOLD\");\n            rax = ?getIntValue@PR_Preference@@QEBAHAEBVQString@@H@Z(rbx, &stack_20, 0x32);\n            eax += eax;\n            *(uint32_t*)0x140fb91cc = eax;\n            ??1QString@@QEAA@XZ(&stack_20);\n            sub_1409e65f4(&data_140fb91d0);\n        }\n    }\n    eax = edi;\n    __asm(\"cdq\");\n    __asm(\"idiv dword ptr [0x140fb91cc]\");\n    if (eax == 0) {\n        if (edi <= 0) {\n            ecx = 0xffffffff;\n            eax = ecx;\n        } else {\n            eax = 1;\n        }\n    }\n    eax = -eax;\n    sub_14047b990(rsi, 0, 0, eax);\n    al = 1;\n    rbx = stack_50;\n    rsi = stack_58;\n    return rax;\n}\n",
+    "signature": "int64_t sub_14047b850(int64_t rcx, int64_t r9)",
+    "strings": [
+      "WHEEL_ZOOM_THRESHOLD"
+    ],
+    "structured": true
+  },
+  "summary": "Pseudo-C for sub_14047b850 (42 lines).",
+  "confidence": "inferred",
+  "authority": "original-files",
+  "environment": {
+    "clean_room": false,
+    "engine": "builtin",
+    "engine_version": "0.5.0",
+    "host": "windows-x86_64"
+  },
+  "limitations": [
+    {
+      "code": "register_level",
+      "message": "variables are machine registers and stack slots; types are not recovered"
+    },
+    {
+      "code": "calling_convention_assumed",
+      "message": "call arguments follow the usual x86_64 convention and may be wrong for unusual functions"
+    },
+    {
+      "code": "conditions_from_flags",
+      "message": "branch conditions are rebuilt from the last compare and may be approximate"
+    },
+    {
+      "code": "inline_asm",
+      "message": "2 instructions have no C rule and are shown as __asm(...)"
+    },
+    {
+      "code": "deep_engine_unavailable",
+      "message": "Ghidra couldn't open this program (could not start Ghidra: Ghidra's analysis failed; see C:\\Users\\leont\\AppData\\Roaming\\craft-anything\\engines\\ghidra-cache\\3444bc3c18f29168-f2dfab6faedc84f0.log). So this came from the built-in decompiler, which is less exact."
+    }
+  ],
+  "coverage": {
+    "status": "unknown"
+  },
+  "locations": [
+    {
+      "kind": "address",
+      "value": "0x14047b850"
+    }
+  ],
+  "links": [],
+  "carries_target_content": true
+}

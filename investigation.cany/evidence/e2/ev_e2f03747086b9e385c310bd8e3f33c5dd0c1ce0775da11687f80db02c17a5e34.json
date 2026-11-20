@@ -1,0 +1,82 @@
+{
+  "id": "ev_e2f03747086b9e385c310bd8e3f33c5dd0c1ce0775da11687f80db02c17a5e34",
+  "subject": {
+    "kind": "pe",
+    "sha256": "3444bc3c18f29168512fb92e5f56bfa466df99bbe5e937201cf448d99482897a",
+    "name": "HarmonyPremium.exe"
+  },
+  "operation": "native_function_pseudocode",
+  "params": {
+    "function": "0x14088a790"
+  },
+  "result": {
+    "calls": [
+      "??0QObject@@QEAA@PEAV0@@Z",
+      "??0QString@@QEAA@AEBV0@@Z",
+      "??0QString@@QEAA@PEBD@Z",
+      "??0QString@@QEAA@XZ",
+      "??1QString@@QEAA@XZ",
+      "??4QString@@QEAAAEAV0@AEBV0@@Z",
+      "sub_14088a510"
+    ],
+    "engine": "clean-room lifter",
+    "entry": "0x14088a790",
+    "function": "sub_14088a790",
+    "gotos": 0,
+    "inline_asm": 0,
+    "pseudo_code": "int64_t sub_14088a790(int64_t rcx, int64_t rdx, int64_t r8)\n{\n    stack_18 = rbx;\n    stack_8 = rcx;\n    rbx = r8;\n    rdi = rdx;\n    r14 = rcx;\n    ??0QObject@@QEAA@PEAV0@@Z(rcx, 0);\n    rax = &data_140c8aa88;\n    *(uint64_t*)(r14) = rax;\n    rax = &data_140c8aae8;\n    *(uint64_t*)(r14 + 16) = rax;\n    r15d = 0;\n    *(uint64_t*)(r14 + 0x18) = r15;\n    *(uint64_t*)(r14 + 0x20) = r15;\n    *(uint64_t*)(r14 + 0x28) = r15;\n    *(uint64_t*)(r14 + 0x30) = r15;\n    *(uint64_t*)(r14 + 0x38) = rbx;\n    *(uint64_t*)(r14 + 0x40) = rdi;\n    *(uint64_t*)(r14 + 0x48) = r15;\n    *(uint64_t*)(r14 + 0x50) = r15;\n    ??0QString@@QEAA@XZ(&var_28);\n    rax = ??0QString@@QEAA@PEBD@Z(&var_40, \"DRAWING\");\n    rbx = rax;\n    ??4QString@@QEAAAEAV0@AEBV0@@Z(&var_28, rax);\n    var_10 = r15d;\n    ??1QString@@QEAA@XZ(rbx);\n    rbx = *(uint64_t*)(r14 + 0x20);\n    if (rbx == *(uint64_t*)(r14 + 0x28)) {\n        sub_14088a510(r14 + 0x18, rbx, &var_28);\n    } else {\n        ??0QString@@QEAA@AEBV0@@Z(rbx, &var_28);\n        eax = var_10;\n        *(uint32_t*)(rbx + 0x18) = eax;\n        *(uint64_t*)(r14 + 0x20) += 0x20;\n    }\n    rax = ??0QString@@QEAA@PEBD@Z(&var_40, \"SOUND\");\n    rbx = rax;\n    ??4QString@@QEAAAEAV0@AEBV0@@Z(&var_28, rax);\n    var_10 = 1;\n    ??1QString@@QEAA@XZ(rbx);\n    rbx = *(uint64_t*)(r14 + 0x20);\n    if (rbx == *(uint64_t*)(r14 + 0x28)) {\n        sub_14088a510(r14 + 0x18, rbx, &var_28);\n    } else {\n        ??0QString@@QEAA@AEBV0@@Z(rbx, &var_28);\n        eax = var_10;\n        *(uint32_t*)(rbx + 0x18) = eax;\n        *(uint64_t*)(r14 + 0x20) += 0x20;\n    }\n    rax = ??0QString@@QEAA@PEBD@Z(&var_40, \"TIMING\");\n    rbx = rax;\n    ??4QString@@QEAAAEAV0@AEBV0@@Z(&var_28, rax);\n    var_10 = 6;\n    ??1QString@@QEAA@XZ(rbx);\n    rbx = *(uint64_t*)(r14 + 0x20);\n    if (rbx == *(uint64_t*)(r14 + 0x28)) {\n        sub_14088a510(r14 + 0x18, rbx, &var_28);\n    } else {\n        ??0QString@@QEAA@AEBV0@@Z(rbx, &var_28);\n        eax = var_10;\n        *(uint32_t*)(rbx + 0x18) = eax;\n        *(uint64_t*)(r14 + 0x20) += 0x20;\n    }\n    rax = ??0QString@@QEAA@PEBD@Z(&var_40, \"3DPATH\");\n    rbx = rax;\n    ??4QString@@QEAAAEAV0@AEBV0@@Z(&var_28, rax);\n    var_10 = 2;\n    ??1QString@@QEAA@XZ(rbx);\n    rbx = *(uint64_t*)(r14 + 0x20);\n    if (rbx == *(uint64_t*)(r14 + 0x28)) {\n        sub_14088a510(r14 + 0x18, rbx, &var_28);\n    } else {\n        ??0QString@@QEAA@AEBV0@@Z(rbx, &var_28);\n        eax = var_10;\n        *(uint32_t*)(rbx + 0x18) = eax;\n        *(uint64_t*)(r14 + 0x20) += 0x20;\n    }\n    rax = ??0QString@@QEAA@PEBD@Z(&var_40, \"BEZIER\");\n    rbx = rax;\n    ??4QString@@QEAAAEAV0@AEBV0@@Z(&var_28, rax);\n    var_10 = 3;\n    ??1QString@@QEAA@XZ(rbx);\n    rbx = *(uint64_t*)(r14 + 0x20);\n    if (rbx == *(uint64_t*)(r14 + 0x28)) {\n        sub_14088a510(r14 + 0x18, rbx, &var_28);\n    } else {\n        ??0QString@@QEAA@AEBV0@@Z(rbx, &var_28);\n        eax = var_10;\n        *(uint32_t*)(rbx + 0x18) = eax;\n        *(uint64_t*)(r14 + 0x20) += 0x20;\n    }\n    rax = ??0QString@@QEAA@PEBD@Z(&var_40, \"EASE\");\n    rbx = rax;\n    ??4QString@@QEAAAEAV0@AEBV0@@Z(&var_28, rax);\n    var_10 = 4;\n    ??1QString@@QEAA@XZ(rbx);\n    rbx = *(uint64_t*)(r14 + 0x20);\n    if (rbx == *(uint64_t*)(r14 + 0x28)) {\n        sub_14088a510(r14 + 0x18, rbx, &var_28);\n    } else {\n        ??0QString@@QEAA@AEBV0@@Z(rbx, &var_28);\n        eax = var_10;\n        *(uint32_t*)(rbx + 0x18) = eax;\n        *(uint64_t*)(r14 + 0x20) += 0x20;\n    }\n    rax = ??0QString@@QEAA@PEBD@Z(&var_40, \"EXPR\");\n    rbx = rax;\n    ??4QString@@QEAAAEAV0@AEBV0@@Z(&var_28, rax);\n    var_10 = 5;\n    ??1QString@@QEAA@XZ(rbx);\n    rbx = *(uint64_t*)(r14 + 0x20);\n    if (rbx == *(uint64_t*)(r14 + 0x28)) {\n        sub_14088a510(r14 + 0x18, rbx, &var_28);\n    } else {\n        ??0QString@@QEAA@AEBV0@@Z(rbx, &var_28);\n        eax = var_10;\n        *(uint32_t*)(rbx + 0x18) = eax;\n        *(uint64_t*)(r14 + 0x20) += 0x20;\n    }\n    rax = ??0QString@@QEAA@PEBD@Z(&var_40, \"QUATERNIONPATH\");\n    rbx = rax;\n    ??4QString@@QEAAAEAV0@AEBV0@@Z(&var_28, rax);\n    var_10 = 8;\n    ??1QString@@QEAA@XZ(rbx);\n    rbx = *(uint64_t*)(r14 + 0x20);\n    if (rbx == *(uint64_t*)(r14 + 0x28)) {\n        sub_14088a510(r14 + 0x18, rbx, &var_28);\n    } else {\n        ??0QString@@QEAA@AEBV0@@Z(rbx, &var_28);\n        eax = var_10;\n        *(uint32_t*)(rbx + 0x18) = eax;\n        *(uint64_t*)(r14 + 0x20) += 0x20;\n    }\n    rax = ??0QString@@QEAA@PEBD@Z(&var_40, \"ANNOTATION\");\n    rbx = rax;\n    ??4QString@@QEAAAEAV0@AEBV0@@Z(&var_28, rax);\n    var_10 = 9;\n    ??1QString@@QEAA@XZ(rbx);\n    rbx = *(uint64_t*)(r14 + 0x20);\n    if (rbx == *(uint64_t*)(r14 + 0x28)) {\n        sub_14088a510(r14 + 0x18, rbx, &var_28);\n    } else {\n        ??0QString@@QEAA@AEBV0@@Z(rbx, &var_28);\n        eax = var_10;\n        *(uint32_t*)(rbx + 0x18) = eax;\n        *(uint64_t*)(r14 + 0x20) += 0x20;\n    }\n    rax = ??0QString@@QEAA@PEBD@Z(&var_40, \"VELOBASED\");\n    rbx = rax;\n    ??4QString@@QEAAAEAV0@AEBV0@@Z(&var_28, rax);\n    var_10 = 7;\n    ??1QString@@QEAA@XZ(rbx);\n    rbx = *(uint64_t*)(r14 + 0x20);\n    if (rbx == *(uint64_t*)(r14 + 0x28)) {\n        sub_14088a510(r14 + 0x18, rbx, &var_28);\n    } else {\n        ??0QString@@QEAA@AEBV0@@Z(rbx, &var_28);\n        eax = var_10;\n        *(uint32_t*)(rbx + 0x18) = eax;\n        *(uint64_t*)(r14 + 0x20) += 0x20;\n    }\n    rax = ??0QString@@QEAA@PEBD@Z(&var_40, \"FILE_LIBRARY\");\n    rbx = rax;\n    ??4QString@@QEAAAEAV0@AEBV0@@Z(&var_28, rax);\n    var_10 = 10;\n    ??1QString@@QEAA@XZ(rbx);\n    rbx = *(uint64_t*)(r14 + 0x20);\n    if (rbx == *(uint64_t*)(r14 + 0x28)) {\n        sub_14088a510(r14 + 0x18, rbx, &var_28);\n    } else {\n        ??0QString@@QEAA@AEBV0@@Z(rbx, &var_28);\n        eax = var_10;\n        *(uint32_t*)(rbx + 0x18) = eax;\n        *(uint64_t*)(r14 + 0x20) += 0x20;\n    }\n    ??1QString@@QEAA@XZ(&var_28);\n    rax = r14;\n    rbx = stack_a0;\n    return rax;\n}\n",
+    "signature": "int64_t sub_14088a790(int64_t rcx, int64_t rdx, int64_t r8)",
+    "strings": [
+      "DRAWING",
+      "SOUND",
+      "TIMING",
+      "3DPATH",
+      "BEZIER",
+      "EASE",
+      "EXPR",
+      "QUATERNIONPATH",
+      "ANNOTATION",
+      "VELOBASED",
+      "FILE_LIBRARY"
+    ],
+    "structured": true
+  },
+  "summary": "Pseudo-C for sub_14088a790 (181 lines).",
+  "confidence": "inferred",
+  "authority": "original-files",
+  "environment": {
+    "clean_room": false,
+    "engine": "builtin",
+    "engine_version": "0.5.0",
+    "host": "windows-x86_64"
+  },
+  "limitations": [
+    {
+      "code": "register_level",
+      "message": "variables are machine registers and stack slots; types are not recovered"
+    },
+    {
+      "code": "calling_convention_assumed",
+      "message": "call arguments follow the usual x86_64 convention and may be wrong for unusual functions"
+    },
+    {
+      "code": "conditions_from_flags",
+      "message": "branch conditions are rebuilt from the last compare and may be approximate"
+    },
+    {
+      "code": "deep_engine_unavailable",
+      "message": "Ghidra couldn't open this program (could not start Ghidra: Ghidra's analysis failed; see C:\\Users\\leont\\AppData\\Roaming\\craft-anything\\engines\\ghidra-cache\\3444bc3c18f29168-f2dfab6faedc84f0.log). So this came from the built-in decompiler, which is less exact."
+    }
+  ],
+  "coverage": {
+    "status": "unknown"
+  },
+  "locations": [
+    {
+      "kind": "address",
+      "value": "0x14088a790"
+    }
+  ],
+  "links": [],
+  "carries_target_content": true
+}

@@ -1,0 +1,16 @@
+{
+  "id": "unk_63cf1d20579688ef",
+  "revision": 3,
+  "question": "¿Cómo se ve exactamente la ventana del original (distribución de paneles, colores, iconos)? No hay capturas en reference/ ni en capture/.",
+  "severity": "medium",
+  "domain": "ui",
+  "status": "resolved",
+  "probes": [
+    "Que la persona añada capturas de pantalla del programa a reference/"
+  ],
+  "evidence_for": [
+    "ev_e746dd566ecf43fa36254fe85d2e447ed2ff0fbd2ff7bf2d31b01b6b7b531c6b"
+  ],
+  "evidence_against": [],
+  "resolution": "La persona añadió dos capturas del original (reference/picture-1.png y picture-2.png: herramientas a la izquierda, visor gris claro, paneles a la derecha, línea de tiempo abajo) y pidió expresamente usar la interfaz y el sistema de salas de su propia versión web (carpeta leontoon, styles/main.css y rooms/*.js). Se siguió la versión web: barra superior con menús y 11 pestañas de salas, columna de herramientas, barra de opciones, panel lateral por sala, barra de tiempo y Xsheet; colores #1d1d1d/#252525/#303030/#3a3a3a con acento #EA7221. La disposición general coincide con las capturas; el parecido de píxeles con Harmony es bajo (18 %) a propósito."
+}

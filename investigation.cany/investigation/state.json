@@ -1,0 +1,83 @@
+{
+  "revision": 16,
+  "brief": {
+    "question": "Reconstruir LeonToon (escritorio, Rust/egui) con la interfaz y el sistema de trabajo por salas de la versión web de la persona (leontoon.html / carpeta leontoon), conservando las funciones centrales de animación 2D del programa objetivo.",
+    "purpose": "La persona es principiante y quiere una versión estable propia; dio su HTML anterior como referencia de UI y salas.",
+    "targets": [
+      "C:\\Program Files (x86)\\Toon Boom Animation\\Toon Boom Harmony 24 Premium\\win64\\bin\\HarmonyPremium.exe",
+      "C:\\Users\\leont\\OneDrive\\Documents\\LeonToon\\leontoon (proyecto web propio de la persona)"
+    ],
+    "constraints": [
+      "Deep mode: valores del original leídos del ejecutable y de resources/prefs.xml",
+      "Rust + eframe/egui en app/",
+      "Sin marcas ni logotipos del original; LeonToon es la marca de la persona",
+      "Opción --screenshot"
+    ],
+    "done_when": "cargo build funciona, la ventana tiene las 11 salas de la versión web, --screenshot produce una imagen correcta y rebuild_check pasa."
+  },
+  "plan": [
+    {
+      "title": "Preparar las herramientas para construir",
+      "status": "done",
+      "why": "Rust + MinGW instalados"
+    },
+    {
+      "title": "Dibujar el lienzo y las herramientas de dibujo",
+      "status": "done"
+    },
+    {
+      "title": "Crear capas y línea de tiempo con fotogramas",
+      "status": "done"
+    },
+    {
+      "title": "Añadir reproducción y papel cebolla",
+      "status": "done"
+    },
+    {
+      "title": "Guardar, abrir y exportar imágenes",
+      "status": "done"
+    },
+    {
+      "title": "Ronda 2: estabilidad",
+      "status": "done",
+      "why": "Decidido por mí (la persona delegó): deshacer ligero (Arc), guardado seguro con .bak y verificación, copia automática en segundo plano cada 30 s, aviso de recuperación tras cierre inesperado, captura de fallos internos con copia de emergencia y registro de errores, atajos bloqueados mientras se dibuja, flechas sin glifo sustituidas. 7 pruebas unitarias OK, build debug y release OK, capturas revisadas."
+    }
+  ],
+  "hypotheses": [],
+  "findings": [
+    {
+      "id": "fnd_1",
+      "statement": "El papel cebolla del original pasa de opacidad 0.8 (dibujo más cercano) a 0.2 (más lejano), limitada a [0,1], en modo por fotogramas; lo lee la función 0x1404e1200 de las preferencias DRAWING_ONIONSKIN_MAX/MIN_OPACITY (valores por defecto en resources/prefs.xml). LeonToon usa esos extremos con el degradado lineal de la versión web de la persona.",
+      "evidence_ids": [
+        "ev_0fccba24ea0d51430df9b2745f481e23f4ad144fd74ca3857394d71cdef32294",
+        "ev_e2115344130f1e901c211dd7fa6bffbeb9c8d712acbfb380d6d1ad53d25141fc",
+        "ev_e746dd566ecf43fa36254fe85d2e447ed2ff0fbd2ff7bf2d31b01b6b7b531c6b"
+      ],
+      "confidence": "observed"
+    },
+    {
+      "id": "fnd_2",
+      "statement": "Zoom del visor del original: escalera fija 1 %…80000 % (1, 1.25, 1.6, 2, 2.5, 3.3, 4, 5, 6.3, 8, 10 …) en la tabla de textos 0x140c1b840; la rueda da un paso por muesca (0x14047b850: umbral 2×WHEEL_ZOOM_THRESHOLD=100 unidades). Xsheet: fila 17 px a zoom 10, zoom 5–16 (0x140106d90 + prefs.xml).",
+      "evidence_ids": [
+        "ev_b3e9c87f3fee00d4a4966fefae9ce677b9ce2b5fde4aaf31978b2807695ca4dc",
+        "ev_3a5fe29d329305dbbfd3b97ff34948f34a57a9283da81df05c9e3c46911bf1ff",
+        "ev_6f3b8ee00ac504067ff4c3123b29dbe3545ac4daf0112c8929ea1687cc0b2bdf",
+        "ev_a7e7a61ddd05a8a622a852a96cad0d2558cf818807f1830537689e7bb7251eaf",
+        "ev_54337e3c812b490042357870a44d1b79728334bfcc81b1402db293c2f26a1100"
+      ],
+      "confidence": "observed"
+    },
+    {
+      "id": "fnd_3",
+      "statement": "Papel cebolla del original: 10 pesos por lado que empiezan en 1.0 y bajan 0.1 por dibujo (0x1404dbbc0), con opacidad entre 0.2 y 0.8 (0x1404e1200); reproducción sin bucle por defecto (PLAY_ENABLE_LOOP=false, 0x1404180b0) y vuelta al inicio sin pausa al terminar el bucle (0x14041a1f0, PLAY_DELAY_END_OF_LOOP=0).",
+      "evidence_ids": [
+        "ev_0d6f49597eba8e3071d4c9afc1f7f015fe00158ee7550921799aaf0de8e42026",
+        "ev_7636e4ce11c22e46a44b7565c17ee1936dbc2a8d0e55aa499697d2f93c301029",
+        "ev_b4fb1f777c886b6bf8d7fb386dfcf29f0e00c57838d9069f4202baf9702549eb"
+      ],
+      "confidence": "derived"
+    }
+  ],
+  "handoff": "Ronda 4 (2026-11-19, «Llegó el momento de la UI»): la persona pidió seguir su prototipo «LeonToon — Prototipo de interfaz v0.3.html» (en Documents\\LeonToon\\, 860 KB; la ilustración del puma está incrustada como webp y se copió a app/assets/puma.webp). Eligió por pregunta: solo arquitectura (bienvenida, inicio, conjuntos de salas, salas, paneles, herramientas); funciones nuevas (3D, huesos, pluma, texto) quedan como «pendiente». Hecho: catalog.rs (Tool 15 con modos objeto/edición, RoomKind 12, ROOM_SETS 5, Editor 7), start.rs (Stage Splash/Home/Work, recientes en data_dir/recientes.json; LEONTOON_INICIO=bienvenida|inicio para capturas; --screenshot va directo a Work), shell.rs (titlebar, pestañas renombrar/cerrar/arrastrar/+, menús del prototipo, status con pistas), panels.rs (toolbar, cabecera, Capas, Propiedades con selector de editor, barra N), hud.rs (píldoras y ventanitas Mesa de luz/Guías/Cebolla), timebar.rs::timeline_area. Project.rooms/room_set se guardan en .ltoon (serde default). Atajos: T, N, O, Tab, Mayús+I/D/Supr, Mayús+A/N, Ctrl+Tab, Inicio=ajustar. Para ver el prototipo: copiar el HTML a %TEMP%, sustituir requestAnimationFrame(step) por finish() y sacar foto con msedge --headless --screenshot. TRAMPAS: en PowerShell las comillas dobles convierten `0 en NUL (pasó en MECHANICS.md); los here-strings grandes en PowerShell a veces los bloquea el modo automático, usar Edit. 13 pruebas OK, rebuild_check pasa (22 % parecido a la captura de Harmony).",
+  "updated": "2026-11-19T18:56:39Z"
+}

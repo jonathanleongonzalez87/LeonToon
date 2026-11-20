@@ -1,0 +1,14 @@
+{
+  "id": "unk_8030b2fd60cc417c",
+  "revision": 3,
+  "question": "¿Qué funciones del original usa más la persona (animación cuadro a cuadro, recortables con huesos, nodos de composición, sonido, exportar vídeo)?",
+  "severity": "high",
+  "domain": "features",
+  "status": "blocked",
+  "probes": [
+    "Preguntar a la persona qué hace habitualmente con el programa"
+  ],
+  "evidence_for": [],
+  "evidence_against": [],
+  "resolution": "Parcialmente respondido: la persona señaló su versión web como guía, así que se cubrieron sus funciones (dibujo, salas, Xsheet, papel cebolla, claves de animación de capas, StoryBoard con animatic, exportar PNG/secuencia/sprites/GIF). Siguen fuera: huesos/recortables, nodos de composición editables, sonido, vídeo MP4, StoryBoard PDF, presión de tableta. Falta que la persona elija cuál añadir después."
+}

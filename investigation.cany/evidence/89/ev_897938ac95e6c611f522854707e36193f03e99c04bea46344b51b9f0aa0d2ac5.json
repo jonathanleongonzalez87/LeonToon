@@ -1,0 +1,98 @@
+{
+  "id": "ev_897938ac95e6c611f522854707e36193f03e99c04bea46344b51b9f0aa0d2ac5",
+  "subject": {
+    "kind": "pe",
+    "sha256": "3444bc3c18f29168512fb92e5f56bfa466df99bbe5e937201cf448d99482897a",
+    "name": "HarmonyPremium.exe"
+  },
+  "operation": "native_function_pseudocode",
+  "params": {
+    "function": "0x1403a3a40"
+  },
+  "result": {
+    "calls": [
+      "??0OSW_FileInfo@@QEAA@AEBVQString@@@Z",
+      "??0QChar@@QEAA@D@Z",
+      "??0QFile@@QEAA@AEBVQString@@@Z",
+      "??0QObject@@QEAA@PEAV0@@Z",
+      "??0QString@@QEAA@AEBV0@@Z",
+      "??0QString@@QEAA@PEBD@Z",
+      "??1OSW_FileInfo@@QEAA@XZ",
+      "??1QFile@@UEAA@XZ",
+      "??1QString@@QEAA@XZ",
+      "?displayName@OSW_FileInfo@@QEBA?AVQString@@XZ",
+      "?endsWith@QString@@QEBA_NVQLatin1String@@W4CaseSensitivity@Qt@@@Z",
+      "?exists@QFile@@QEBA_NXZ",
+      "?getString@PR_Preference@@QEAAAEBVQString@@AEBV2@@Z",
+      "?serverCallBack@ST_ServerInfo@@YAP6A_NXZXZ",
+      "?split@QString@@QEBA?AV?$QList@VQString@@@@VQChar@@V?$QFlags@W4SplitBehaviorFlags@Qt@@@@W4CaseSensitivity@Qt@@@Z",
+      "?toLower@QString@@QEGBA?AV1@XZ",
+      "rax",
+      "sub_140017ae0",
+      "sub_140026d80",
+      "sub_140029c80",
+      "sub_140060440",
+      "sub_1409e6230"
+    ],
+    "engine": "clean-room lifter",
+    "entry": "0x1403a3a40",
+    "function": "sub_1403a3a40",
+    "gotos": 9,
+    "inline_asm": 8,
+    "pseudo_code": "int64_t sub_1403a3a40(int64_t rcx)\n{\n    stack_8 = rcx;\n    rbp = &stack_48;\n    r12 = rcx;\n    ebx = 0;\n    arg_a0 = ebx;\n    ??0QObject@@QEAA@PEAV0@@Z(rcx, 0);\n    rax = &data_140bd70d0;\n    *(uint64_t*)(r12) = rax;\n    rax = sub_1409e6230(rbx + 0x30);\n    *(uint64_t*)(rax) = rbx;\n    *(uint64_t*)(rax + 8) = rbx;\n    *(uint64_t*)(rax + 16) = rbx;\n    *(uint64_t*)(rax + 0x18) = rbx;\n    *(uint64_t*)(rax + 0x20) = rbx;\n    *(uint64_t*)(rax + 0x28) = rbx;\n    *(uint64_t*)(r12 + 16) = rax;\n    rax = __imp_?tuPref@@3PEAVPR_Preference@@EA;\n    rdi = *(uint64_t*)(rax);\n    ??0QString@@QEAA@PEBD@Z(&stack_30, \"RECENT_SCENES_LIST\");\n    rax = ?getString@PR_Preference@@QEAAAEBVQString@@AEBV2@@Z(rdi, &stack_30);\n    ??0QString@@QEAA@AEBV0@@Z(&var_8, rax);\n    ??1QString@@QEAA@XZ(&stack_30);\n    rax = ??0QChar@@QEAA@D@Z(&arg_98, 0x24);\n    ?split@QString@@QEBA?AV?$QList@VQString@@@@VQChar@@V?$QFlags@W4SplitBehaviorFlags@Qt@@@@W4CaseSensitivity@Qt@@@Z(&var_8, &stack_70, *(uint16_t*)(rax), ebx, 1);\n    r15l = 0;\n    rax = ?serverCallBack@ST_ServerInfo@@YAP6A_NXZXZ();\n    if (rax != 0) {\n        ?serverCallBack@ST_ServerInfo@@YAP6A_NXZXZ();\n        rax = (*rax)();\n        r15d = al;\n    }\n    ecx = var_80;\n    if (ecx > 0) {\n        rsi = rbx;\n        r14d = ecx;\n        r13 = \".tstage\";\n        rdi = \".tboard\";\n        while (true) {\nlabel_1403a3b50:\n            rax = stack_70;\n            if (rax == 0) {\nlabel_1403a3b67:\n                sub_140026d80(&stack_70, 0, 0, 0);\n            } else {\n                eax = *(uint32_t*)(rax);\n                ebx = arg_a0;\n                if (eax > 1) {\n                    goto label_1403a3b67;\n                }\n            }\n        }\n    }\n    sub_140017ae0(&stack_70);\n    ??1QString@@QEAA@XZ(&var_8);\n    rax = r12;\n    return rax;\n    rax = stack_70;\n    if (rax == 0) {\nlabel_1403a3b90:\n        sub_140026d80(&stack_70, 0, 0, 0);\n    } else {\n        eax = *(uint32_t*)(rax);\n        ebx = arg_a0;\n        if (eax > 1) {\n            goto label_1403a3b90;\n        }\n    }\n    rdx = stack_78;\n    rdx += rsi;\n    ??0QString@@QEAA@AEBV0@@Z(&stack_30);\n    if (r15l != 0) {\nlabel_1403a3ca4:\n        dil = 0;\n    } else {\n        ?toLower@QString@@QEGBA?AV1@XZ(&stack_30, &var_20);\n        ebx |= 1;\n        arg_a0 = ebx;\n        var_70 = 7;\n        var_68 = r13;\n        __asm(\"movaps xmm0, [rbp-0x70]\");\n        __asm(\"movdqa [rsp+0x50], xmm0\");\n        rax = ?endsWith@QString@@QEBA_NVQLatin1String@@W4CaseSensitivity@Qt@@@Z(rax, &stack_50, 1);\n        if (al != 0) {\nlabel_1403a3c9f:\n            dil = 1;\n        } else {\n            ?toLower@QString@@QEGBA?AV1@XZ(&stack_30, &arg_28);\n            ebx |= 2;\n            arg_a0 = ebx;\n            var_60 = 7;\n            var_58 = rdi;\n            __asm(\"movaps xmm0, [rbp-0x60]\");\n            __asm(\"movdqa [rsp+0x50], xmm0\");\n            rax = ?endsWith@QString@@QEBA_NVQLatin1String@@W4CaseSensitivity@Qt@@@Z(rax, &stack_50, 1);\n            if (al != 0) {\n                goto label_1403a3c9f;\n            } else {\n                ?toLower@QString@@QEGBA?AV1@XZ(&stack_30, &arg_10);\n                ebx |= 4;\n                arg_a0 = ebx;\n                var_50 = 5;\n                rcx = \".tbpz\";\n                var_48 = rcx;\n                __asm(\"movaps xmm0, [rbp-0x50]\");\n                __asm(\"movdqa [rsp+0x50], xmm0\");\n                rax = ?endsWith@QString@@QEBA_NVQLatin1String@@W4CaseSensitivity@Qt@@@Z(rax, &stack_50, 1);\n                if (al == 0) {\n                    goto label_1403a3ca4;\n                } else {\n                    goto label_1403a3c9f;\n                }\n            }\n        }\n    }\n    if ((bl & 4) != 0) {\n        ebx &= -5;\n        arg_a0 = ebx;\n        ??1QString@@QEAA@XZ(&arg_10);\n    }\n    if ((bl & 2) != 0) {\n        ebx &= -3;\n        arg_a0 = ebx;\n        ??1QString@@QEAA@XZ(&arg_28);\n    }\n    if ((bl & 1) != 0) {\n        ebx &= -2;\n        arg_a0 = ebx;\n        ??1QString@@QEAA@XZ(&var_20);\n    }\n    if (dil == 0) {\n        ??0QFile@@QEAA@AEBVQString@@@Z(&var_30, &stack_30);\n        if (r15l != 0) {\nlabel_1403a3d5b:\n            dil = 0;\n        } else {\n            ?toLower@QString@@QEGBA?AV1@XZ(&stack_30, &var_20);\n            ebx |= 8;\n            arg_a0 = ebx;\n            var_40 = 7;\n            var_38 = r13;\n            __asm(\"movaps xmm0, [rbp-0x40]\");\n            __asm(\"movdqa [rsp+0x50], xmm0\");\n            rax = ?endsWith@QString@@QEBA_NVQLatin1String@@W4CaseSensitivity@Qt@@@Z(rax, &stack_50, 1);\n            if (al == 0) {\n                goto label_1403a3d5b;\n            } else {\n                dil = 1;\n            }\n        }\n        if ((bl & 8) != 0) {\n            ebx &= -9;\n            arg_a0 = ebx;\n            ??1QString@@QEAA@XZ(&var_20);\n        }\n        rax = ?exists@QFile@@QEBA_NXZ(&var_30);\n        if (al != 0) {\n            if (dil == 0) {\n                rdi = *(uint64_t*)(r12 + 16);\n                sub_140060440(rdi, *(uint64_t*)(rdi + 16), &stack_30);\n                rax = *(uint64_t*)(rdi);\n                if (rax == 0) {\nlabel_1403a3dbc:\n                    sub_140026d80(rdi, 0, 0, 0);\n                } else {\n                    eax = *(uint32_t*)(rax);\n                    ebx = arg_a0;\n                    if (eax > 1) {\n                        goto label_1403a3dbc;\n                    }\n                }\n                rdi = *(uint64_t*)(r12 + 16);\n                rax = ??0OSW_FileInfo@@QEAA@AEBVQString@@@Z(&arg_a8, &stack_30);\n                ?displayName@OSW_FileInfo@@QEBA?AVQString@@XZ(rax, &stack_50);\n                ebx |= 16;\n                arg_a0 = ebx;\n                ??1OSW_FileInfo@@QEAA@XZ(&arg_a8);\n                sub_140029c80(rdi + 0x18, *(uint64_t*)(rdi + 0x28), &stack_50);\n                rax = *(uint64_t*)(rdi + 0x18);\n                if (rax == 0) {\nlabel_1403a3e31:\n                    sub_140026d80(rdi + 0x18, 0, 0, 0);\n                } else {\n                    eax = *(uint32_t*)(rax);\n                    ebx = arg_a0;\n                    if (eax > 1) {\n                        goto label_1403a3e31;\n                    }\n                }\n                ??1QString@@QEAA@XZ(&stack_50);\n            }\n        }\n        ??1QFile@@UEAA@XZ(&var_30);\n    }\n    ??1QString@@QEAA@XZ(&stack_30);\n    rsi += 0x18;\n    r14 -= 1;\n    rdi = \".tboard\";\n    if (r14 != 0) {\n        goto label_1403a3b50;\n    }\n    sub_140017ae0(&stack_70);\n    ??1QString@@QEAA@XZ(&var_8);\n    rax = r12;\n    return rax;\n}\n",
+    "signature": "int64_t sub_1403a3a40(int64_t rcx)",
+    "strings": [
+      "RECENT_SCENES_LIST",
+      ".tstage",
+      ".tboard",
+      ".tbpz"
+    ],
+    "structured": false
+  },
+  "summary": "Pseudo-C for sub_1403a3a40 (207 lines, partly unstructured).",
+  "confidence": "inferred",
+  "authority": "original-files",
+  "environment": {
+    "clean_room": false,
+    "engine": "builtin",
+    "engine_version": "0.5.0",
+    "host": "windows-x86_64"
+  },
+  "limitations": [
+    {
+      "code": "register_level",
+      "message": "variables are machine registers and stack slots; types are not recovered"
+    },
+    {
+      "code": "calling_convention_assumed",
+      "message": "call arguments follow the usual x86_64 convention and may be wrong for unusual functions"
+    },
+    {
+      "code": "conditions_from_flags",
+      "message": "branch conditions are rebuilt from the last compare and may be approximate"
+    },
+    {
+      "code": "unstructured_flow",
+      "message": "9 gotos remain where the control flow isn't a simple if/loop"
+    },
+    {
+      "code": "inline_asm",
+      "message": "8 instructions have no C rule and are shown as __asm(...)"
+    },
+    {
+      "code": "deep_engine_unavailable",
+      "message": "Ghidra couldn't open this program (could not start Ghidra: Ghidra's analysis failed; see C:\\Users\\leont\\AppData\\Roaming\\craft-anything\\engines\\ghidra-cache\\3444bc3c18f29168-f2dfab6faedc84f0.log). So this came from the built-in decompiler, which is less exact."
+    }
+  ],
+  "coverage": {
+    "status": "unknown"
+  },
+  "locations": [
+    {
+      "kind": "address",
+      "value": "0x1403a3a40"
+    }
+  ],
+  "links": [],
+  "carries_target_content": true
+}

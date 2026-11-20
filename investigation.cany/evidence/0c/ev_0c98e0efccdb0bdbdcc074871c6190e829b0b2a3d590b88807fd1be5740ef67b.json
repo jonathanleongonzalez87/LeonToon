@@ -1,0 +1,419 @@
+{
+  "id": "ev_0c98e0efccdb0bdbdcc074871c6190e829b0b2a3d590b88807fd1be5740ef67b",
+  "subject": {
+    "kind": "pe",
+    "sha256": "3444bc3c18f29168512fb92e5f56bfa466df99bbe5e937201cf448d99482897a",
+    "name": "HarmonyPremium.exe"
+  },
+  "operation": "native_strings_find",
+  "params": {
+    "case_sensitive": false,
+    "limit": 80,
+    "mode": "regex",
+    "offset": 0,
+    "pattern": "(?i)splash|welcome|recent ?(scene|file|project)s?|MAX_RECENT|NB_RECENT|RECENT_"
+  },
+  "result": {
+    "matches": [
+      {
+        "address": "0x140b32780",
+        "references": [
+          {
+            "from": "0x14001abd4",
+            "function": "sub_140018390"
+          }
+        ],
+        "section": ".rdata",
+        "text": "-no-welcome-screen"
+      },
+      {
+        "address": "0x140b32a78",
+        "references": [
+          {
+            "from": "0x14001be8f",
+            "function": "sub_140018390"
+          },
+          {
+            "from": "0x14001be9d",
+            "function": "sub_140018390"
+          }
+        ],
+        "section": ".rdata",
+        "text": "splash screen done"
+      },
+      {
+        "address": "0x140b33378",
+        "references": [
+          {
+            "from": "0x14001e84a",
+            "function": "sub_140018390"
+          },
+          {
+            "from": "0x14003a7de",
+            "function": "sub_14003a780"
+          },
+          {
+            "from": "0x14071b7c0",
+            "function": "sub_14071b7a0"
+          },
+          {
+            "from": "0x14071b939",
+            "function": "sub_14071b920"
+          }
+        ],
+        "section": ".rdata",
+        "text": "SHOW_WELCOME_SCREEN_ON_STARTUP"
+      },
+      {
+        "address": "0x140b386c0",
+        "references": [
+          {
+            "from": "0x14002d86b",
+            "function": "sub_14002d7d0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Show Welcome Screen"
+      },
+      {
+        "address": "0x140b3a4a0",
+        "references": [
+          {
+            "from": "0x14004fc4b",
+            "function": "sub_14004fbc0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "welcomeDialog"
+      },
+      {
+        "address": "0x140b3a4b0",
+        "references": [
+          {
+            "from": "0x14004fd0e",
+            "function": "sub_14004fbc0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "welcome/leftArrow.png"
+      },
+      {
+        "address": "0x140b3a4c8",
+        "references": [
+          {
+            "from": "0x14004fdab",
+            "function": "sub_14004fbc0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "welcome/rightArrow.png"
+      },
+      {
+        "address": "0x140b3a5f8",
+        "references": [],
+        "section": ".rdata",
+        "text": "1showWelcomeScreen()"
+      },
+      {
+        "address": "0x140b3cfd0",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionShowWelcomeScreen"
+      },
+      {
+        "address": "0x140b3cfea",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionShowWelcomeScreenValidate"
+      },
+      {
+        "address": "0x140b3d00c",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionShowWelcomeScreenQuit"
+      },
+      {
+        "address": "0x140b3d02a",
+        "references": [],
+        "section": ".rdata",
+        "text": "showWelcomeScreen"
+      },
+      {
+        "address": "0x140b3dded",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionClearRecentSceneList"
+      },
+      {
+        "address": "0x140bd7128",
+        "references": [
+          {
+            "from": "0x1403a3aaa",
+            "function": "sub_1403a3a40"
+          },
+          {
+            "from": "0x1403a4924",
+            "function": "sub_1403a4870"
+          }
+        ],
+        "section": ".rdata",
+        "text": "RECENT_SCENES_LIST"
+      },
+      {
+        "address": "0x140bd75a8",
+        "references": [
+          {
+            "from": "0x1403a51f4",
+            "function": "sub_1403a5030"
+          }
+        ],
+        "section": ".rdata",
+        "text": "/forms/AB_WelcomeWidget.ui"
+      },
+      {
+        "address": "0x140bd7670",
+        "references": [
+          {
+            "from": "0x1403a553f",
+            "function": "sub_1403a5030"
+          }
+        ],
+        "section": ".rdata",
+        "text": "recentProjects"
+      },
+      {
+        "address": "0x140bd77f0",
+        "references": [
+          {
+            "from": "0x1403a5965",
+            "function": "sub_1403a5030"
+          }
+        ],
+        "section": ".rdata",
+        "text": "welcome/video_image.png"
+      },
+      {
+        "address": "0x140bd7808",
+        "references": [
+          {
+            "from": "0x1403a5977",
+            "function": "sub_1403a5030"
+          }
+        ],
+        "section": ".rdata",
+        "text": "welcome/support_image.png"
+      },
+      {
+        "address": "0x140bd7828",
+        "references": [
+          {
+            "from": "0x1403a599f",
+            "function": "sub_1403a5030"
+          }
+        ],
+        "section": ".rdata",
+        "text": "storyboard/welcome/video_image.png"
+      },
+      {
+        "address": "0x140bd7850",
+        "references": [
+          {
+            "from": "0x1403a59b0",
+            "function": "sub_1403a5030"
+          }
+        ],
+        "section": ".rdata",
+        "text": "storyboard/welcome/support_image.png"
+      },
+      {
+        "address": "0x140bd7a18",
+        "references": [
+          {
+            "from": "0x1403a718f",
+            "function": "sub_1403a7180"
+          }
+        ],
+        "section": ".rdata",
+        "text": "1openWelcomeImage()"
+      },
+      {
+        "address": "0x140be8f48",
+        "references": [
+          {
+            "from": "0x14041f35e",
+            "function": "sub_14041de90"
+          }
+        ],
+        "section": ".rdata",
+        "text": "-no-splash-screen"
+      },
+      {
+        "address": "0x140be9ac8",
+        "references": [
+          {
+            "from": "0x140f63d38",
+            "function": null
+          }
+        ],
+        "section": ".rdata",
+        "text": "AB_WelcomeDialog"
+      },
+      {
+        "address": "0x140be9af8",
+        "references": [],
+        "section": ".rdata",
+        "text": "AB_WelcomeActionDelayer"
+      },
+      {
+        "address": "0x140be9cd8",
+        "references": [],
+        "section": ".rdata",
+        "text": "AB_WelcomeWidget"
+      },
+      {
+        "address": "0x140bea088",
+        "references": [
+          {
+            "from": "0x140425fc2",
+            "function": "sub_140425fa0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "AB_WelcomeDialog"
+      },
+      {
+        "address": "0x140bea099",
+        "references": [],
+        "section": ".rdata",
+        "text": "openWelcomeImage"
+      },
+      {
+        "address": "0x140bea180",
+        "references": [
+          {
+            "from": "0x140f63da8",
+            "function": null
+          }
+        ],
+        "section": ".rdata",
+        "text": "AB_WelcomeActionDelayer"
+      },
+      {
+        "address": "0x140bea198",
+        "references": [
+          {
+            "from": "0x140f63e18",
+            "function": null
+          }
+        ],
+        "section": ".rdata",
+        "text": "AB_WelcomeWidget"
+      },
+      {
+        "address": "0x140c4afe0",
+        "references": [
+          {
+            "from": "0x14071af68",
+            "function": "sub_14071ada0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "SCUI_WelcomeInterface"
+      },
+      {
+        "address": "0x140c7f3c0",
+        "references": [
+          {
+            "from": "0x14081e70d",
+            "function": "sub_14081e620"
+          }
+        ],
+        "section": ".rdata",
+        "text": "SHOW_WELCOME_VALUE"
+      },
+      {
+        "address": "0x140e6a678",
+        "references": [],
+        "section": ".rdata",
+        "text": "?forceWelcomeScreen@WHO_Features@@SA_NXZ"
+      },
+      {
+        "address": "0x140e6fc94",
+        "references": [],
+        "section": ".rdata",
+        "text": "?trWelcome@WHO_StringTable@@SA?AVQString@@XZ"
+      },
+      {
+        "address": "0x140e766b4",
+        "references": [],
+        "section": ".rdata",
+        "text": "?createSplashScreen@BUIAPP_Application@@QEAAXXZ"
+      },
+      {
+        "address": "0x140ea8fe2",
+        "references": [],
+        "section": ".rdata",
+        "text": "??0TUDbSelectSingleDbClient@@QEAA@V?$vector@W4dba_userType_types@TUDbAccess@@V?$allocator@W4dba_userType_types@TUDbAccess@@@std@@@std@@_N11V?$QPointer@VQSplashScreen@@@@@Z"
+      },
+      {
+        "address": "0x140eb2fba",
+        "references": [],
+        "section": ".rdata",
+        "text": "?setRecentScene@PR_LocalCachePref@@QEAAXAEBVQString@@@Z"
+      },
+      {
+        "address": "0x140f97bd0",
+        "references": [],
+        "section": ".data",
+        "text": ".?AVAB_WelcomeWidget@@"
+      },
+      {
+        "address": "0x140f97bf8",
+        "references": [],
+        "section": ".data",
+        "text": ".?AVAB_WelcomeDialog@@"
+      },
+      {
+        "address": "0x140f97c48",
+        "references": [],
+        "section": ".data",
+        "text": ".?AVAB_WelcomeActionDelayer@@"
+      },
+      {
+        "address": "0x140fa18e8",
+        "references": [],
+        "section": ".data",
+        "text": ".?AVAB_WelcomeInterface@@"
+      },
+      {
+        "address": "0x140fa1948",
+        "references": [],
+        "section": ".data",
+        "text": ".?AVSCUI_WelcomeInterface@@"
+      }
+    ],
+    "total": 41
+  },
+  "summary": "41 strings match \"(?i)splash|welcome|recent ?(scene|file|project)s?|MAX_RECENT|NB_RECENT|RECENT_\".",
+  "confidence": "observed",
+  "authority": "original-files",
+  "environment": {
+    "clean_room": false,
+    "engine": "builtin",
+    "engine_version": "0.5.0",
+    "host": "windows-x86_64"
+  },
+  "limitations": [
+    {
+      "code": "data_sections_only",
+      "message": "only strings stored in the file are searched (absence is not proof)"
+    }
+  ],
+  "coverage": {
+    "status": "complete",
+    "examined": 41,
+    "total": 41
+  },
+  "locations": [],
+  "links": []
+}

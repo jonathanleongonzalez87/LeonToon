@@ -1,0 +1,75 @@
+{
+  "id": "ev_a697324d828ac86b99b52a5868c2292498f906294b034cda686303b0bc2acf41",
+  "subject": {
+    "kind": "pe",
+    "sha256": "3444bc3c18f29168512fb92e5f56bfa466df99bbe5e937201cf448d99482897a",
+    "name": "HarmonyPremium.exe"
+  },
+  "operation": "native_function_pseudocode",
+  "params": {
+    "function": "0x14047b990"
+  },
+  "result": {
+    "calls": [
+      "?setSingleShot@QTimer@@QEAAX_N@Z",
+      "?start@QTimer@@QEAAXH@Z",
+      "?stop@QTimer@@QEAAXXZ",
+      "sub_14047c060"
+    ],
+    "engine": "clean-room lifter",
+    "entry": "0x14047b990",
+    "function": "sub_14047b990",
+    "gotos": 8,
+    "inline_asm": 3,
+    "pseudo_code": "int64_t sub_14047b990(int64_t rcx, int64_t rdx, int64_t r8, int64_t r9)\n{\n    stack_8 = rbx;\n    stack_10 = rbp;\n    stack_18 = rsi;\n    edi = r9d;\n    esi = r8d;\n    rbx = rcx;\n    if (*(uint32_t*)(rcx + 0x2d8) == 0) {\n        sub_14047c060();\n    }\n    r11d = *(uint32_t*)(rbx + 0x350);\n    r10d = *(uint32_t*)(rbx + 0x358);\n    r9d = *(uint32_t*)(rbx + 0x354);\n    edx = r11 + rbp;\n    ecx = r10 + rdi;\n    *(uint32_t*)(rbx + 0x350) = edx;\n    edi = 0;\n    *(uint32_t*)(rbx + 0x358) = ecx;\n    eax = r9 + rsi;\n    *(uint32_t*)(rbx + 0x354) = eax;\n    if (r11d <= 0) {\nlabel_14047b9fb:\n        r8d = edx;\n        if (r11d < 0) {\n            if (edx > 0) {\nlabel_14047ba07:\n                *(uint32_t*)(rbx + 0x350) = edi;\n                r8d = edi;\n            }\n        }\n    } else {\n        if (edx < 0) {\n            goto label_14047ba07;\n        } else {\n            goto label_14047b9fb;\n        }\n    }\n    if (r9d <= 0) {\nlabel_14047ba19:\n        edx = eax;\n        if (r9d < 0) {\n            if (eax > 0) {\nlabel_14047ba24:\n                *(uint32_t*)(rbx + 0x354) = edi;\n                edx = edi;\n            }\n        }\n    } else {\n        if (eax < 0) {\n            goto label_14047ba24;\n        } else {\n            goto label_14047ba19;\n        }\n    }\n    if (r10d <= 0) {\nlabel_14047ba35:\n        eax = ecx;\n        if (r10d < 0) {\n            if (ecx > 0) {\nlabel_14047ba40:\n                *(uint32_t*)(rbx + 0x358) = edi;\n                eax = edi;\n            }\n        }\n    } else {\n        if (ecx < 0) {\n            goto label_14047ba40;\n        } else {\n            goto label_14047ba35;\n        }\n    }\n    if (r8d != 0) {\nlabel_14047ba64:\n        ?setSingleShot@QTimer@@QEAAX_N@Z(*(uint64_t*)(rbx + 0x360), 0);\n        __asm(\"movsd xmm0, [0x140b3a568]\");\n        __asm(\"divsd xmm0, [rbx+0x340]\");\n        __asm(\"cvttsd2si edx, xmm0\");\n        ?start@QTimer@@QEAAXH@Z(*(uint64_t*)(rbx + 0x360));\n    } else {\n        if (edx != 0) {\n            goto label_14047ba64;\n        } else {\n            if (eax != 0) {\n                goto label_14047ba64;\n            } else {\n                ?stop@QTimer@@QEAAXXZ(*(uint64_t*)(rbx + 0x360));\n            }\n        }\n    }\n    rbx = stack_30;\n    rsi = stack_40;\n    return rax;\n}\n",
+    "signature": "int64_t sub_14047b990(int64_t rcx, int64_t rdx, int64_t r8, int64_t r9)",
+    "strings": [],
+    "structured": false
+  },
+  "summary": "Pseudo-C for sub_14047b990 (94 lines, partly unstructured).",
+  "confidence": "inferred",
+  "authority": "original-files",
+  "environment": {
+    "clean_room": false,
+    "engine": "builtin",
+    "engine_version": "0.5.0",
+    "host": "windows-x86_64"
+  },
+  "limitations": [
+    {
+      "code": "register_level",
+      "message": "variables are machine registers and stack slots; types are not recovered"
+    },
+    {
+      "code": "calling_convention_assumed",
+      "message": "call arguments follow the usual x86_64 convention and may be wrong for unusual functions"
+    },
+    {
+      "code": "conditions_from_flags",
+      "message": "branch conditions are rebuilt from the last compare and may be approximate"
+    },
+    {
+      "code": "unstructured_flow",
+      "message": "8 gotos remain where the control flow isn't a simple if/loop"
+    },
+    {
+      "code": "inline_asm",
+      "message": "3 instructions have no C rule and are shown as __asm(...)"
+    },
+    {
+      "code": "deep_engine_unavailable",
+      "message": "Ghidra couldn't open this program (could not start Ghidra: Ghidra's analysis failed; see C:\\Users\\leont\\AppData\\Roaming\\craft-anything\\engines\\ghidra-cache\\3444bc3c18f29168-f2dfab6faedc84f0.log). So this came from the built-in decompiler, which is less exact."
+    }
+  ],
+  "coverage": {
+    "status": "unknown"
+  },
+  "locations": [
+    {
+      "kind": "address",
+      "value": "0x14047b990"
+    }
+  ],
+  "links": [],
+  "carries_target_content": true
+}

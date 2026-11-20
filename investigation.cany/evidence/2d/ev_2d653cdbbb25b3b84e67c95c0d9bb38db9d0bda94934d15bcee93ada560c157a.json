@@ -1,0 +1,173 @@
+{
+  "id": "ev_2d653cdbbb25b3b84e67c95c0d9bb38db9d0bda94934d15bcee93ada560c157a",
+  "subject": {
+    "kind": "pe",
+    "sha256": "3444bc3c18f29168512fb92e5f56bfa466df99bbe5e937201cf448d99482897a",
+    "name": "HarmonyPremium.exe"
+  },
+  "operation": "native_strings_find",
+  "params": {
+    "case_sensitive": true,
+    "limit": 80,
+    "mode": "regex",
+    "offset": 0,
+    "pattern": "^(SELECT|DRAWING_SELECT|TRANSFORM|ROTATION_HANDLE|DRAWING_ROTATE|EASE|DEFAULT_EASE|FUNCTION|ANIMATION_DEFAULT|DEFAULT_KEYFRAME|KEYFRAME|DRAWING_SUBSTITUTION|SUBSTITUTION)[A-Z_]*$"
+  },
+  "result": {
+    "matches": [
+      {
+        "address": "0x140bc87a0",
+        "references": [
+          {
+            "from": "0x14036d740",
+            "function": "sub_14036d2c0"
+          },
+          {
+            "from": "0x14036df75",
+            "function": "sub_14036df30"
+          }
+        ],
+        "section": ".rdata",
+        "text": "FUNCTION_EDITOR_SHOW_MOTION"
+      },
+      {
+        "address": "0x140bc87c0",
+        "references": [
+          {
+            "from": "0x14036d787",
+            "function": "sub_14036d2c0"
+          },
+          {
+            "from": "0x14036dfbb",
+            "function": "sub_14036df30"
+          }
+        ],
+        "section": ".rdata",
+        "text": "FUNCTION_EDITOR_SHOW_ROTATION"
+      },
+      {
+        "address": "0x140bc87e0",
+        "references": [
+          {
+            "from": "0x14036d7ce",
+            "function": "sub_14036d2c0"
+          },
+          {
+            "from": "0x14036e001",
+            "function": "sub_14036df30"
+          }
+        ],
+        "section": ".rdata",
+        "text": "FUNCTION_EDITOR_SHOW_SCALE"
+      },
+      {
+        "address": "0x140bc8800",
+        "references": [
+          {
+            "from": "0x14036d81a",
+            "function": "sub_14036d2c0"
+          },
+          {
+            "from": "0x14036e04c",
+            "function": "sub_14036df30"
+          }
+        ],
+        "section": ".rdata",
+        "text": "FUNCTION_EDITOR_SHOW_SKEW"
+      },
+      {
+        "address": "0x140bc8820",
+        "references": [
+          {
+            "from": "0x14036d861",
+            "function": "sub_14036d2c0"
+          },
+          {
+            "from": "0x14036e092",
+            "function": "sub_14036df30"
+          }
+        ],
+        "section": ".rdata",
+        "text": "FUNCTION_EDITOR_SHOW_OTHER"
+      },
+      {
+        "address": "0x140bd9ef0",
+        "references": [
+          {
+            "from": "0x1403b4ed7",
+            "function": "sub_1403b45e0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "DRAWING_SELECT_TOOL_KEY"
+      },
+      {
+        "address": "0x140bda038",
+        "references": [
+          {
+            "from": "0x1403b5358",
+            "function": "sub_1403b45e0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "DRAWING_SELECT_TOOL_BY_COLOR_KEY"
+      },
+      {
+        "address": "0x140c11c78",
+        "references": [
+          {
+            "from": "0x1404b132a",
+            "function": "sub_1404b11e0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "KEYFRAME_INTERVAL"
+      },
+      {
+        "address": "0x140c8ab08",
+        "references": [
+          {
+            "from": "0x14088a9f3",
+            "function": "sub_14088a790"
+          }
+        ],
+        "section": ".rdata",
+        "text": "EASE"
+      },
+      {
+        "address": "0x140ca2cf8",
+        "references": [
+          {
+            "from": "0x140966392",
+            "function": "sub_1409662f0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "TRANSFORM_MATRIX"
+      }
+    ],
+    "total": 10
+  },
+  "summary": "10 strings match \"^(SELECT|DRAWING_SELECT|TRANSFORM|ROTATION_HANDLE|DRAWING_ROTATE|EASE|DEFAULT_EASE|FUNCTION|ANIMATION_DEFAULT|DEFAULT_KEYFRAME|KEYFRAME|DRAWING_SUBSTITUTION|SUBSTITUTION)[A-Z_]*$\".",
+  "confidence": "observed",
+  "authority": "original-files",
+  "environment": {
+    "clean_room": false,
+    "engine": "builtin",
+    "engine_version": "0.5.0",
+    "host": "windows-x86_64"
+  },
+  "limitations": [
+    {
+      "code": "data_sections_only",
+      "message": "only strings stored in the file are searched (absence is not proof)"
+    }
+  ],
+  "coverage": {
+    "status": "complete",
+    "examined": 10,
+    "total": 10
+  },
+  "locations": [],
+  "links": []
+}

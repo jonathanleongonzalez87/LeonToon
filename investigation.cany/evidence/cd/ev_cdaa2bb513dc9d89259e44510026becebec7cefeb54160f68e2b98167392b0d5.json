@@ -1,0 +1,596 @@
+{
+  "id": "ev_cdaa2bb513dc9d89259e44510026becebec7cefeb54160f68e2b98167392b0d5",
+  "subject": {
+    "kind": "pe",
+    "sha256": "3444bc3c18f29168512fb92e5f56bfa466df99bbe5e937201cf448d99482897a",
+    "name": "HarmonyPremium.exe"
+  },
+  "operation": "native_strings_find",
+  "params": {
+    "case_sensitive": false,
+    "limit": 60,
+    "mode": "regex",
+    "offset": 0,
+    "pattern": "(?i)^[A-Z_]*ZOOM[A-Z_]*$|zoomIn|zoomOut|ZoomIn|ZoomOut"
+  },
+  "result": {
+    "matches": [
+      {
+        "address": "0x140b3e8d6",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionChooseZoomTool"
+      },
+      {
+        "address": "0x140b3e8ed",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionChooseZoomToolValidate"
+      },
+      {
+        "address": "0x140b51718",
+        "references": [
+          {
+            "from": "0x140104aed",
+            "function": "sub_140104910"
+          },
+          {
+            "from": "0x14036b3d1",
+            "function": "sub_14036b270"
+          },
+          {
+            "from": "0x1403b5899",
+            "function": "sub_1403b5760"
+          },
+          {
+            "from": "0x1403c81d9",
+            "function": "sub_1403c80c0"
+          },
+          {
+            "from": "0x14047b8ed",
+            "function": "sub_14047b850"
+          },
+          {
+            "from": "0x14047cf79",
+            "function": "sub_14047ccb0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "WHEEL_ZOOM_THRESHOLD"
+      },
+      {
+        "address": "0x140b51770",
+        "references": [
+          {
+            "from": "0x1400ff3e1",
+            "function": "sub_1400ff330"
+          },
+          {
+            "from": "0x1400ff701",
+            "function": "sub_1400ff650"
+          },
+          {
+            "from": "0x140118baa",
+            "function": "sub_140118af0"
+          },
+          {
+            "from": "0x140207ff7",
+            "function": "sub_140207fe0"
+          },
+          {
+            "from": "0x1402080e7",
+            "function": "sub_1402080d0"
+          },
+          {
+            "from": "0x14036fb3e",
+            "function": "sub_14036faf0"
+          },
+          {
+            "from": "0x14036fd8e",
+            "function": "sub_14036fd40"
+          },
+          {
+            "from": "0x14036ffde",
+            "function": "sub_14036ff90"
+          },
+          {
+            "from": "0x14037022e",
+            "function": "sub_1403701e0"
+          },
+          {
+            "from": "0x14037047e",
+            "function": "sub_140370430"
+          },
+          {
+            "from": "0x1403706ce",
+            "function": "sub_140370680"
+          },
+          {
+            "from": "0x1403b896f",
+            "function": "sub_1403b8900"
+          },
+          {
+            "from": "0x1403b8bcf",
+            "function": "sub_1403b8b60"
+          },
+          {
+            "from": "0x1403c8470",
+            "function": "sub_1403c8440"
+          },
+          {
+            "from": "0x1403c8630",
+            "function": "sub_1403c8600"
+          }
+        ],
+        "section": ".rdata",
+        "text": "SHORTCUT_ZOOM_ON_MOUSE"
+      },
+      {
+        "address": "0x140b521a8",
+        "references": [
+          {
+            "from": "0x1400efec9",
+            "function": "sub_1400efea0"
+          },
+          {
+            "from": "0x140157dad",
+            "function": "sub_140157d70"
+          },
+          {
+            "from": "0x140158858",
+            "function": "sub_140158680"
+          },
+          {
+            "from": "0x14026a76a",
+            "function": "sub_14026a710"
+          },
+          {
+            "from": "0x14026ab66",
+            "function": "sub_14026aaf0"
+          },
+          {
+            "from": "0x140362d28",
+            "function": "sub_140362ce0"
+          },
+          {
+            "from": "0x14036858e",
+            "function": "sub_140368400"
+          },
+          {
+            "from": "0x1403900c8",
+            "function": "sub_140390040"
+          },
+          {
+            "from": "0x14046fa30",
+            "function": "sub_14046f9f0"
+          },
+          {
+            "from": "0x1404cd7e8",
+            "function": "sub_1404cd750"
+          }
+        ],
+        "section": ".rdata",
+        "text": "FREE_PAN_AND_ZOOM_KEY"
+      },
+      {
+        "address": "0x140b52fa0",
+        "references": [
+          {
+            "from": "0x140106e6c",
+            "function": "sub_140106d90"
+          },
+          {
+            "from": "0x140107854",
+            "function": "sub_140107770"
+          }
+        ],
+        "section": ".rdata",
+        "text": "XSHEET_MAX_ZOOM"
+      },
+      {
+        "address": "0x140b52fb0",
+        "references": [
+          {
+            "from": "0x140106eb4",
+            "function": "sub_140106d90"
+          },
+          {
+            "from": "0x14010789d",
+            "function": "sub_140107770"
+          }
+        ],
+        "section": ".rdata",
+        "text": "XSHEET_MIN_ZOOM"
+      },
+      {
+        "address": "0x140b5c9c2",
+        "references": [],
+        "section": ".rdata",
+        "text": "getZoomInMode"
+      },
+      {
+        "address": "0x140b5c9d0",
+        "references": [],
+        "section": ".rdata",
+        "text": "setZoomInMode"
+      },
+      {
+        "address": "0x140b5d526",
+        "references": [],
+        "section": ".rdata",
+        "text": "zoomInMode"
+      },
+      {
+        "address": "0x140b62cce",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionZoomIn"
+      },
+      {
+        "address": "0x140b62cdd",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionZoomInValidate"
+      },
+      {
+        "address": "0x140b62cfd",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionZoomOut"
+      },
+      {
+        "address": "0x140b62d0d",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionZoomOutValidate"
+      },
+      {
+        "address": "0x140b62d25",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionResetZoom"
+      },
+      {
+        "address": "0x140b62d37",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionResetZoomValidate"
+      },
+      {
+        "address": "0x140b6d5ce",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionZoomIn"
+      },
+      {
+        "address": "0x140b6d5dd",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionZoomOut"
+      },
+      {
+        "address": "0x140b6d5ed",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionZoomExtents"
+      },
+      {
+        "address": "0x140b6d601",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionResetZoom"
+      },
+      {
+        "address": "0x140b6da29",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionZoomInValidate"
+      },
+      {
+        "address": "0x140b6da40",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionZoomOutValidate"
+      },
+      {
+        "address": "0x140b6da58",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionResetZoomValidate"
+      },
+      {
+        "address": "0x140b6dc9a",
+        "references": [],
+        "section": ".rdata",
+        "text": "unitZoomLevel"
+      },
+      {
+        "address": "0x140b84df4",
+        "references": [],
+        "section": ".rdata",
+        "text": "editWaveformZoomFactor"
+      },
+      {
+        "address": "0x140b92dca",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionZoomIn"
+      },
+      {
+        "address": "0x140b92dd9",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionZoomInValidate"
+      },
+      {
+        "address": "0x140b92df0",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionZoomOut"
+      },
+      {
+        "address": "0x140b92e00",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionZoomOutValidate"
+      },
+      {
+        "address": "0x140b92e18",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionResetZoom"
+      },
+      {
+        "address": "0x140b92e2a",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionResetZoomValidate"
+      },
+      {
+        "address": "0x140ba222a",
+        "references": [],
+        "section": ".rdata",
+        "text": "SetWaveformZoomFactor"
+      },
+      {
+        "address": "0x140bb3180",
+        "references": [
+          {
+            "from": "0x1402fd252",
+            "function": "sub_1402fc640"
+          }
+        ],
+        "section": ".rdata",
+        "text": "1zoomInClicked(bool)"
+      },
+      {
+        "address": "0x140bb3198",
+        "references": [
+          {
+            "from": "0x1402fd287",
+            "function": "sub_1402fc640"
+          }
+        ],
+        "section": ".rdata",
+        "text": "1zoomOutClicked(bool)"
+      },
+      {
+        "address": "0x140bb59b5",
+        "references": [],
+        "section": ".rdata",
+        "text": "onZoomHorizontalChanged"
+      },
+      {
+        "address": "0x140bba76a",
+        "references": [],
+        "section": ".rdata",
+        "text": "zoomInClicked"
+      },
+      {
+        "address": "0x140bba779",
+        "references": [],
+        "section": ".rdata",
+        "text": "zoomOutClicked"
+      },
+      {
+        "address": "0x140bc4d50",
+        "references": [
+          {
+            "from": "0x14035c3e7",
+            "function": "sub_14035c2b0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Zoom"
+      },
+      {
+        "address": "0x140bc701e",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionResetZoom"
+      },
+      {
+        "address": "0x140bc721a",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionResetZoomValidate"
+      },
+      {
+        "address": "0x140bcc857",
+        "references": [],
+        "section": ".rdata",
+        "text": "zoomChanged"
+      },
+      {
+        "address": "0x140bcfcf7",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionResetZoom"
+      },
+      {
+        "address": "0x140bd1002",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionZoomIn"
+      },
+      {
+        "address": "0x140bd1011",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionZoomOut"
+      },
+      {
+        "address": "0x140bd1021",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionZoomInX"
+      },
+      {
+        "address": "0x140bd1031",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionZoomOutX"
+      },
+      {
+        "address": "0x140bd1042",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionZoomInY"
+      },
+      {
+        "address": "0x140bd1052",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionZoomOutY"
+      },
+      {
+        "address": "0x140bd9e80",
+        "references": [
+          {
+            "from": "0x1403b4d1e",
+            "function": "sub_1403b45e0"
+          },
+          {
+            "from": "0x1403c7f73",
+            "function": "sub_1403c7ef0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "DRAWING_ZOOM_TOOL_KEY"
+      },
+      {
+        "address": "0x140bdfac0",
+        "references": [
+          {
+            "from": "0x1403d9ea0",
+            "function": "sub_1403d9200"
+          },
+          {
+            "from": "0x1403dc0d9",
+            "function": "sub_1403dc080"
+          }
+        ],
+        "section": ".rdata",
+        "text": "DRAWING_PICKER_ZOOM"
+      },
+      {
+        "address": "0x140be3f20",
+        "references": [
+          {
+            "from": "0x1403f437b",
+            "function": "sub_1403f4350"
+          }
+        ],
+        "section": ".rdata",
+        "text": "DRAWING_VIEW_DO_NOT_ZOOM_WHEN_RESIZE"
+      },
+      {
+        "address": "0x140be8c50",
+        "references": [
+          {
+            "from": "0x140421319",
+            "function": "sub_140420780"
+          },
+          {
+            "from": "0x14042324b",
+            "function": "sub_1404231b0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "LIBRARY_TEMPLATE_ZOOM"
+      },
+      {
+        "address": "0x140bed7bf",
+        "references": [],
+        "section": ".rdata",
+        "text": "OnZoomFactorActivated"
+      },
+      {
+        "address": "0x140bed7de",
+        "references": [],
+        "section": ".rdata",
+        "text": "OnPopUpZoom"
+      },
+      {
+        "address": "0x140bed7f5",
+        "references": [],
+        "section": ".rdata",
+        "text": "OnAboutToShowZoomPopup"
+      },
+      {
+        "address": "0x140bee66a",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionChooseZoomToolOverride"
+      },
+      {
+        "address": "0x140bee7e4",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionZoomIn"
+      },
+      {
+        "address": "0x140bee7f3",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionZoomInValidate"
+      },
+      {
+        "address": "0x140bee80a",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionZoomOut"
+      },
+      {
+        "address": "0x140bee81a",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionZoomOutValidate"
+      }
+    ],
+    "total": 134
+  },
+  "summary": "134 strings match \"(?i)^[A-Z_]*ZOOM[A-Z_]*$|zoomIn|zoomOut|ZoomIn|ZoomOut\".",
+  "confidence": "observed",
+  "authority": "original-files",
+  "environment": {
+    "clean_room": false,
+    "engine": "builtin",
+    "engine_version": "0.5.0",
+    "host": "windows-x86_64"
+  },
+  "limitations": [
+    {
+      "code": "data_sections_only",
+      "message": "only strings stored in the file are searched (absence is not proof)"
+    }
+  ],
+  "coverage": {
+    "status": "partial",
+    "examined": 60,
+    "total": 134,
+    "next_offset": 60
+  },
+  "locations": [],
+  "links": []
+}

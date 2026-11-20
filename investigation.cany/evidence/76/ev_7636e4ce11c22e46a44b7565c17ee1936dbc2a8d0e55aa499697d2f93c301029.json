@@ -1,0 +1,72 @@
+{
+  "id": "ev_7636e4ce11c22e46a44b7565c17ee1936dbc2a8d0e55aa499697d2f93c301029",
+  "subject": {
+    "kind": "pe",
+    "sha256": "3444bc3c18f29168512fb92e5f56bfa466df99bbe5e937201cf448d99482897a",
+    "name": "HarmonyPremium.exe"
+  },
+  "operation": "native_function_pseudocode",
+  "params": {
+    "function": "0x1404180b0"
+  },
+  "result": {
+    "calls": [
+      "*(uint64_t*)(rax + 0xf0",
+      "??0QString@@QEAA@PEBD@Z",
+      "??1QString@@QEAA@XZ",
+      "?blockSignals@QObject@@QEAA_N_N@Z",
+      "?setBoolValue@PR_Preference@@QEAAXAEBVQString@@_N@Z",
+      "?setChecked@QAction@@QEAAX_N@Z",
+      "?signalsBlocked@QObject@@QEBA_NXZ"
+    ],
+    "engine": "clean-room lifter",
+    "entry": "0x1404180b0",
+    "function": "sub_1404180b0",
+    "gotos": 0,
+    "inline_asm": 0,
+    "pseudo_code": "int64_t sub_1404180b0(int64_t rcx, int64_t rdx, int64_t r8)\n{\n    stack_8 = rbx;\n    stack_10 = rbp;\n    stack_18 = rsi;\n    rsi = rcx;\n    if (dl != *(uint8_t*)(rcx + 0x7a)) {\n        *(uint8_t*)(rcx + 0x7a) = dl;\n        rdi = *(uint64_t*)(rcx + 0x160);\n        if (rdi != 0) {\n            rax = ?signalsBlocked@QObject@@QEBA_NXZ(rdi, rdx, r8, r9, rdi);\n            ebx = al;\n            stack_28 = al;\n            ?blockSignals@QObject@@QEAA_N_N@Z(rdi, 1);\n            ?setChecked@QAction@@QEAAX_N@Z(rdi, *(uint8_t*)(rsi + 0x7a));\n            ?blockSignals@QObject@@QEAA_N_N@Z(rdi, bl);\n            edx = *(uint8_t*)(rsi + 0x7a);\n        }\n        rax = *(uint64_t*)(rsi);\n        (**(uint64_t*)(rax + 0xf0))(rsi);\n        if (bpl != 0) {\n            rax = __imp_?tuPref@@3PEAVPR_Preference@@EA;\n            rdi = *(uint64_t*)(rax);\n            ebx = *(uint8_t*)(rsi + 0x7a);\n            ??0QString@@QEAA@PEBD@Z(&stack_20, \"PLAY_ENABLE_LOOP\");\n            ?setBoolValue@PR_Preference@@QEAAXAEBVQString@@_N@Z(rdi, &stack_20, bl);\n            ??1QString@@QEAA@XZ(&stack_20);\n        }\n    }\n    rbx = stack_50;\n    rsi = stack_60;\n    return rax;\n}\n",
+    "signature": "int64_t sub_1404180b0(int64_t rcx, int64_t rdx, int64_t r8)",
+    "strings": [
+      "PLAY_ENABLE_LOOP"
+    ],
+    "structured": true
+  },
+  "summary": "Pseudo-C for sub_1404180b0 (33 lines).",
+  "confidence": "inferred",
+  "authority": "original-files",
+  "environment": {
+    "clean_room": false,
+    "engine": "builtin",
+    "engine_version": "0.5.0",
+    "host": "windows-x86_64"
+  },
+  "limitations": [
+    {
+      "code": "register_level",
+      "message": "variables are machine registers and stack slots; types are not recovered"
+    },
+    {
+      "code": "calling_convention_assumed",
+      "message": "call arguments follow the usual x86_64 convention and may be wrong for unusual functions"
+    },
+    {
+      "code": "conditions_from_flags",
+      "message": "branch conditions are rebuilt from the last compare and may be approximate"
+    },
+    {
+      "code": "deep_engine_unavailable",
+      "message": "Ghidra couldn't open this program (could not start Ghidra: Ghidra's analysis failed; see C:\\Users\\leont\\AppData\\Roaming\\craft-anything\\engines\\ghidra-cache\\3444bc3c18f29168-f2dfab6faedc84f0.log). So this came from the built-in decompiler, which is less exact."
+    }
+  ],
+  "coverage": {
+    "status": "unknown"
+  },
+  "locations": [
+    {
+      "kind": "address",
+      "value": "0x1404180b0"
+    }
+  ],
+  "links": [],
+  "carries_target_content": true
+}

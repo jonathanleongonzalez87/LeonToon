@@ -1,0 +1,46 @@
+{
+  "id": "ev_54337e3c812b490042357870a44d1b79728334bfcc81b1402db293c2f26a1100",
+  "subject": {
+    "kind": "pe",
+    "sha256": "3444bc3c18f29168512fb92e5f56bfa466df99bbe5e937201cf448d99482897a",
+    "name": "HarmonyPremium.exe"
+  },
+  "operation": "native_data_show",
+  "params": {
+    "address": "0x140b52248",
+    "type": "f64"
+  },
+  "result": {
+    "address": "0x140b52248",
+    "name": null,
+    "references_to": 90,
+    "section": ".rdata",
+    "type": "f64",
+    "value": "10.0"
+  },
+  "summary": "0x140b52248 looks like f64.",
+  "confidence": "observed",
+  "authority": "original-files",
+  "environment": {
+    "clean_room": false,
+    "engine": "builtin",
+    "engine_version": "0.5.0",
+    "host": "windows-x86_64"
+  },
+  "limitations": [
+    {
+      "code": "no_type_recovery",
+      "message": "the clean-room engine doesn't recover declared types; this reads the bytes and infers what they look like"
+    }
+  ],
+  "coverage": {
+    "status": "unknown"
+  },
+  "locations": [
+    {
+      "kind": "address",
+      "value": "0x140b52248"
+    }
+  ],
+  "links": []
+}

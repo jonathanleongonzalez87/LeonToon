@@ -1,0 +1,82 @@
+{
+  "id": "ev_cd9e32cc9e98c79420e1a329abbf3f01564f8714b3257204cc3f02ca8da763e9",
+  "subject": {
+    "kind": "pe",
+    "sha256": "3444bc3c18f29168512fb92e5f56bfa466df99bbe5e937201cf448d99482897a",
+    "name": "HarmonyPremium.exe"
+  },
+  "operation": "native_function_pseudocode",
+  "params": {
+    "function": "0x140529b10"
+  },
+  "result": {
+    "calls": [
+      "??0QByteArray@@QEAA@PEBD_J@Z",
+      "??1QByteArray@@QEAA@XZ",
+      "?castHelper@QByteArrayView@@CAPEBDPEBD@Z",
+      "?compareMemory@QtPrivate@@YAHVQByteArrayView@@0@Z",
+      "?lengthHelperCharArray@QByteArrayView@@CA_JPEBD_K@Z",
+      "?normalizedType@QMetaObject@@SA?AVQByteArray@@PEBD@Z",
+      "?size@QByteArrayView@@QEBA_JXZ",
+      "sub_140529a00",
+      "sub_1409e68d0"
+    ],
+    "engine": "clean-room lifter",
+    "entry": "0x140529b10",
+    "function": "sub_140529b10",
+    "gotos": 1,
+    "inline_asm": 10,
+    "pseudo_code": "int64_t sub_140529b10()\n{\n    stack_8 = rbx;\n    rbp = &stack_57;\n    rax = *(uint64_t*)0x140f7ff18;\n    rax ^= rsp;\n    arg_4f = rax;\n    eax = *(uint32_t*)0x140fba5c4;\n    if (eax == 0) {\n        __asm(\"movdqa xmm0, [0x140c1b810]\");\n        __asm(\"movdqu [rbp+0x37], xmm0\");\n        arg_47 = 0x656e6f70;\n        arg_4b = 0x2a746e;\n        rax = ?lengthHelperCharArray@QByteArrayView@@CA_JPEBD_K@Z(\"WID_XmlEditorComponent *\", rax + 0x19);\n        var_39 = rax;\n        rax = ?castHelper@QByteArrayView@@CAPEBDPEBD@Z(\"WID_XmlEditorComponent *\");\n        var_31 = rax;\n        rcx = &arg_37;\n        rax = -1;\n        while (true) {\n            rax++;\n            if (*(uint8_t*)(rcx + rax) == 0) break;\n        }\n        var_49 = rax;\n        rax = ?castHelper@QByteArrayView@@CAPEBDPEBD@Z(&arg_37);\n        var_41 = rax;\n        __asm(\"movaps xmm0, [rbp-0x39]\");\n        __asm(\"movdqa [rbp-0x29], xmm0\");\n        __asm(\"movaps xmm1, [rbp-0x49]\");\n        __asm(\"movdqa [rbp-0x49], xmm1\");\n        rax = ?size@QByteArrayView@@QEBA_JXZ(&var_29);\n        rbx = rax;\n        rax = ?size@QByteArrayView@@QEBA_JXZ(&var_49);\n        if (rax != rbx) {\nlabel_140529c01:\n            al = 0;\n        } else {\n            __asm(\"movaps xmm0, [rbp-0x29]\");\n            __asm(\"movdqa [rbp-0x19], xmm0\");\n            __asm(\"movaps xmm1, [rbp-0x49]\");\n            __asm(\"movdqa [rbp-9], xmm1\");\n            rax = ?compareMemory@QtPrivate@@YAHVQByteArrayView@@0@Z(&var_9, &var_19);\n            if (eax != 0) {\n                goto label_140529c01;\n            } else {\n                al = 1;\n            }\n        }\n        if (al == 0) {\n            ?normalizedType@QMetaObject@@SA?AVQByteArray@@PEBD@Z(&arg_1f, \"WID_XmlEditorComponent *\");\n            rax = sub_140529a00(&arg_1f);\n            ebx = eax;\n            rcx = &arg_1f;\n        } else {\n            ??0QByteArray@@QEAA@PEBD_J@Z(&arg_7, &arg_37, -1);\n            rax = sub_140529a00(&arg_7);\n            ebx = eax;\n            rcx = &arg_7;\n        }\n        ??1QByteArray@@QEAA@XZ();\n        *(uint32_t*)0x140fba5c4 = ebx;\n    }\n    rcx = arg_4f;\n    rcx ^= rsp;\n    sub_1409e68d0();\n    rbx = stack_d0;\n    return rax;\n}\n",
+    "signature": "int64_t sub_140529b10()",
+    "strings": [
+      "WID_XmlEditorComponent *"
+    ],
+    "structured": false
+  },
+  "summary": "Pseudo-C for sub_140529b10 (68 lines, partly unstructured).",
+  "confidence": "inferred",
+  "authority": "original-files",
+  "environment": {
+    "clean_room": false,
+    "engine": "builtin",
+    "engine_version": "0.5.0",
+    "host": "windows-x86_64"
+  },
+  "limitations": [
+    {
+      "code": "register_level",
+      "message": "variables are machine registers and stack slots; types are not recovered"
+    },
+    {
+      "code": "calling_convention_assumed",
+      "message": "call arguments follow the usual x86_64 convention and may be wrong for unusual functions"
+    },
+    {
+      "code": "conditions_from_flags",
+      "message": "branch conditions are rebuilt from the last compare and may be approximate"
+    },
+    {
+      "code": "unstructured_flow",
+      "message": "1 gotos remain where the control flow isn't a simple if/loop"
+    },
+    {
+      "code": "inline_asm",
+      "message": "10 instructions have no C rule and are shown as __asm(...)"
+    },
+    {
+      "code": "deep_engine_unavailable",
+      "message": "Ghidra couldn't open this program (could not start Ghidra: Ghidra's analysis failed; see C:\\Users\\leont\\AppData\\Roaming\\craft-anything\\engines\\ghidra-cache\\3444bc3c18f29168-f2dfab6faedc84f0.log). So this came from the built-in decompiler, which is less exact."
+    }
+  ],
+  "coverage": {
+    "status": "unknown"
+  },
+  "locations": [
+    {
+      "kind": "address",
+      "value": "0x140529b10"
+    }
+  ],
+  "links": [],
+  "carries_target_content": true
+}

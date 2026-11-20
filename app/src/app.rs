@@ -1,0 +1,886 @@
+//! Interfaz de LeonToon: estado de la aplicación, salas y ciclo principal.
+
+mod catalog;
+mod canvas;
+mod dialogs;
+mod edit;
+mod icons;
+mod palette;
+mod panels;
+mod rooms;
+mod safety;
+mod start;
+mod select;
+mod shell;
+mod storyboard;
+mod hud;
+mod view3d;
+mod timebar;
+mod timeline;
+
+pub use safety::install_panic_hook;
+
+use crate::model::{Drawing, Interp, Layer, LayerKind, Project, Rgba, ShapeKind, Stroke, XKey};
+use crate::render;
+use eframe::egui::{
+    self, Align2, Color32, FontId, Key, Modifiers, Pos2, Rect, RichText, Sense, Shape, Stroke as EStroke,
+    StrokeKind as EStrokeKind, Vec2,
+};
+use catalog::*;
+use icons::*;
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+
+// ---------- Colores de la interfaz (prototipo de interfaz v0.3 de LeonToon) ----------
+const UI0: Color32 = Color32::from_rgb(0x14, 0x13, 0x12);
+const BG: Color32 = Color32::from_rgb(0x1a, 0x19, 0x18);
+const BG2: Color32 = Color32::from_rgb(0x21, 0x1f, 0x1e);
+const BG3: Color32 = Color32::from_rgb(0x2a, 0x28, 0x26);
+const BG4: Color32 = Color32::from_rgb(0x34, 0x31, 0x2e);
+const LINE: Color32 = Color32::from_rgb(0x2e, 0x2b, 0x29);
+const LINE_STRONG: Color32 = Color32::from_rgb(0x3a, 0x36, 0x33);
+const TX: Color32 = Color32::from_rgb(0xf2, 0xe8, 0xda);
+const MU: Color32 = Color32::from_rgb(0xb5, 0xa8, 0x98);
+const INK3: Color32 = Color32::from_rgb(0x85, 0x7a, 0x6e);
+const ACCENT: Color32 = Color32::from_rgb(0xfd, 0x67, 0x24);
+const ACCENT2: Color32 = Color32::from_rgb(0xff, 0x8a, 0x52);
+const ACCENT_INK: Color32 = Color32::from_rgb(0x26, 0x26, 0x26);
+const VIEWER_BG: Color32 = Color32::from_rgb(0x1a, 0x19, 0x18);
+const SEL_BG: Color32 = Color32::from_rgb(0x44, 0x2b, 0x1f);
+const CELL_SEL: Color32 = Color32::from_rgb(0x5a, 0x33, 0x20);
+const KEY_GOLD: Color32 = Color32::from_rgb(0xff, 0xcc, 0x44);/// Colores del papel cebolla del prototipo v0.3: anterior en ámbar, siguiente en azul
+/// (el original usa rojo 255,0,0 y verde 55,120,55 en prefs.xml).
+const ONION_BEFORE: Color32 = Color32::from_rgb(0xfd, 0x67, 0x24);
+const ONION_AFTER: Color32 = Color32::from_rgb(0x5f, 0x8f, 0xb4);
+/// Opacidad del papel cebolla: del más cercano al más lejano (prefs.xml del original).
+const ONION_MAX_OPACITY: f32 = 0.8;
+const ONION_MIN_OPACITY: f32 = 0.2;
+/// Hasta 10 dibujos por lado (0x1404dbbc0 reserva 10 pesos y activa la máscara 0x3ff).
+const ONION_LIMIT: u32 = 10;
+/// Alcance máximo de los deslizadores del papel cebolla en el prototipo v0.3 (0 a 12).
+const ONION_UI_MAX: u32 = 12;
+/// Peso por distancia del original (0x1404dbbc0): empieza en 1.0 y baja 1/10 por dibujo.
+fn onion_slot_weight(d: u32) -> f32 {
+    (1.0 - (d.max(1) - 1) as f32 / ONION_LIMIT as f32).max(0.0)
+}
+/// Opacidad del dibujo a distancia d: entre la mínima y la máxima (0x1404e1200) según su peso.
+fn onion_original_opacity(d: u32) -> f32 {
+    ONION_MIN_OPACITY + (ONION_MAX_OPACITY - ONION_MIN_OPACITY) * onion_slot_weight(d)
+}
+
+/// Niveles de zoom del visor del original (tabla de textos en 0x140c1b840…0x140c1b9a0, en %).
+const ZOOM_LADDER: [f32; 50] = [
+    1.0, 1.25, 1.6, 2.0, 2.5, 3.3, 4.0, 5.0, 6.3, 8.0, 10.0, 12.5, 16.0, 20.0, 25.0, 32.0, 40.0, 50.0, 63.0, 80.0, 100.0,
+    125.0, 160.0, 200.0, 250.0, 320.0, 400.0, 500.0, 630.0, 800.0, 1000.0, 1250.0, 1600.0, 2000.0, 2500.0, 3200.0,
+    4000.0, 5000.0, 6300.0, 8000.0, 10000.0, 12500.0, 16000.0, 20000.0, 25000.0, 32000.0, 40000.0, 50000.0, 63000.0,
+    80000.0,
+];
+/// Siguiente nivel de zoom de la escalera (dir = +1 acercar, -1 alejar), desde un zoom cualquiera.
+fn zoom_ladder_step(zoom: f32, dir: i32) -> f32 {
+    let pct = zoom * 100.0;
+    let next = if dir > 0 {
+        ZOOM_LADDER.iter().copied().find(|z| *z > pct * 1.001)
+    } else {
+        ZOOM_LADDER.iter().rev().copied().find(|z| *z < pct * 0.999)
+    };
+    next.unwrap_or(pct) / 100.0
+}
+/// Xsheet: alto de fila 17 px a zoom 10, zoom de 5 a 16 (0x140106d90 y prefs.xml XSHEET_MIN/MAX_ZOOM).
+const XS_ROW_BASE: f32 = 17.0;
+/// Una muesca de la rueda en puntos de egui; el original da un paso cada 2×WHEEL_ZOOM_THRESHOLD = 100 unidades Qt (una muesca = 120).
+const WHEEL_NOTCH: f32 = 40.0;
+const XS_ZOOM_DEFAULT: f32 = 10.0;
+const XS_ZOOM_MIN: f32 = 5.0;
+const XS_ZOOM_MAX: f32 = 16.0;
+
+fn c32(c: Rgba) -> Color32 {
+    Color32::from_rgba_unmultiplied(c[0], c[1], c[2], c[3])
+}
+fn rgba(c: Color32) -> Rgba {
+    c.to_srgba_unmultiplied()
+}
+fn stk(w: f32, c: Color32) -> EStroke {
+    EStroke::new(w, c)
+}
+fn with_alpha(c: Color32, a: f32) -> Color32 {
+    let [r, g, b, al] = c.to_srgba_unmultiplied();
+    Color32::from_rgba_unmultiplied(r, g, b, (al as f32 * a.clamp(0.0, 1.0)).round() as u8)
+}
+/// Curva de salida suave para los paneles que entran y salen (0,18 s, como el prototipo).
+fn ease_out_cubic(t: f32) -> f32 {
+    1.0 - (1.0 - t).powi(3)
+}
+/// Avance 0…1 de un panel que se muestra u oculta con movimiento fluido.
+fn panel_t(ctx: &egui::Context, id: &str, on: bool) -> f32 {
+    ctx.animate_bool_with_time_and_easing(egui::Id::new(("panel_t", id)), on, 0.18, ease_out_cubic)
+}
+fn hex(c: Color32) -> String {
+    format!("#{:02x}{:02x}{:02x}", c.r(), c.g(), c.b())
+}
+
+enum Gesture {
+    Paint { stroke: Stroke, smooth: [f32; 2], last_raw: [f32; 2] },
+    Shape { kind: ShapeKind, start: [f32; 2], stroke: Stroke },
+    Erase { last: [f32; 2] },
+    Move { last: [f32; 2] },
+    /// Recuadro de selección (en coordenadas del dibujo).
+    Marquee { start: [f32; 2], cur: [f32; 2], add: bool },
+    /// Escalar lo elegido: punto fijo y último punto.
+    SelScale { anchor: [f32; 2], last: [f32; 2], keep: bool },
+    /// Girar lo elegido alrededor de su centro.
+    SelRotate { center: [f32; 2], last: f32 },
+    Animate { start: [f32; 2], base: XKey, mode: u8 },
+    Pick,
+}
+
+#[derive(Clone)]
+enum Pending {
+    New,
+    Open,
+    OpenPath(PathBuf),
+    Recover,
+    Quit,
+}
+
+struct Shot {
+    path: PathBuf,
+    frames: u32,
+    requested: bool,
+}
+
+/// Ajustes "ligeros" del proyecto, para poder deshacer cambios hechos en los paneles.
+#[derive(Clone, PartialEq)]
+struct Meta {
+    size: (u32, u32, u32, u32),
+    bg: Rgba,
+    palettes: Vec<crate::model::NamedPalette>,
+    layers: Vec<(String, bool, bool, f32, BTreeMap<u32, XKey>)>,
+    sb: Vec<[String; 6]>,
+    durs: Vec<u32>,
+    range: Option<(u32, u32)>,
+}
+
+fn meta_of(p: &Project) -> Meta {
+    Meta {
+        size: (p.width, p.height, p.fps, p.length),
+        bg: p.background,
+        palettes: p.palettes.clone(),
+        layers: p.layers.iter().map(|l| (l.name.clone(), l.visible, l.locked, l.opacity, l.xform.clone())).collect(),
+        sb: p
+            .storyboard
+            .iter()
+            .map(|s| [s.title.clone(), s.action.clone(), s.dialogue.clone(), s.camera.clone(), s.trans.clone(), s.notes.clone()])
+            .collect(),
+        durs: p.storyboard.iter().map(|s| (s.dur * 1000.0).round() as u32).collect(),
+        range: p.range,
+    }
+}
+
+fn apply_meta(p: &mut Project, m: &Meta) {
+    (p.width, p.height, p.fps, p.length) = m.size;
+    p.background = m.bg;
+    p.palettes = m.palettes.clone();
+    p.range = m.range;
+    for (l, (n, v, lk, o, x)) in p.layers.iter_mut().zip(&m.layers) {
+        l.name = n.clone();
+        l.visible = *v;
+        l.locked = *lk;
+        l.opacity = *o;
+        l.xform = x.clone();
+    }
+    for ((s, t), d) in p.storyboard.iter_mut().zip(&m.sb).zip(&m.durs) {
+        [s.title, s.action, s.dialogue, s.camera, s.trans, s.notes] = t.clone();
+        s.dur = *d as f32 / 1000.0;
+    }
+}
+
+/// Opciones de la sala Render.
+struct RenderOpts {
+    a: u32,
+    b: u32,
+    scale: f32,
+    transparent: bool,
+    columns: u32,
+    message: String,
+}
+
+pub struct LeonApp {
+    project: Project,
+    path: Option<PathBuf>,
+    dirty: bool,
+    undo: Vec<Project>,
+    redo: Vec<Project>,
+    meta_skip: bool,
+    last_meta_change: u64,
+    frame_no: u64,
+
+    /// Pestaña de sala activa (índice en project.rooms).
+    room_idx: usize,
+    /// Arranque: bienvenida, inicio o trabajo.
+    stage: start::Stage,
+    splash_t0: Option<f64>,
+    puma: Option<egui::TextureHandle>,
+    recent: Vec<PathBuf>,
+    /// Modo objeto (true) o modo edición (false); Tab cambia.
+    obj_mode: bool,
+    show_toolbar: bool,
+    show_n: bool,
+    n_tab: u8,
+    /// Editor elegido en el panel de propiedades (None = el de la sala).
+    props_editor: Option<Editor>,
+    /// Ventana emergente abierta en el visor: 1 mesa de luz, 2 guías, 3 papel cebolla.
+    hud_pop: u8,
+    /// Mesa de luz: gris del fondo (0 negro…100 blanco), cuadrícula de transparencia, barra de registro.
+    light_gray: f32,
+    show_alpha: bool,
+    pegbar: bool,
+    /// Mesa de luz (prototipo v0.3): luz 0…100, temperatura 0…100 (cálida→fría),
+    /// tamaño y contraste de la cuadrícula de transparencia, opacidad de la vista.
+    light_amt: f32,
+    light_temp: f32,
+    chk_size: f32,
+    chk_con: f32,
+    view_op: f32,
+    /// Menú «Agregar capa» (Mayús+A): posición en pantalla donde se abrió.
+    add_menu: Option<Pos2>,
+    /// Vista 3D (planos en profundidad): activa, modo (0 cámara, 1 usuario, 2 superior, 3 lateral…),
+    /// giro, proyección ortográfica, desplazamiento y zoom.
+    view3d: bool,
+    v3: u8,
+    yaw: f32,
+    pitch: f32,
+    ortho: bool,
+    pan3: Vec2,
+    zoom3: f32,
+    giz: Option<view3d::Giz>,
+    giz_drag: Option<view3d::GizDrag>,
+    stroke_opacity: f32,
+    pressure: bool,
+    shape_kind: ShapeKind,
+    hover_area: u8,
+    tab_drag: Option<usize>,
+    tab_rename: Option<(usize, String)>,
+    tool: Tool,
+    color: Color32,
+    fill_color: Color32,
+    fill_shapes: bool,
+    brush_size: f32,
+    pencil_size: f32,
+    eraser_size: f32,
+    shape_width: f32,
+    smoothing: f32,
+
+    cl: usize,
+    frame: u32,
+    playing: bool,
+    play_accum: f64,
+    loop_play: bool,
+    /// Selección de celdas en el Xsheet: (capa, desde, hasta).
+    sel: Option<(usize, u32, u32)>,
+    xs_horizontal: bool,
+
+    onion: bool,
+    onion_before: u32,
+    onion_after: u32,
+    onion_opacity: f32,
+    onion_falloff: u8,
+
+    guides: [bool; 6],
+
+    zoom: f32,
+    pan: Vec2,
+    need_fit: bool,
+    cursor_canvas: Option<[f32; 2]>,
+    tb_ppf: Option<f32>,
+    tb_start: f32,
+    tb_drag: u8,
+    /// Zoom del Xsheet (5–16, 10 = normal).
+    xs_zoom: f32,
+    /// Rueda acumulada para dar un paso de zoom por muesca.
+    wheel_acc: f32,
+
+    sb_sel: usize,
+    sb_zoom: f32,
+    sb_detail: bool,
+    sb_last: Option<[f32; 2]>,
+    sb_erase: bool,
+    sb_onion: bool,
+    sb_stroke: Option<Stroke>,
+    sb_drag: Option<usize>,
+    render_opts: RenderOpts,
+
+    gesture: Option<Gesture>,
+    pre: Option<Project>,
+    changed: bool,
+    space_down: bool,
+    space_panned: bool,
+    /// Trazos elegidos con la herramienta Selección, y de qué capa y dibujo son.
+    picked: Vec<usize>,
+    picked_owner: Option<(usize, u32)>,
+    pal_sel: usize,
+    swatch_sel: Option<usize>,
+    swatch_rename: Option<(usize, String)>,
+    ffmpeg: Option<PathBuf>,
+
+    clipboard: Option<Drawing>,
+    status: String,
+    status_time: f64,
+    now: f64,
+
+    show_help: bool,
+    show_about: bool,
+    show_new: bool,
+    new_w: u32,
+    new_h: u32,
+    new_fps: u32,
+    new_secs: f32,
+    pending: Option<Pending>,
+    allow_close: bool,
+    renaming: Option<(usize, String, bool)>,
+    last_scroll_frame: Option<u32>,
+    last_title: String,
+    last_autosave: f64,
+    shot: Option<Shot>,
+    safety: safety::Safety,
+    /// Solo para pruebas: provoca un fallo interno en ese fotograma (LEONTOON_PRUEBA_FALLO=n).
+    test_panic_frame: u64,
+}
+
+impl LeonApp {
+    pub fn new(cc: &eframe::CreationContext<'_>, screenshot: Option<PathBuf>, open: Option<PathBuf>) -> Self {
+        setup_style(&cc.egui_ctx);
+        let safety = safety::Safety::start(screenshot.is_none());
+        let mut project = Project::demo();
+        project.room_set = "trad".into();
+        project.rooms = start::tabs_for_set("trad");
+        // Para capturas de la vista 3D: LEONTOON_CAMARA=1 añade una cámara; LEONTOON_V3=0..7 elige la vista.
+        if std::env::var("LEONTOON_CAMARA").is_ok() {
+            let mut c = Layer::new("Cámara 1");
+            c.kind = LayerKind::Camera;
+            c.is3d = true;
+            c.depth = -crate::model::CAM_DIST;
+            project.layers.insert(0, c);
+        }
+        // Para pruebas y capturas: LEONTOON_SALA=<nombre de sala> abre esa sala.
+        let room_idx = std::env::var("LEONTOON_SALA")
+            .ok()
+            .and_then(|s| {
+                let k = RoomKind::ALL.into_iter().find(|r| r.def().name.eq_ignore_ascii_case(&s) || r.def().id == s)?;
+                if !project.rooms.iter().any(|t| t.kind == k.def().id) {
+                    project.rooms.push(crate::model::RoomTab { kind: k.def().id.into(), name: None });
+                }
+                project.rooms.iter().position(|t| t.kind == k.def().id)
+            })
+            .unwrap_or(0);
+        let stage = start::initial_stage(screenshot.is_some());
+        let len = project.length;
+        let mut app = LeonApp {
+            project,
+            path: None,
+            dirty: false,
+            undo: Vec::new(),
+            redo: Vec::new(),
+            meta_skip: false,
+            last_meta_change: 0,
+            frame_no: 0,
+            room_idx,
+            stage,
+            splash_t0: None,
+            puma: None,
+            recent: start::load_recent(),
+            obj_mode: false,
+            show_toolbar: true,
+            show_n: true,
+            n_tab: 0,
+            props_editor: None,
+            // Variables de prueba para capturas: LEONTOON_POP=1|2|3, LEONTOON_ALPHA=1, LEONTOON_ADDMENU=1.
+            hud_pop: std::env::var("LEONTOON_POP").ok().and_then(|v| v.parse().ok()).unwrap_or(0),
+            light_gray: 10.0,
+            show_alpha: std::env::var("LEONTOON_ALPHA").is_ok(),
+            pegbar: true,
+            light_amt: 55.0,
+            light_temp: 30.0,
+            chk_size: 20.0,
+            chk_con: 12.0,
+            view_op: 100.0,
+            add_menu: if std::env::var("LEONTOON_ADDMENU").is_ok() { Some(Pos2::new(560.0, 260.0)) } else { None },
+            view3d: false,
+            v3: std::env::var("LEONTOON_V3").ok().and_then(|v| v.parse().ok()).unwrap_or(1),
+            yaw: match std::env::var("LEONTOON_V3").ok().and_then(|v| v.parse::<u8>().ok()) { Some(2) | Some(4) | Some(7) => 0.0, Some(3) => -90.0, Some(5) => 180.0, Some(6) => 90.0, _ => -32.0 },
+            pitch: match std::env::var("LEONTOON_V3").ok().and_then(|v| v.parse::<u8>().ok()) { Some(2) => 85.0, Some(7) => -85.0, Some(3) | Some(4) | Some(5) | Some(6) => 0.0, _ => 16.0 },
+            ortho: false,
+            pan3: Vec2::ZERO,
+            zoom3: 1.0,
+            giz: None,
+            giz_drag: None,
+            stroke_opacity: 1.0,
+            pressure: true,
+            shape_kind: ShapeKind::Ellipse,
+            hover_area: 0,
+            tab_drag: None,
+            tab_rename: None,
+            tool: Tool::Brush,
+            color: Color32::from_rgb(20, 20, 24),
+            fill_color: Color32::from_rgb(253, 216, 53),
+            fill_shapes: false,
+            brush_size: 8.0,
+            pencil_size: 2.0,
+            eraser_size: 24.0,
+            shape_width: 4.0,
+            smoothing: 0.35,
+            cl: 0,
+            frame: 0,
+            playing: false,
+            play_accum: 0.0,
+            loop_play: false,
+            sel: None,
+            xs_horizontal: false,
+            onion: true,
+            onion_before: 2,
+            onion_after: 2,
+            onion_opacity: 0.4,
+            onion_falloff: 0,
+            guides: [false; 6],
+            zoom: 0.5,
+            pan: Vec2::ZERO,
+            need_fit: true,
+            cursor_canvas: None,
+            tb_ppf: None,
+            tb_start: 0.0,
+            tb_drag: 0,
+            xs_zoom: XS_ZOOM_DEFAULT,
+            wheel_acc: 0.0,
+            sb_sel: 0,
+            sb_zoom: 260.0,
+            sb_detail: false,
+            sb_last: None,
+            sb_erase: false,
+            sb_onion: true,
+            sb_stroke: None,
+            sb_drag: None,
+            render_opts: RenderOpts { a: 1, b: len, scale: 1.0, transparent: false, columns: 8, message: "Listo.".into() },
+            gesture: None,
+            pre: None,
+            changed: false,
+            space_down: false,
+            space_panned: false,
+            picked: Vec::new(),
+            picked_owner: None,
+            pal_sel: 2,
+            swatch_sel: None,
+            swatch_rename: None,
+            ffmpeg: None,
+            clipboard: None,
+            status: "LeonToon listo · funciona sin conexión. Pulsa F1 para ver la guía rápida.".into(),
+            status_time: 0.0,
+            now: 0.0,
+            show_help: false,
+            show_about: false,
+            show_new: false,
+            new_w: 1280,
+            new_h: 720,
+            new_fps: 24,
+            new_secs: 2.0,
+            pending: None,
+            allow_close: false,
+            renaming: None,
+            last_scroll_frame: None,
+            last_title: String::new(),
+            last_autosave: 0.0,
+            shot: screenshot.map(|path| Shot { path, frames: 0, requested: false }),
+            safety,
+            test_panic_frame: std::env::var("LEONTOON_PRUEBA_FALLO").ok().and_then(|v| v.parse().ok()).unwrap_or(0),
+        };
+        app.set_room_idx(room_idx);
+        app.status = "LeonToon listo · funciona sin conexión. Pulsa F1 para ver la guía rápida.".into();
+        if let Some(p) = open {
+            app.load_from(&p);
+        }
+        app
+    }
+
+    // ---------- Utilidades ----------
+
+    fn say(&mut self, s: impl Into<String>) {
+        self.status = s.into();
+        self.status_time = self.now.max(0.001);
+    }
+
+    fn push_undo(&mut self, p: Project) {
+        self.undo.push(p);
+        if self.undo.len() > 150 {
+            self.undo.remove(0);
+        }
+        self.redo.clear();
+        self.dirty = true;
+    }
+
+    fn checkpoint(&mut self) {
+        let p = self.project.clone();
+        self.push_undo(p);
+        self.meta_skip = true;
+    }
+
+    fn clamp_state(&mut self) {
+        self.project.sanitize();
+        self.cl = self.cl.min(self.project.layers.len() - 1);
+        self.frame = self.frame.min(self.project.length - 1);
+        self.sb_sel = self.sb_sel.min(self.project.storyboard.len().saturating_sub(1));
+    }
+
+    fn do_undo(&mut self) {
+        self.finish_gesture();
+        if let Some(p) = self.undo.pop() {
+            let cur = std::mem::replace(&mut self.project, p);
+            self.redo.push(cur);
+            self.dirty = true;
+            self.meta_skip = true;
+            self.clamp_state();
+            self.say("Deshacer");
+        } else {
+            self.say("No hay nada que deshacer");
+        }
+    }
+
+    fn do_redo(&mut self) {
+        self.finish_gesture();
+        if let Some(p) = self.redo.pop() {
+            let cur = std::mem::replace(&mut self.project, p);
+            self.undo.push(cur);
+            self.dirty = true;
+            self.meta_skip = true;
+            self.clamp_state();
+            self.say("Rehacer");
+        } else {
+            self.say("No hay nada que rehacer");
+        }
+    }
+
+    fn layer(&self) -> &Layer {
+        &self.project.layers[self.cl]
+    }
+
+    fn file_name(&self) -> String {
+        self.path
+            .as_ref()
+            .and_then(|p| p.file_name())
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "Sin título".into())
+    }
+
+    /// Tipo de la sala activa.
+    fn room_kind(&self) -> RoomKind {
+        self.project
+            .rooms
+            .get(self.room_idx)
+            .and_then(|t| RoomKind::from_id(&t.kind))
+            .unwrap_or(RoomKind::Layout)
+    }
+
+    /// Nombre visible de una pestaña (el propio si se renombró).
+    fn tab_name(&self, i: usize) -> String {
+        match self.project.rooms.get(i) {
+            Some(t) => t
+                .name
+                .clone()
+                .unwrap_or_else(|| RoomKind::from_id(&t.kind).map_or("Sala", |k| k.def().name).to_string()),
+            None => String::new(),
+        }
+    }
+
+    /// Activa la pestaña `i`: herramienta y orientación de la línea de tiempo de esa sala.
+    fn set_room_idx(&mut self, i: usize) {
+        if self.project.rooms.is_empty() {
+            self.project.rooms = start::tabs_for_set("trad");
+        }
+        let i = i.min(self.project.rooms.len() - 1);
+        self.finish_gesture();
+        self.playing = false;
+        self.room_idx = i;
+        let def = self.room_kind().def();
+        self.xs_horizontal = def.tl_horizontal;
+        self.props_editor = None;
+        self.hud_pop = std::env::var("LEONTOON_POP").ok().and_then(|v| v.parse().ok()).unwrap_or(0);
+        if let Some(t) = def.tool {
+            self.obj_mode = false;
+            self.tool = t;
+        }
+        self.need_fit = true;
+        // Como el prototipo: la sala Composición 3D abre la vista 3D y las demás la 2D.
+        self.view3d = def.id == "comp";
+        self.giz_drag = None;
+        self.say(format!("Sala {}: {}", self.tab_name(i), def.desc));
+    }
+
+    /// Abre la primera sala de un tipo (o la añade si no está).
+    fn goto_room_kind(&mut self, k: RoomKind) {
+        let id = k.def().id;
+        let i = match self.project.rooms.iter().position(|t| t.kind == id) {
+            Some(i) => i,
+            None => {
+                self.project.rooms.push(crate::model::RoomTab { kind: id.into(), name: None });
+                self.project.rooms.len() - 1
+            }
+        };
+        self.set_room_idx(i);
+    }
+
+    /// Opacidad del papel cebolla a distancia d (1..n): la del más cercano es la elegida en el
+    /// panel (prototipo v0.3, 40 % por defecto); la caída sigue los pesos del original.
+    fn onion_weight(&self, d: u32, _n: u32) -> f32 {
+        let rel = match self.onion_falloff {
+            1 => 0.55f32.powi(d as i32 - 1),
+            2 => 1.0,
+            _ => onion_original_opacity(d) / ONION_MAX_OPACITY,
+        };
+        (self.onion_opacity * rel).clamp(0.0, 1.0)
+    }
+
+    // ---------- Archivos ----------
+
+    fn autosave_path() -> Option<PathBuf> {
+        Some(safety::data_dir()?.join("autosave.ltoon"))
+    }
+
+    fn save(&mut self) -> bool {
+        match self.path.clone() {
+            Some(p) => self.save_to(&p),
+            None => self.save_as(),
+        }
+    }
+
+    fn save_as(&mut self) -> bool {
+        let dialog = rfd::FileDialog::new()
+            .set_title("Guardar proyecto")
+            .add_filter("Proyecto LeonToon", &["ltoon"])
+            .set_file_name("mi_animacion.ltoon");
+        match dialog.save_file() {
+            Some(mut p) => {
+                if p.extension().is_none() {
+                    p.set_extension("ltoon");
+                }
+                self.save_to(&p)
+            }
+            None => false,
+        }
+    }
+
+    fn save_to(&mut self, p: &Path) -> bool {
+        match safety::write_project(&self.project, p, true) {
+            Ok(()) => {
+                self.path = Some(p.to_path_buf());
+                self.dirty = false;
+                self.remember_recent(p);
+                self.say(format!("Guardado y verificado: {}", p.display()));
+                true
+            }
+            Err(e) => {
+                safety::log_line(&format!("No se pudo guardar {}: {e}", p.display()));
+                self.say(format!("No se pudo guardar: {e}"));
+                false
+            }
+        }
+    }
+
+    fn load_from(&mut self, p: &Path) -> bool {
+        match safety::read_project(p) {
+            Ok(proj) => {
+                self.project = proj;
+                self.path = Some(p.to_path_buf());
+                self.after_load();
+                self.remember_recent(p);
+                self.say(format!("Abierto: {}", p.display()));
+                true
+            }
+            Err(e) => {
+                self.say(format!("No se pudo abrir el archivo: {e}"));
+                false
+            }
+        }
+    }
+
+    fn after_load(&mut self) {
+        self.undo.clear();
+        self.redo.clear();
+        self.dirty = false;
+        self.cl = 0;
+        self.frame = 0;
+        self.sel = None;
+        self.sb_sel = 0;
+        self.sb_detail = false;
+        self.picked.clear();
+        self.pal_sel = self.pal_sel.min(self.project.palettes.len().saturating_sub(1));
+        self.playing = false;
+        self.gesture = None;
+        self.pre = None;
+        self.need_fit = true;
+        self.meta_skip = true;
+        self.render_opts.a = 1;
+        self.render_opts.b = self.project.length;
+        if self.project.rooms.is_empty() {
+            if self.project.room_set.is_empty() {
+                self.project.room_set = "trad".into();
+            }
+            self.project.rooms = start::tabs_for_set(&self.project.room_set.clone());
+        }
+        self.set_room_idx(0);
+        self.stage = start::Stage::Work;
+    }
+
+    fn perform(&mut self, ctx: &egui::Context, a: Pending) {
+        match a {
+            Pending::New => self.show_new = true,
+            Pending::Open => {
+                if let Some(p) = rfd::FileDialog::new()
+                    .set_title("Abrir proyecto")
+                    .add_filter("Proyecto LeonToon", &["ltoon"])
+                    .pick_file()
+                {
+                    self.load_from(&p);
+                }
+            }
+            Pending::OpenPath(p) => {
+                self.load_from(&p);
+            }
+            Pending::Recover => match Self::autosave_path() {
+                Some(p) if p.exists() => {
+                    if self.load_from(&p) {
+                        self.path = None;
+                        self.dirty = true;
+                        self.say("Copia automática recuperada. Guárdala con «Guardar como…».");
+                    }
+                }
+                _ => self.say("No hay ninguna copia automática."),
+            },
+            Pending::Quit => {
+                self.allow_close = true;
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            }
+        }
+    }
+
+    fn request(&mut self, ctx: &egui::Context, a: Pending) {
+        if self.dirty {
+            self.pending = Some(a);
+        } else {
+            self.perform(ctx, a);
+        }
+    }
+
+    fn update_title(&mut self, ctx: &egui::Context) {
+        let title = format!("{}{} — LeonToon", if self.dirty { "• " } else { "" }, self.file_name());
+        if title != self.last_title {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Title(title.clone()));
+            self.last_title = title;
+        }
+    }
+
+    fn handle_screenshot(&mut self, ctx: &egui::Context) {
+        let Some(shot) = &mut self.shot else { return };
+        shot.frames += 1;
+        ctx.request_repaint();
+        if !shot.requested && shot.frames >= 120 {
+            shot.requested = true;
+            ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
+        }
+        let img = ctx.input(|i| {
+            i.raw.events.iter().find_map(|e| match e {
+                egui::Event::Screenshot { image, .. } => Some(image.clone()),
+                _ => None,
+            })
+        });
+        if let Some(img) = img {
+            let bytes: Vec<u8> = img.pixels.iter().flat_map(|c| c.to_array()).collect();
+            let path = shot.path.clone();
+            match render::save_rgba_png(img.size[0] as u32, img.size[1] as u32, &bytes, &path) {
+                Ok(()) => println!("Captura guardada en {}", path.display()),
+                Err(e) => eprintln!("No se pudo guardar la captura: {e}"),
+            }
+            self.allow_close = true;
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        } else if shot.frames > 900 {
+            eprintln!("La captura no llegó a tiempo");
+            std::process::exit(1);
+        }
+    }
+}
+
+impl eframe::App for LeonApp {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Si algo falla dentro de un fotograma, no se pierde nada: se guarda y se sigue.
+        let ok = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.update_inner(ctx))).is_ok();
+        if !ok {
+            self.recover_from_panic(ctx);
+        }
+    }
+}
+
+impl LeonApp {
+    fn update_inner(&mut self, ctx: &egui::Context) {
+        self.frame_no += 1;
+        self.now = ctx.input(|i| i.time);
+        self.handle_screenshot(ctx);
+        if ctx.input(|i| i.viewport().close_requested()) && self.dirty && !self.allow_close {
+            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            self.pending = Some(Pending::Quit);
+        }
+
+        let meta_before = meta_of(&self.project);
+        self.meta_skip = false;
+
+        self.validate_pick();
+        if self.stage == start::Stage::Splash {
+            self.splash(ctx);
+            return;
+        }
+        self.handle_shortcuts(ctx);
+        self.advance_playback(ctx);
+        self.shell(ctx);
+        if self.stage == start::Stage::Home {
+            self.home(ctx);
+        }
+        self.dialogs(ctx);
+        self.safety_dialogs(ctx);
+
+        // Los cambios hechos en los paneles (nombre, opacidad, claves, notas…) también se pueden deshacer.
+        if !self.meta_skip {
+            let now_meta = meta_of(&self.project);
+            if now_meta != meta_before {
+                if self.last_meta_change + 1 != self.frame_no {
+                    let mut snap = self.project.clone();
+                    apply_meta(&mut snap, &meta_before);
+                    self.push_undo(snap);
+                }
+                self.last_meta_change = self.frame_no;
+                self.dirty = true;
+            }
+        }
+        self.project.length = self.project.length.max(1);
+        self.project.fps = self.project.fps.max(1);
+        self.frame = self.frame.min(self.project.length - 1);
+        self.cl = self.cl.min(self.project.layers.len().saturating_sub(1));
+        self.autosave();
+        self.update_title(ctx);
+        ctx.request_repaint_after(std::time::Duration::from_secs(20));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn zoom_ladder_matches_original_steps() {
+        assert!((zoom_ladder_step(1.0, 1) - 1.25).abs() < 1e-4);
+        assert!((zoom_ladder_step(1.0, -1) - 0.8).abs() < 1e-4);
+        assert!((zoom_ladder_step(0.45, -1) - 0.40).abs() < 1e-4);
+        assert!((zoom_ladder_step(800.0, 1) - 800.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn onion_opacity_follows_original_weights() {
+        assert!((onion_original_opacity(1) - 0.8).abs() < 1e-5);
+        assert!((onion_original_opacity(2) - 0.74).abs() < 1e-5);
+        assert!((onion_original_opacity(10) - 0.26).abs() < 1e-5);
+    }
+}

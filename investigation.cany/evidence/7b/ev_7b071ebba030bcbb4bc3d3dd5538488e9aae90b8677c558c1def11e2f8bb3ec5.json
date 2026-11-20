@@ -1,0 +1,48 @@
+{
+  "id": "ev_7b071ebba030bcbb4bc3d3dd5538488e9aae90b8677c558c1def11e2f8bb3ec5",
+  "subject": {
+    "kind": "pe",
+    "sha256": "3444bc3c18f29168512fb92e5f56bfa466df99bbe5e937201cf448d99482897a",
+    "name": "HarmonyPremium.exe"
+  },
+  "operation": "native_xrefs_list",
+  "params": {
+    "address": "0x140c1b8b8",
+    "limit": 200,
+    "offset": 0
+  },
+  "result": {
+    "address": "0x140c1b8b8",
+    "name": null,
+    "references_from": [],
+    "references_to": [],
+    "total_to": 0
+  },
+  "summary": "0x140c1b8b8 is referenced from 0 places and refers to 0.",
+  "confidence": "derived",
+  "authority": "original-files",
+  "environment": {
+    "clean_room": false,
+    "engine": "builtin",
+    "engine_version": "0.5.0",
+    "host": "windows-x86_64"
+  },
+  "limitations": [
+    {
+      "code": "static_references",
+      "message": "references made through computed pointers at run time are not seen"
+    }
+  ],
+  "coverage": {
+    "status": "complete",
+    "examined": 0,
+    "total": 0
+  },
+  "locations": [
+    {
+      "kind": "address",
+      "value": "0x140c1b8b8"
+    }
+  ],
+  "links": []
+}

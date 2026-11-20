@@ -1,0 +1,2805 @@
+{
+  "id": "ev_7bb48bb14bd191b618ed556bd04529af320505e86749a0250ae0d0dc59436a26",
+  "subject": {
+    "kind": "pe",
+    "sha256": "3444bc3c18f29168512fb92e5f56bfa466df99bbe5e937201cf448d99482897a",
+    "name": "HarmonyPremium.exe"
+  },
+  "operation": "native_strings_find",
+  "params": {
+    "case_sensitive": false,
+    "limit": 200,
+    "mode": "regex",
+    "offset": 0,
+    "pattern": "(?i)zoom|frame ?rate|playback|substitut|ease|palette"
+  },
+  "result": {
+    "matches": [
+      {
+        "address": "0x140b32480",
+        "references": [
+          {
+            "from": "0x140019a77",
+            "function": "sub_140018390"
+          },
+          {
+            "from": "0x14041f2a7",
+            "function": "sub_14041de90"
+          }
+        ],
+        "section": ".rdata",
+        "text": "-cleanPaletteLists"
+      },
+      {
+        "address": "0x140b32740",
+        "references": [
+          {
+            "from": "0x14001aa56",
+            "function": "sub_140018390"
+          },
+          {
+            "from": "0x14041f3c0",
+            "function": "sub_14041de90"
+          }
+        ],
+        "section": ".rdata",
+        "text": "-link_palette"
+      },
+      {
+        "address": "0x140b334a8",
+        "references": [
+          {
+            "from": "0x14001f211",
+            "function": "sub_140018390"
+          }
+        ],
+        "section": ".rdata",
+        "text": "No scene loaded to perform palette cleanup on.\n"
+      },
+      {
+        "address": "0x140b33980",
+        "references": [
+          {
+            "from": "0x140023396",
+            "function": "sub_1400229a0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "  -link_palette\t\t\t\t\tLink palettes to model (to be used with -template)"
+      },
+      {
+        "address": "0x140b34518",
+        "references": [
+          {
+            "from": "0x140026394",
+            "function": "sub_140026340"
+          },
+          {
+            "from": "0x140053be1",
+            "function": "sub_140053b90"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Synching Local Cache with Server.\nPlease wait."
+      },
+      {
+        "address": "0x140b34c80",
+        "references": [
+          {
+            "from": "0x140001ba6",
+            "function": "sub_140001b60"
+          },
+          {
+            "from": "0x140005886",
+            "function": "sub_140005840"
+          },
+          {
+            "from": "0x140006aa6",
+            "function": "sub_140006a60"
+          },
+          {
+            "from": "0x140006b86",
+            "function": "sub_140006b40"
+          },
+          {
+            "from": "0x140006c66",
+            "function": "sub_140006c20"
+          },
+          {
+            "from": "0x140006d46",
+            "function": "sub_140006d00"
+          },
+          {
+            "from": "0x14000b836",
+            "function": "sub_14000b7f0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "The OSB format is not supported in Vulkan. Please use a different format for the 3D model."
+      },
+      {
+        "address": "0x140b36ec8",
+        "references": [
+          {
+            "from": "0x1400377bd",
+            "function": "sub_1400375c0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Palette cleanup on non template"
+      },
+      {
+        "address": "0x140b37060",
+        "references": [
+          {
+            "from": "0x140038992",
+            "function": "sub_1400375c0"
+          },
+          {
+            "from": "0x1400389e4",
+            "function": "sub_1400375c0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Drawing Substitutions"
+      },
+      {
+        "address": "0x140b37108",
+        "references": [
+          {
+            "from": "0x140033fc4",
+            "function": "sub_140033e90"
+          },
+          {
+            "from": "0x14003901c",
+            "function": "sub_1400375c0"
+          },
+          {
+            "from": "0x14003906e",
+            "function": "sub_1400375c0"
+          },
+          {
+            "from": "0x1403a7ba3",
+            "function": "sub_1403a7b10"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Playback"
+      },
+      {
+        "address": "0x140b37428",
+        "references": [
+          {
+            "from": "0x140031c29",
+            "function": "sub_140031a20"
+          }
+        ],
+        "section": ".rdata",
+        "text": "1updateToolbarsIfNotInPlayback()"
+      },
+      {
+        "address": "0x140b37628",
+        "references": [
+          {
+            "from": "0x14004e026",
+            "function": "sub_14004de70"
+          }
+        ],
+        "section": ".rdata",
+        "text": "2frameReleased()"
+      },
+      {
+        "address": "0x140b376e8",
+        "references": [
+          {
+            "from": "0x14004e790",
+            "function": "sub_14004e2c0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "1playBack()"
+      },
+      {
+        "address": "0x140b378e0",
+        "references": [
+          {
+            "from": "0x14004f745",
+            "function": "sub_14004e2c0"
+          },
+          {
+            "from": "0x1403aa57d",
+            "function": "sub_1403a8ea0"
+          },
+          {
+            "from": "0x1404707b3",
+            "function": "sub_140470590"
+          },
+          {
+            "from": "0x1407a0f2d",
+            "function": "sub_1407a0cb0"
+          },
+          {
+            "from": "0x1407a0f8f",
+            "function": "sub_1407a0cb0"
+          },
+          {
+            "from": "0x1407b4772",
+            "function": "sub_1407b4560"
+          },
+          {
+            "from": "0x1407b54c6",
+            "function": "sub_1407b4d10"
+          },
+          {
+            "from": "0x1407c72a2",
+            "function": "sub_1407c6f70"
+          },
+          {
+            "from": "0x140801d51",
+            "function": "sub_1408009b0"
+          },
+          {
+            "from": "0x1408112d8",
+            "function": "sub_140810370"
+          }
+        ],
+        "section": ".rdata",
+        "text": "2sliderReleased()"
+      },
+      {
+        "address": "0x140b379e8",
+        "references": [
+          {
+            "from": "0x140030d1b",
+            "function": "sub_140030800"
+          },
+          {
+            "from": "0x140030d3b",
+            "function": "sub_140030800"
+          }
+        ],
+        "section": ".rdata",
+        "text": "No palettes need to be cleaned up."
+      },
+      {
+        "address": "0x140b37d80",
+        "references": [
+          {
+            "from": "0x1400315b9",
+            "function": "sub_1400313a0"
+          },
+          {
+            "from": "0x140721faf",
+            "function": "sub_140721f60"
+          }
+        ],
+        "section": ".rdata",
+        "text": "SAVE_PALETTES"
+      },
+      {
+        "address": "0x140b37d90",
+        "references": [
+          {
+            "from": "0x1400315fd",
+            "function": "sub_1400313a0"
+          },
+          {
+            "from": "0x140721ced",
+            "function": "sub_140721ca0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "SAVE_PALETTE_LISTS"
+      },
+      {
+        "address": "0x140b39a90",
+        "references": [
+          {
+            "from": "0x14003b5c1",
+            "function": "sub_14003b480"
+          }
+        ],
+        "section": ".rdata",
+        "text": "SWF export does not support decimal values for frame rate. The frame rate will be rounded to the closest integer."
+      },
+      {
+        "address": "0x140b3a290",
+        "references": [
+          {
+            "from": "0x14002f6ed",
+            "function": "sub_14002f4f0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "the palettes"
+      },
+      {
+        "address": "0x140b3a2a0",
+        "references": [
+          {
+            "from": "0x14002f7a5",
+            "function": "sub_14002f4f0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "the external palette backup folder"
+      },
+      {
+        "address": "0x140b3a628",
+        "references": [
+          {
+            "from": "0x1400580a8",
+            "function": "sub_140058030"
+          },
+          {
+            "from": "0x1403a9eca",
+            "function": "sub_1403a8ea0"
+          },
+          {
+            "from": "0x140471802",
+            "function": "sub_140470590"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Set Playback Start Frame"
+      },
+      {
+        "address": "0x140b3a648",
+        "references": [
+          {
+            "from": "0x1400581d8",
+            "function": "sub_140058160"
+          },
+          {
+            "from": "0x1403aa089",
+            "function": "sub_1403a8ea0"
+          },
+          {
+            "from": "0x140471a05",
+            "function": "sub_140470590"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Set Playback Stop Frame"
+      },
+      {
+        "address": "0x140b3a670",
+        "references": [
+          {
+            "from": "0x140057f4c",
+            "function": "sub_140057f10"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Enter New Frame Rate"
+      },
+      {
+        "address": "0x140b3a688",
+        "references": [
+          {
+            "from": "0x140057f71",
+            "function": "sub_140057f10"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Set Playback Speed"
+      },
+      {
+        "address": "0x140b3b27d",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionPaletteOperations"
+      },
+      {
+        "address": "0x140b3c9db",
+        "references": [],
+        "section": ".rdata",
+        "text": "autoLockPalettesChanged"
+      },
+      {
+        "address": "0x140b3cb90",
+        "references": [],
+        "section": ".rdata",
+        "text": "isPaletteLinking"
+      },
+      {
+        "address": "0x140b3cbea",
+        "references": [],
+        "section": ".rdata",
+        "text": "frameRate"
+      },
+      {
+        "address": "0x140b3cc60",
+        "references": [],
+        "section": ".rdata",
+        "text": "releaseAllDrawings"
+      },
+      {
+        "address": "0x140b3cc73",
+        "references": [],
+        "section": ".rdata",
+        "text": "releaseUnsavedElements"
+      },
+      {
+        "address": "0x140b3cd8f",
+        "references": [],
+        "section": ".rdata",
+        "text": "savePalettes"
+      },
+      {
+        "address": "0x140b3cddd",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionPaintModePaletteManager"
+      },
+      {
+        "address": "0x140b3cdfd",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionPaintModePaletteManagerValidate"
+      },
+      {
+        "address": "0x140b3cf60",
+        "references": [],
+        "section": ".rdata",
+        "text": "setAutoLockPalettes"
+      },
+      {
+        "address": "0x140b3d1d9",
+        "references": [],
+        "section": ".rdata",
+        "text": "pausePlayback"
+      },
+      {
+        "address": "0x140b3d1e7",
+        "references": [],
+        "section": ".rdata",
+        "text": "unPausePlayback"
+      },
+      {
+        "address": "0x140b3d1f7",
+        "references": [],
+        "section": ".rdata",
+        "text": "stopPlayback"
+      },
+      {
+        "address": "0x140b3d204",
+        "references": [],
+        "section": ".rdata",
+        "text": "stopEffectStackPlayback"
+      },
+      {
+        "address": "0x140b3d2b6",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionCleanPaletteLists"
+      },
+      {
+        "address": "0x140b3d2d0",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionCleanPaletteListsValidate"
+      },
+      {
+        "address": "0x140b3d2f2",
+        "references": [],
+        "section": ".rdata",
+        "text": "cleanPaletteLists"
+      },
+      {
+        "address": "0x140b3d68c",
+        "references": [],
+        "section": ".rdata",
+        "text": "updateToolbarsIfNotInPlayback"
+      },
+      {
+        "address": "0x140b3e0a0",
+        "references": [],
+        "section": ".rdata",
+        "text": "playBack"
+      },
+      {
+        "address": "0x140b3e8d6",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionChooseZoomTool"
+      },
+      {
+        "address": "0x140b3e8ed",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionChooseZoomToolValidate"
+      },
+      {
+        "address": "0x140b3f30c",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionMainSetPlaybackStartFrame"
+      },
+      {
+        "address": "0x140b3f32e",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionMainSetPlaybackStopFrame"
+      },
+      {
+        "address": "0x140b3f365",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionMainSetPlaybackSpeed"
+      },
+      {
+        "address": "0x140b3f47c",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionToggleSideViewPlayback"
+      },
+      {
+        "address": "0x140b3f49b",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionToggleSideViewPlaybackValidate"
+      },
+      {
+        "address": "0x140b3f4c2",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionToggleTopViewPlayback"
+      },
+      {
+        "address": "0x140b3f4e0",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionToggleTopViewPlaybackValidate"
+      },
+      {
+        "address": "0x140b3f506",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionTogglePersViewPlayback"
+      },
+      {
+        "address": "0x140b3f525",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionTogglePersViewPlaybackValidate"
+      },
+      {
+        "address": "0x140b45b00",
+        "references": [
+          {
+            "from": "0x140091fdc",
+            "function": "sub_140091f90"
+          },
+          {
+            "from": "0x140092001",
+            "function": "sub_140091f90"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to modify users --\nplease contact your supervisor or TD to change your user type\nor to modify the user\n"
+      },
+      {
+        "address": "0x140b45ba0",
+        "references": [
+          {
+            "from": "0x14009204c",
+            "function": "sub_140091f90"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to modify users --\nplease contact your supervisor or TD to change your user type\nor to modify the user"
+      },
+      {
+        "address": "0x140b45c50",
+        "references": [
+          {
+            "from": "0x14008becc",
+            "function": "sub_14008be80"
+          },
+          {
+            "from": "0x14008bef1",
+            "function": "sub_14008be80"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to add users --\nplease contact your supervisor or TD to change your user type\nor to add the user\n"
+      },
+      {
+        "address": "0x140b45ce0",
+        "references": [
+          {
+            "from": "0x14008bf36",
+            "function": "sub_14008be80"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to add users --\nplease contact your supervisor or TD to change your user type\nor to add the user"
+      },
+      {
+        "address": "0x140b45d90",
+        "references": [
+          {
+            "from": "0x14008eff3",
+            "function": "sub_14008efb0"
+          },
+          {
+            "from": "0x14008f012",
+            "function": "sub_14008efb0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to delete users --\nplease contact your supervisor or TD to change your user type\nor to delete the user\n"
+      },
+      {
+        "address": "0x140b45e30",
+        "references": [
+          {
+            "from": "0x14008f049",
+            "function": "sub_14008efb0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to delete users --\nplease contact your supervisor or TD to change your user type\nor to delete the user"
+      },
+      {
+        "address": "0x140b46030",
+        "references": [
+          {
+            "from": "0x14008ae46",
+            "function": "sub_14008ae00"
+          },
+          {
+            "from": "0x14008ae66",
+            "function": "sub_14008ae00"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to create environments --\nplease contact your supervisor or TD to change your user type\nor to delete the scenes\n"
+      },
+      {
+        "address": "0x140b460d0",
+        "references": [
+          {
+            "from": "0x14008aea8",
+            "function": "sub_14008ae00"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to create environments --\nplease contact your supervisor or TD to change your user type\nor to delete the scenes"
+      },
+      {
+        "address": "0x140b46190",
+        "references": [
+          {
+            "from": "0x14008e183",
+            "function": "sub_14008e140"
+          },
+          {
+            "from": "0x14008e1a6",
+            "function": "sub_14008e140"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to delete environments --\nplease contact your supervisor or TD to change your user type\nor to delete the environment\n"
+      },
+      {
+        "address": "0x140b46230",
+        "references": [
+          {
+            "from": "0x14008e1e8",
+            "function": "sub_14008e140"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to delete environments --\nplease contact your supervisor or TD to change your user type\nor to delete the environment."
+      },
+      {
+        "address": "0x140b46330",
+        "references": [
+          {
+            "from": "0x140091769",
+            "function": "sub_140091730"
+          },
+          {
+            "from": "0x14009178e",
+            "function": "sub_140091730"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to modify environments --\nplease contact your supervisor or TD to change your user type\nor to modify the environment\n"
+      },
+      {
+        "address": "0x140b463d0",
+        "references": [
+          {
+            "from": "0x1400917d3",
+            "function": "sub_140091730"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to modify environments --\nplease contact your supervisor or TD to change your user type\nor to modify the environment."
+      },
+      {
+        "address": "0x140b464d0",
+        "references": [
+          {
+            "from": "0x14008b135",
+            "function": "sub_14008b0e0"
+          },
+          {
+            "from": "0x14008b152",
+            "function": "sub_14008b0e0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to create jobs --\nplease contact your supervisor or TD to change your user type\nor to create the job\n"
+      },
+      {
+        "address": "0x140b46560",
+        "references": [
+          {
+            "from": "0x14008b196",
+            "function": "sub_14008b0e0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to create jobs --\nplease contact your supervisor or TD to change your user type\nor to create the job"
+      },
+      {
+        "address": "0x140b466d0",
+        "references": [
+          {
+            "from": "0x14008e54e",
+            "function": "sub_14008e500"
+          },
+          {
+            "from": "0x14008e573",
+            "function": "sub_14008e500"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to delete jobs --\nplease contact your supervisor or TD to change your user type\nor to delete the jobs\n"
+      },
+      {
+        "address": "0x140b46760",
+        "references": [
+          {
+            "from": "0x14008e5b8",
+            "function": "sub_14008e500"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to delete jobs --\nplease contact your supervisor or TD to change your user type\nor to delete the jobs"
+      },
+      {
+        "address": "0x140b46860",
+        "references": [
+          {
+            "from": "0x140091983",
+            "function": "sub_140091940"
+          },
+          {
+            "from": "0x1400919a8",
+            "function": "sub_140091940"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to modify jobs --\nplease contact your supervisor or TD to change your user type\nor to modify the jobs\n"
+      },
+      {
+        "address": "0x140b468f0",
+        "references": [
+          {
+            "from": "0x1400919ed",
+            "function": "sub_140091940"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to modify jobs --\nplease contact your supervisor or TD to change your user type\nor to modify the jobs"
+      },
+      {
+        "address": "0x140b46a50",
+        "references": [
+          {
+            "from": "0x14009062d",
+            "function": "sub_140090460"
+          },
+          {
+            "from": "0x140090652",
+            "function": "sub_140090460"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not own the lock on this scene or have the permission necessary to unlock a scene --\nplease contact your supervisor or TD to change your user type\nor to unlock the scenes\n"
+      },
+      {
+        "address": "0x140b46b10",
+        "references": [
+          {
+            "from": "0x140090695",
+            "function": "sub_140090460"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not own the lock on this scene or have the permission necessary to unlock a scene --\nplease contact your supervisor or TD to change your user type\nor to unlock the scenes"
+      },
+      {
+        "address": "0x140b46bd0",
+        "references": [
+          {
+            "from": "0x1400908a3",
+            "function": "sub_140090850"
+          },
+          {
+            "from": "0x1400908c8",
+            "function": "sub_140090850"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not own the lock on this scene version or have the permission necessary to unlock a scene version--\nplease contact your supervisor or TD to change your user type\nor to unlock the scene version.\n"
+      },
+      {
+        "address": "0x140b46ca0",
+        "references": [
+          {
+            "from": "0x14009090b",
+            "function": "sub_140090850"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not own the lock on this scene version or have the permission necessary to unlock a scene version--\nplease contact your supervisor or TD to change your user type\nor to unlock the scene version."
+      },
+      {
+        "address": "0x140b46da0",
+        "references": [
+          {
+            "from": "0x14008b75a",
+            "function": "sub_14008b700"
+          },
+          {
+            "from": "0x14008b77c",
+            "function": "sub_14008b700"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to create scenes --\nplease contact your supervisor or TD to change your user type\nor to create the scenes\n"
+      },
+      {
+        "address": "0x140b46e40",
+        "references": [
+          {
+            "from": "0x14008b7c6",
+            "function": "sub_14008b700"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to create scenes --\nplease contact your supervisor or TD to change your user type\nor to create the scenes"
+      },
+      {
+        "address": "0x140b46f50",
+        "references": [
+          {
+            "from": "0x14008eade",
+            "function": "sub_14008ea90"
+          },
+          {
+            "from": "0x14008eb03",
+            "function": "sub_14008ea90"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to delete scenes --\nplease contact your supervisor or TD to change your user type\nor to delete the scenes\n"
+      },
+      {
+        "address": "0x140b46ff0",
+        "references": [
+          {
+            "from": "0x14008eb46",
+            "function": "sub_14008ea90"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to delete scenes --\nplease contact your supervisor or TD to change your user type\nor to delete the scenes"
+      },
+      {
+        "address": "0x140b471a0",
+        "references": [
+          {
+            "from": "0x140093763",
+            "function": "sub_140093720"
+          },
+          {
+            "from": "0x140093788",
+            "function": "sub_140093720"
+          },
+          {
+            "from": "0x1400c81e6",
+            "function": "sub_1400c81a0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to rename scenes --\nplease contact your supervisor or TD to change your user type\nor to rename the scenes\n"
+      },
+      {
+        "address": "0x140b47240",
+        "references": [
+          {
+            "from": "0x1400937c2",
+            "function": "sub_140093720"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to rename scenes --\nplease contact your supervisor or TD to change your user type\nor to rename the scenes"
+      },
+      {
+        "address": "0x140b473e0",
+        "references": [
+          {
+            "from": "0x14008d323",
+            "function": "sub_14008d2e0"
+          },
+          {
+            "from": "0x14008d346",
+            "function": "sub_14008d2e0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to change the priority of scenes --\nplease contact your supervisor or TD to change your user type\nor to change the priority of scenes\n"
+      },
+      {
+        "address": "0x140b47490",
+        "references": [
+          {
+            "from": "0x14008d388",
+            "function": "sub_14008d2e0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to change the priority of scenes --\nplease contact your supervisor or TD to change your user type\nor to change the priority of the scenes"
+      },
+      {
+        "address": "0x140b476c0",
+        "references": [
+          {
+            "from": "0x14008d7de",
+            "function": "sub_14008d7a0"
+          },
+          {
+            "from": "0x14008d803",
+            "function": "sub_14008d7a0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to change the stage of scenes --\nplease contact your supervisor or TD to change your user type\nor to change the stage of scenes\n"
+      },
+      {
+        "address": "0x140b47770",
+        "references": [
+          {
+            "from": "0x14008d848",
+            "function": "sub_14008d7a0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to change the stage of scenes --\nplease contact your supervisor or TD to change your user type\nor to change the stage of the scenes"
+      },
+      {
+        "address": "0x140b47820",
+        "references": [
+          {
+            "from": "0x14008d9e5",
+            "function": "sub_14008d9a0"
+          },
+          {
+            "from": "0x14008da0a",
+            "function": "sub_14008d9a0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to clear scenes --\nplease contact your supervisor or TD to change your user type\nor to clear the scenes\n"
+      },
+      {
+        "address": "0x140b478c0",
+        "references": [
+          {
+            "from": "0x14008da3e",
+            "function": "sub_14008d9a0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to clear scenes --\nplease contact your supervisor or TD to change your user type\nor to clear the scenes"
+      },
+      {
+        "address": "0x140b47980",
+        "references": [
+          {
+            "from": "0x14008dd20",
+            "function": "sub_14008dcd0"
+          },
+          {
+            "from": "0x14008dd45",
+            "function": "sub_14008dcd0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to copy scenes --\nplease contact your supervisor or TD to change your user type\nor to copy the scenes\n"
+      },
+      {
+        "address": "0x140b47a10",
+        "references": [
+          {
+            "from": "0x14008dd79",
+            "function": "sub_14008dcd0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to copy scenes --\nplease contact your supervisor or TD to change your user type\nor to copy the scenes"
+      },
+      {
+        "address": "0x140b47ac0",
+        "references": [
+          {
+            "from": "0x140092b5b",
+            "function": "sub_140092af0"
+          },
+          {
+            "from": "0x140092b80",
+            "function": "sub_140092af0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "This service does not have permission to move scenes --\nplease contact your supervisor or TD.\n"
+      },
+      {
+        "address": "0x140b47b20",
+        "references": [
+          {
+            "from": "0x140092ba7",
+            "function": "sub_140092af0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "This service does not have permission to move scenes --\nplease contact your supervisor or TD."
+      },
+      {
+        "address": "0x140b47b80",
+        "references": [
+          {
+            "from": "0x140092c05",
+            "function": "sub_140092af0"
+          },
+          {
+            "from": "0x140092c2a",
+            "function": "sub_140092af0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to move scenes --\nplease contact your supervisor or TD to change your user type\nor to move the scenes\n"
+      },
+      {
+        "address": "0x140b47c10",
+        "references": [
+          {
+            "from": "0x140092c51",
+            "function": "sub_140092af0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "You do not have the permission necessary to move scenes --\nplease contact your supervisor or TD to change your user type\nor to move the scenes"
+      },
+      {
+        "address": "0x140b47ca0",
+        "references": [
+          {
+            "from": "0x140092c83",
+            "function": "sub_140092af0"
+          },
+          {
+            "from": "0x140092ca8",
+            "function": "sub_140092af0"
+          },
+          {
+            "from": "0x140092cda",
+            "function": "sub_140092af0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Please select a file system."
+      },
+      {
+        "address": "0x140b47cc0",
+        "references": [
+          {
+            "from": "0x140092f69",
+            "function": "sub_140092af0"
+          },
+          {
+            "from": "0x140092f8e",
+            "function": "sub_140092af0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Please select one or more scenes\n"
+      },
+      {
+        "address": "0x140b47ce8",
+        "references": [
+          {
+            "from": "0x140092fc0",
+            "function": "sub_140092af0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Please select one or more scenes"
+      },
+      {
+        "address": "0x140b47d90",
+        "references": [
+          {
+            "from": "0x14008c805",
+            "function": "sub_14008c1d0"
+          },
+          {
+            "from": "0x1400adbd3",
+            "function": "sub_1400ab850"
+          },
+          {
+            "from": "0x1400b1448",
+            "function": "sub_1400b1310"
+          },
+          {
+            "from": "0x1400b4ba3",
+            "function": "sub_1400b34d0"
+          },
+          {
+            "from": "0x1400be9cf",
+            "function": "sub_1400be7d0"
+          },
+          {
+            "from": "0x1400bf572",
+            "function": "sub_1400bf370"
+          },
+          {
+            "from": "0x1400c12e6",
+            "function": "sub_1400c0c90"
+          },
+          {
+            "from": "0x1400c1955",
+            "function": "sub_1400c0c90"
+          },
+          {
+            "from": "0x1400c2f38",
+            "function": "sub_1400c2340"
+          },
+          {
+            "from": "0x1400c3c4c",
+            "function": "sub_1400c3170"
+          },
+          {
+            "from": "0x1400d028f",
+            "function": "sub_1400d01d0"
+          },
+          {
+            "from": "0x1408825d6",
+            "function": "sub_140880de0"
+          },
+          {
+            "from": "0x1408826dc",
+            "function": "sub_140880de0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "/palette-library"
+      },
+      {
+        "address": "0x140b4b4b8",
+        "references": [
+          {
+            "from": "0x140003574",
+            "function": "sub_140003570"
+          },
+          {
+            "from": "0x1400035b4",
+            "function": "sub_1400035b0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "BKExternal-palette"
+      },
+      {
+        "address": "0x140b4b888",
+        "references": [
+          {
+            "from": "0x1400b77b2",
+            "function": "sub_1400b6d60"
+          },
+          {
+            "from": "0x1400c731b",
+            "function": "sub_1400c6c10"
+          },
+          {
+            "from": "0x140944233",
+            "function": "sub_140941130"
+          }
+        ],
+        "section": ".rdata",
+        "text": "palette"
+      },
+      {
+        "address": "0x140b4b890",
+        "references": [
+          {
+            "from": "0x1400b7846",
+            "function": "sub_1400b6d60"
+          },
+          {
+            "from": "0x1400c737f",
+            "function": "sub_1400c6c10"
+          }
+        ],
+        "section": ".rdata",
+        "text": "env_palette"
+      },
+      {
+        "address": "0x140b4b8a0",
+        "references": [
+          {
+            "from": "0x1400b78dc",
+            "function": "sub_1400b6d60"
+          },
+          {
+            "from": "0x1400c73e3",
+            "function": "sub_1400c6c10"
+          }
+        ],
+        "section": ".rdata",
+        "text": "job_palette"
+      },
+      {
+        "address": "0x140b4b8b0",
+        "references": [
+          {
+            "from": "0x1400b797b",
+            "function": "sub_1400b6d60"
+          },
+          {
+            "from": "0x1400c7447",
+            "function": "sub_1400c6c10"
+          }
+        ],
+        "section": ".rdata",
+        "text": "scene_palette"
+      },
+      {
+        "address": "0x140b4b8c0",
+        "references": [
+          {
+            "from": "0x1400b7a1a",
+            "function": "sub_1400b6d60"
+          },
+          {
+            "from": "0x1400c74ab",
+            "function": "sub_1400c6c10"
+          }
+        ],
+        "section": ".rdata",
+        "text": "backup_palette"
+      },
+      {
+        "address": "0x140b4b908",
+        "references": [
+          {
+            "from": "0x1400b62b8",
+            "function": "sub_1400b6030"
+          },
+          {
+            "from": "0x1400b62d3",
+            "function": "sub_1400b6030"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Error in Destination, please specify: "
+      },
+      {
+        "address": "0x140b4bcd8",
+        "references": [
+          {
+            "from": "0x1400b2727",
+            "function": "sub_1400b2070"
+          },
+          {
+            "from": "0x1400b4a89",
+            "function": "sub_1400b34d0"
+          },
+          {
+            "from": "0x1400c07a4",
+            "function": "sub_1400bff80"
+          },
+          {
+            "from": "0x1400c3d36",
+            "function": "sub_1400c3170"
+          }
+        ],
+        "section": ".rdata",
+        "text": "palette-library"
+      },
+      {
+        "address": "0x140b4bcf8",
+        "references": [
+          {
+            "from": "0x1400b22d2",
+            "function": "sub_1400b2070"
+          },
+          {
+            "from": "0x1400c0033",
+            "function": "sub_1400bff80"
+          },
+          {
+            "from": "0x1400c0ba2",
+            "function": "sub_1400bff80"
+          }
+        ],
+        "section": ".rdata",
+        "text": "PALETTE"
+      },
+      {
+        "address": "0x140b4bd00",
+        "references": [
+          {
+            "from": "0x1400b0664",
+            "function": "sub_1400b0520"
+          },
+          {
+            "from": "0x1400b2359",
+            "function": "sub_1400b2070"
+          },
+          {
+            "from": "0x1400be0b1",
+            "function": "sub_1400bdf20"
+          },
+          {
+            "from": "0x1400c0027",
+            "function": "sub_1400bff80"
+          }
+        ],
+        "section": ".rdata",
+        "text": "PALETTE_LIST"
+      },
+      {
+        "address": "0x140b4bd10",
+        "references": [
+          {
+            "from": "0x1400b05da",
+            "function": "sub_1400b0520"
+          },
+          {
+            "from": "0x1400be027",
+            "function": "sub_1400bdf20"
+          },
+          {
+            "from": "0x1408b9aee",
+            "function": "sub_1408b9a60"
+          }
+        ],
+        "section": ".rdata",
+        "text": "PALETTES"
+      },
+      {
+        "address": "0x140b4bda8",
+        "references": [
+          {
+            "from": "0x1400b3065",
+            "function": "sub_1400b2a00"
+          },
+          {
+            "from": "0x1400c2cb3",
+            "function": "sub_1400c2340"
+          }
+        ],
+        "section": ".rdata",
+        "text": "/PALETTES"
+      },
+      {
+        "address": "0x140b4bdb8",
+        "references": [
+          {
+            "from": "0x1400b31c8",
+            "function": "sub_1400b2a00"
+          },
+          {
+            "from": "0x1400c1ec6",
+            "function": "sub_1400c1db0"
+          },
+          {
+            "from": "0x1400c2e43",
+            "function": "sub_1400c2340"
+          }
+        ],
+        "section": ".rdata",
+        "text": "/PALETTE_LIST"
+      },
+      {
+        "address": "0x140b4bfe0",
+        "references": [
+          {
+            "from": "0x1400bb006",
+            "function": "sub_1400bae80"
+          },
+          {
+            "from": "0x1400bb037",
+            "function": "sub_1400bae80"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Please select at least one scene."
+      },
+      {
+        "address": "0x140b4c1a0",
+        "references": [
+          {
+            "from": "0x1400c4aa7",
+            "function": "sub_1400c4890"
+          },
+          {
+            "from": "0x1400c4f63",
+            "function": "sub_1400c4890"
+          }
+        ],
+        "section": ".rdata",
+        "text": "%1/%2/palette-library"
+      },
+      {
+        "address": "0x140b4c930",
+        "references": [
+          {
+            "from": "0x1400c8249",
+            "function": "sub_1400c81a0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Please use -name <new scene name>"
+      },
+      {
+        "address": "0x140b4d31b",
+        "references": [],
+        "section": ".rdata",
+        "text": "envPalette"
+      },
+      {
+        "address": "0x140b4d326",
+        "references": [],
+        "section": ".rdata",
+        "text": "jobPalette"
+      },
+      {
+        "address": "0x140b4d331",
+        "references": [],
+        "section": ".rdata",
+        "text": "scenePalette"
+      },
+      {
+        "address": "0x140b4d9a0",
+        "references": [],
+        "section": ".rdata",
+        "text": "envPalette"
+      },
+      {
+        "address": "0x140b4d9ab",
+        "references": [],
+        "section": ".rdata",
+        "text": "jobPalette"
+      },
+      {
+        "address": "0x140b4d9b6",
+        "references": [],
+        "section": ".rdata",
+        "text": "scenePalette"
+      },
+      {
+        "address": "0x140b4dfa2",
+        "references": [],
+        "section": ".rdata",
+        "text": "envPalette"
+      },
+      {
+        "address": "0x140b4dfad",
+        "references": [],
+        "section": ".rdata",
+        "text": "jobPalette"
+      },
+      {
+        "address": "0x140b4dfb8",
+        "references": [],
+        "section": ".rdata",
+        "text": "scenePalette"
+      },
+      {
+        "address": "0x140b4f408",
+        "references": [
+          {
+            "from": "0x1400dd02e",
+            "function": "sub_1400dcf20"
+          },
+          {
+            "from": "0x1400dd382",
+            "function": "sub_1400dd2f0"
+          },
+          {
+            "from": "0x1400dd599",
+            "function": "sub_1400dd2f0"
+          },
+          {
+            "from": "0x1400dd716",
+            "function": "sub_1400dd2f0"
+          },
+          {
+            "from": "0x1400dd7b3",
+            "function": "sub_1400dd2f0"
+          },
+          {
+            "from": "0x1400dd8b1",
+            "function": "sub_1400dd2f0"
+          },
+          {
+            "from": "0x1400ddf32",
+            "function": "sub_1400ddeb0"
+          },
+          {
+            "from": "0x1400de09f",
+            "function": "sub_1400ddeb0"
+          },
+          {
+            "from": "0x1400de16d",
+            "function": "sub_1400ddeb0"
+          },
+          {
+            "from": "0x1400de1f3",
+            "function": "sub_1400ddeb0"
+          },
+          {
+            "from": "0x1400de2b6",
+            "function": "sub_1400ddeb0"
+          },
+          {
+            "from": "0x1400de5f7",
+            "function": "sub_1400de4c0"
+          },
+          {
+            "from": "0x1400de689",
+            "function": "sub_1400de4c0"
+          },
+          {
+            "from": "0x1400de7c2",
+            "function": "sub_1400de4c0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "CUI_PaletteOpsCtrl"
+      },
+      {
+        "address": "0x140b4f470",
+        "references": [
+          {
+            "from": "0x1400dd70f",
+            "function": "sub_1400dd2f0"
+          },
+          {
+            "from": "0x1400de166",
+            "function": "sub_1400ddeb0"
+          },
+          {
+            "from": "0x1400de5f0",
+            "function": "sub_1400de4c0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "One or more selected palettes are currently being edited by someone."
+      },
+      {
+        "address": "0x140b4f4c0",
+        "references": [
+          {
+            "from": "0x1400dd7ac",
+            "function": "sub_1400dd2f0"
+          },
+          {
+            "from": "0x140f6d8b8",
+            "function": null
+          }
+        ],
+        "section": ".rdata",
+        "text": "Copying a palette may cause conflicts and lead to data loss. Do you want to continue?"
+      },
+      {
+        "address": "0x140b4f518",
+        "references": [
+          {
+            "from": "0x1400dd8aa",
+            "function": "sub_1400dd2f0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Multiple palettes cannot be copied into their own directory."
+      },
+      {
+        "address": "0x140b4f560",
+        "references": [
+          {
+            "from": "0x1400de682",
+            "function": "sub_1400de4c0"
+          },
+          {
+            "from": "0x140f6d8c8",
+            "function": null
+          }
+        ],
+        "section": ".rdata",
+        "text": "Renaming a palette that is in use elsewhere may lead to data loss. Do you want to continue?"
+      },
+      {
+        "address": "0x140b4f5c0",
+        "references": [
+          {
+            "from": "0x1400de7bb",
+            "function": "sub_1400de4c0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Unable to rename the palette."
+      },
+      {
+        "address": "0x140b4f5e0",
+        "references": [
+          {
+            "from": "0x1400de1ec",
+            "function": "sub_1400ddeb0"
+          },
+          {
+            "from": "0x140f6d8e8",
+            "function": null
+          }
+        ],
+        "section": ".rdata",
+        "text": "Deleting a palette that is in use elsewhere may lead to data loss. Do you want to continue?"
+      },
+      {
+        "address": "0x140b4f640",
+        "references": [
+          {
+            "from": "0x1400de2af",
+            "function": "sub_1400ddeb0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Unable to delete the palette."
+      },
+      {
+        "address": "0x140b4fed0",
+        "references": [
+          {
+            "from": "0x1400e1c89",
+            "function": "sub_1400e1a40"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Tool Preset Recovered Palette"
+      },
+      {
+        "address": "0x140b51718",
+        "references": [
+          {
+            "from": "0x140104aed",
+            "function": "sub_140104910"
+          },
+          {
+            "from": "0x14036b3d1",
+            "function": "sub_14036b270"
+          },
+          {
+            "from": "0x1403b5899",
+            "function": "sub_1403b5760"
+          },
+          {
+            "from": "0x1403c81d9",
+            "function": "sub_1403c80c0"
+          },
+          {
+            "from": "0x14047b8ed",
+            "function": "sub_14047b850"
+          },
+          {
+            "from": "0x14047cf79",
+            "function": "sub_14047ccb0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "WHEEL_ZOOM_THRESHOLD"
+      },
+      {
+        "address": "0x140b51770",
+        "references": [
+          {
+            "from": "0x1400ff3e1",
+            "function": "sub_1400ff330"
+          },
+          {
+            "from": "0x1400ff701",
+            "function": "sub_1400ff650"
+          },
+          {
+            "from": "0x140118baa",
+            "function": "sub_140118af0"
+          },
+          {
+            "from": "0x140207ff7",
+            "function": "sub_140207fe0"
+          },
+          {
+            "from": "0x1402080e7",
+            "function": "sub_1402080d0"
+          },
+          {
+            "from": "0x14036fb3e",
+            "function": "sub_14036faf0"
+          },
+          {
+            "from": "0x14036fd8e",
+            "function": "sub_14036fd40"
+          },
+          {
+            "from": "0x14036ffde",
+            "function": "sub_14036ff90"
+          },
+          {
+            "from": "0x14037022e",
+            "function": "sub_1403701e0"
+          },
+          {
+            "from": "0x14037047e",
+            "function": "sub_140370430"
+          },
+          {
+            "from": "0x1403706ce",
+            "function": "sub_140370680"
+          },
+          {
+            "from": "0x1403b896f",
+            "function": "sub_1403b8900"
+          },
+          {
+            "from": "0x1403b8bcf",
+            "function": "sub_1403b8b60"
+          },
+          {
+            "from": "0x1403c8470",
+            "function": "sub_1403c8440"
+          },
+          {
+            "from": "0x1403c8630",
+            "function": "sub_1403c8600"
+          }
+        ],
+        "section": ".rdata",
+        "text": "SHORTCUT_ZOOM_ON_MOUSE"
+      },
+      {
+        "address": "0x140b51788",
+        "references": [
+          {
+            "from": "0x1400ff60a",
+            "function": "sub_1400ff5e0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Zoom In Node View"
+      },
+      {
+        "address": "0x140b517a0",
+        "references": [
+          {
+            "from": "0x1400ff92a",
+            "function": "sub_1400ff900"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Zoom Out Node View"
+      },
+      {
+        "address": "0x140b517b8",
+        "references": [
+          {
+            "from": "0x1400fca1a",
+            "function": "sub_1400fc9f0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Reset Node View Zoom"
+      },
+      {
+        "address": "0x140b521a8",
+        "references": [
+          {
+            "from": "0x1400efec9",
+            "function": "sub_1400efea0"
+          },
+          {
+            "from": "0x140157dad",
+            "function": "sub_140157d70"
+          },
+          {
+            "from": "0x140158858",
+            "function": "sub_140158680"
+          },
+          {
+            "from": "0x14026a76a",
+            "function": "sub_14026a710"
+          },
+          {
+            "from": "0x14026ab66",
+            "function": "sub_14026aaf0"
+          },
+          {
+            "from": "0x140362d28",
+            "function": "sub_140362ce0"
+          },
+          {
+            "from": "0x14036858e",
+            "function": "sub_140368400"
+          },
+          {
+            "from": "0x1403900c8",
+            "function": "sub_140390040"
+          },
+          {
+            "from": "0x14046fa30",
+            "function": "sub_14046f9f0"
+          },
+          {
+            "from": "0x1404cd7e8",
+            "function": "sub_1404cd750"
+          }
+        ],
+        "section": ".rdata",
+        "text": "FREE_PAN_AND_ZOOM_KEY"
+      },
+      {
+        "address": "0x140b52fa0",
+        "references": [
+          {
+            "from": "0x140106e6c",
+            "function": "sub_140106d90"
+          },
+          {
+            "from": "0x140107854",
+            "function": "sub_140107770"
+          }
+        ],
+        "section": ".rdata",
+        "text": "XSHEET_MAX_ZOOM"
+      },
+      {
+        "address": "0x140b52fb0",
+        "references": [
+          {
+            "from": "0x140106eb4",
+            "function": "sub_140106d90"
+          },
+          {
+            "from": "0x14010789d",
+            "function": "sub_140107770"
+          }
+        ],
+        "section": ".rdata",
+        "text": "XSHEET_MIN_ZOOM"
+      },
+      {
+        "address": "0x140b530a8",
+        "references": [
+          {
+            "from": "0x140117047",
+            "function": "sub_140116f80"
+          }
+        ],
+        "section": ".rdata",
+        "text": "1setColumnsPaletteFlag()"
+      },
+      {
+        "address": "0x140b530c8",
+        "references": [
+          {
+            "from": "0x14011705b",
+            "function": "sub_140116f80"
+          }
+        ],
+        "section": ".rdata",
+        "text": "2drawingPaletteChanged()"
+      },
+      {
+        "address": "0x140b530e8",
+        "references": [
+          {
+            "from": "0x140117081",
+            "function": "sub_140116f80"
+          },
+          {
+            "from": "0x1403eaeaf",
+            "function": "sub_1403eabd0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "2drawingPaletteRecovered()"
+      },
+      {
+        "address": "0x140b53300",
+        "references": [
+          {
+            "from": "0x1401172d9",
+            "function": "sub_140116f80"
+          },
+          {
+            "from": "0x1408636f4",
+            "function": "sub_14085d860"
+          },
+          {
+            "from": "0x1408ee822",
+            "function": "sub_1408ee6c0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "1onPlaybackModeChanged(int)"
+      },
+      {
+        "address": "0x140b53320",
+        "references": [
+          {
+            "from": "0x1401172ed",
+            "function": "sub_140116f80"
+          },
+          {
+            "from": "0x1401fbe89",
+            "function": "sub_1401fb690"
+          },
+          {
+            "from": "0x1403b6556",
+            "function": "sub_1403b5d10"
+          },
+          {
+            "from": "0x1408ee82c",
+            "function": "sub_1408ee6c0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "2playbackModeChanged(int)"
+      },
+      {
+        "address": "0x140b53638",
+        "references": [
+          {
+            "from": "0x140114132",
+            "function": "sub_1401140f0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Zoom In Xsheet"
+      },
+      {
+        "address": "0x140b53648",
+        "references": [
+          {
+            "from": "0x140114212",
+            "function": "sub_1401141d0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Zoom Out Xsheet"
+      },
+      {
+        "address": "0x140b53658",
+        "references": [
+          {
+            "from": "0x140112582",
+            "function": "sub_140112540"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Reset Xsheet Zoom"
+      },
+      {
+        "address": "0x140b53670",
+        "references": [
+          {
+            "from": "0x1401125fc",
+            "function": "sub_1401125c0"
+          },
+          {
+            "from": "0x1401126ac",
+            "function": "sub_140112670"
+          },
+          {
+            "from": "0x140267b6c",
+            "function": "sub_140267b30"
+          },
+          {
+            "from": "0x140267bec",
+            "function": "sub_140267bb0"
+          },
+          {
+            "from": "0x1403b7e0a",
+            "function": "sub_1403b7dd0"
+          },
+          {
+            "from": "0x1403b7eba",
+            "function": "sub_1403b7e80"
+          },
+          {
+            "from": "0x140458dfe",
+            "function": "sub_140458d80"
+          },
+          {
+            "from": "0x140481e55",
+            "function": "sub_140481dd0"
+          },
+          {
+            "from": "0x140481f60",
+            "function": "sub_140481eb0"
+          },
+          {
+            "from": "0x14048200b",
+            "function": "sub_140481eb0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Cell Substitution"
+      },
+      {
+        "address": "0x140b55210",
+        "references": [
+          {
+            "from": "0x14011c795",
+            "function": "sub_14011c6a0"
+          },
+          {
+            "from": "0x14011c7f6",
+            "function": "sub_14011c6a0"
+          },
+          {
+            "from": "0x14011c84b",
+            "function": "sub_14011c6a0"
+          },
+          {
+            "from": "0x14011c8dd",
+            "function": "sub_14011c6a0"
+          },
+          {
+            "from": "0x14011c93e",
+            "function": "sub_14011c6a0"
+          },
+          {
+            "from": "0x14011c993",
+            "function": "sub_14011c6a0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "PaletteManager"
+      },
+      {
+        "address": "0x140b55220",
+        "references": [
+          {
+            "from": "0x14011c6e7",
+            "function": "sub_14011c6a0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "PaletteLayoutView"
+      },
+      {
+        "address": "0x140b55238",
+        "references": [
+          {
+            "from": "0x14011c6d0",
+            "function": "sub_14011c6a0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "paletteView"
+      },
+      {
+        "address": "0x140b55248",
+        "references": [
+          {
+            "from": "0x14011c9e9",
+            "function": "sub_14011c6a0"
+          },
+          {
+            "from": "0x14020f34b",
+            "function": "sub_14020f290"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Palette Manager Menu"
+      },
+      {
+        "address": "0x140b55748",
+        "references": [
+          {
+            "from": "0x14011dbdf",
+            "function": "sub_14011d350"
+          },
+          {
+            "from": "0x140130f08",
+            "function": "sub_140130ec0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "CUR_PALETTE_OVERRIDE"
+      },
+      {
+        "address": "0x140b55790",
+        "references": [
+          {
+            "from": "0x14011dd28",
+            "function": "sub_14011d350"
+          }
+        ],
+        "section": ".rdata",
+        "text": "1autoLockPaletteListsChanged(bool)"
+      },
+      {
+        "address": "0x140b557b8",
+        "references": [
+          {
+            "from": "0x14011dd37",
+            "function": "sub_14011d350"
+          }
+        ],
+        "section": ".rdata",
+        "text": "2autoLockPaletteListsChanged(bool)"
+      },
+      {
+        "address": "0x140b55808",
+        "references": [
+          {
+            "from": "0x14012b4af",
+            "function": "sub_14012b100"
+          }
+        ],
+        "section": ".rdata",
+        "text": "CUI_PaletteManagerCtrl"
+      },
+      {
+        "address": "0x140b55820",
+        "references": [
+          {
+            "from": "0x14012b4ba",
+            "function": "sub_14012b100"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Cannot restore the bitmap colour as it is a temporary colour.\nOnly palette colours may be used on vector art layers."
+      },
+      {
+        "address": "0x140b55898",
+        "references": [
+          {
+            "from": "0x14011ef0e",
+            "function": "sub_14011ee70"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Create Palette from Selection"
+      },
+      {
+        "address": "0x140b558b8",
+        "references": [
+          {
+            "from": "0x14011ef31",
+            "function": "sub_14011ee70"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Create Palette"
+      },
+      {
+        "address": "0x140b558c8",
+        "references": [
+          {
+            "from": "0x14011ef6b",
+            "function": "sub_14011ee70"
+          },
+          {
+            "from": "0x1401225cc",
+            "function": "sub_1401222e0"
+          },
+          {
+            "from": "0x1401230ca",
+            "function": "sub_1401222e0"
+          },
+          {
+            "from": "0x14020e4ed",
+            "function": "sub_14020de60"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Import Palette"
+      },
+      {
+        "address": "0x140b558d8",
+        "references": [
+          {
+            "from": "0x14011ef8e",
+            "function": "sub_14011ee70"
+          },
+          {
+            "from": "0x14011f135",
+            "function": "sub_14011ee70"
+          },
+          {
+            "from": "0x14020e4cf",
+            "function": "sub_14020de60"
+          },
+          {
+            "from": "0x1402292cc",
+            "function": "sub_140229110"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Link Palette"
+      },
+      {
+        "address": "0x140b558e8",
+        "references": [
+          {
+            "from": "0x14011f089",
+            "function": "sub_14011ee70"
+          },
+          {
+            "from": "0x14011f437",
+            "function": "sub_14011ee70"
+          }
+        ],
+        "section": ".rdata",
+        "text": "PALETTE_BROWSER_RECOLOR_SELECTED"
+      },
+      {
+        "address": "0x140b55910",
+        "references": [
+          {
+            "from": "0x14011f6c6",
+            "function": "sub_14011ee70"
+          },
+          {
+            "from": "0x14011f6f8",
+            "function": "sub_14011ee70"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Missing palette [%1] in [%2]"
+      },
+      {
+        "address": "0x140b55930",
+        "references": [
+          {
+            "from": "0x14011f7da",
+            "function": "sub_14011ee70"
+          },
+          {
+            "from": "0x14011f99f",
+            "function": "sub_14011ee70"
+          },
+          {
+            "from": "0x14020e204",
+            "function": "sub_14020de60"
+          }
+        ],
+        "section": ".rdata",
+        "text": "New Palette"
+      },
+      {
+        "address": "0x140b55940",
+        "references": [
+          {
+            "from": "0x14011f9c6",
+            "function": "sub_14011ee70"
+          },
+          {
+            "from": "0x140121166",
+            "function": "sub_140120cf0"
+          },
+          {
+            "from": "0x1402dd757",
+            "function": "sub_1402dd720"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Load Palette"
+      },
+      {
+        "address": "0x140b55950",
+        "references": [
+          {
+            "from": "0x14011fd61",
+            "function": "sub_14011ee70"
+          },
+          {
+            "from": "0x14011fd8c",
+            "function": "sub_14011ee70"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Cannot create Colour palette. There are no coloured vector strokes in the selected drawings."
+      },
+      {
+        "address": "0x140b559b0",
+        "references": [
+          {
+            "from": "0x14011fd08",
+            "function": "sub_14011ee70"
+          },
+          {
+            "from": "0x14011fd33",
+            "function": "sub_14011ee70"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Cannot create Pencil Texture palette. There are no vector pencil strokes in the selected drawings."
+      },
+      {
+        "address": "0x140b55a18",
+        "references": [
+          {
+            "from": "0x14011fae5",
+            "function": "sub_14011ee70"
+          },
+          {
+            "from": "0x14011fb10",
+            "function": "sub_14011ee70"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Cannot create palette. Unknown palette type encountered."
+      },
+      {
+        "address": "0x140b55a58",
+        "references": [
+          {
+            "from": "0x14011fe37",
+            "function": "sub_14011ee70"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Recolouring drawings with new palette"
+      },
+      {
+        "address": "0x140b55ab0",
+        "references": [
+          {
+            "from": "0x1401223b3",
+            "function": "sub_1401222e0"
+          },
+          {
+            "from": "0x14017be44",
+            "function": "sub_14017bc40"
+          },
+          {
+            "from": "0x140293ea8",
+            "function": "sub_140293480"
+          },
+          {
+            "from": "0x1402dabc7",
+            "function": "sub_1402daa60"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Palette"
+      },
+      {
+        "address": "0x140b55ad0",
+        "references": [
+          {
+            "from": "0x140122e05",
+            "function": "sub_1401222e0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "The palette %1 is a pencil texture palette. Pencil textures are not supported in Harmony Essentials."
+      },
+      {
+        "address": "0x140b55b38",
+        "references": [
+          {
+            "from": "0x140128525",
+            "function": "sub_140128380"
+          },
+          {
+            "from": "0x14023ba83",
+            "function": "sub_14023b9e0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Rename Palette"
+      },
+      {
+        "address": "0x140b55b48",
+        "references": [
+          {
+            "from": "0x1401212c9",
+            "function": "sub_140121240"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Save Palette As"
+      },
+      {
+        "address": "0x140b55b58",
+        "references": [
+          {
+            "from": "0x1401212eb",
+            "function": "sub_140121240"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Clone Palette"
+      },
+      {
+        "address": "0x140b55b68",
+        "references": [
+          {
+            "from": "0x140121308",
+            "function": "sub_140121240"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Duplicate Palette"
+      },
+      {
+        "address": "0x140b55b80",
+        "references": [
+          {
+            "from": "0x140128cf4",
+            "function": "sub_140128c60"
+          },
+          {
+            "from": "0x140863460",
+            "function": "sub_14085d860"
+          }
+        ],
+        "section": ".rdata",
+        "text": "ADVANCED_PALETTELIST"
+      },
+      {
+        "address": "0x140b55bb0",
+        "references": [
+          {
+            "from": "0x140129478",
+            "function": "sub_140129420"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Changes have been made to the palette. Saving As this palette will empty the undo list. Do you want to continue?"
+      },
+      {
+        "address": "0x140b55c30",
+        "references": [
+          {
+            "from": "0x140130121",
+            "function": "sub_140130040"
+          },
+          {
+            "from": "0x14013291d",
+            "function": "sub_140132840"
+          }
+        ],
+        "section": ".rdata",
+        "text": "This palette has been modified; you will lose all changes. Do you want to continue?"
+      },
+      {
+        "address": "0x140b55c90",
+        "references": [
+          {
+            "from": "0x14012d53c",
+            "function": "sub_14012d4e0"
+          },
+          {
+            "from": "0x14097221c",
+            "function": "sub_140972010"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Failed to obtain the database lock for all affected palette  lists"
+      },
+      {
+        "address": "0x140b55ce0",
+        "references": [
+          {
+            "from": "0x14012d669",
+            "function": "sub_14012d4e0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Some colours are used by drawings in the scene. Do you really want to delete this palette ?"
+      },
+      {
+        "address": "0x140b55d40",
+        "references": [
+          {
+            "from": "0x14012d712",
+            "function": "sub_14012d4e0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Deleting a palette will remove it from all palette lists where it is currently found and may affect all drawings and projects that links to it.\n Do you really want to delete this palette and its disk file ?"
+      },
+      {
+        "address": "0x140b55e10",
+        "references": [
+          {
+            "from": "0x14012d784",
+            "function": "sub_14012d4e0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Remove and Delete Palette"
+      },
+      {
+        "address": "0x140b55e30",
+        "references": [
+          {
+            "from": "0x140127f36",
+            "function": "sub_140127ec0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "This palette has been modified. Changes will be lost if the palette is removed. Removing the palette will also clear the undo actions. Do you want to continue?"
+      },
+      {
+        "address": "0x140b55ed0",
+        "references": [
+          {
+            "from": "0x140127db7",
+            "function": "sub_140127b50"
+          },
+          {
+            "from": "0x14012812b",
+            "function": "sub_140127ec0"
+          },
+          {
+            "from": "0x14020e35f",
+            "function": "sub_14020de60"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Remove Palette"
+      },
+      {
+        "address": "0x140b55ee0",
+        "references": [
+          {
+            "from": "0x140127bca",
+            "function": "sub_140127b50"
+          }
+        ],
+        "section": ".rdata",
+        "text": "This palette has been modified. Changes will be lost if the palette is removed. Do you want to continue?"
+      },
+      {
+        "address": "0x140b55f50",
+        "references": [
+          {
+            "from": "0x140120300",
+            "function": "sub_1401202b0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "This palette has been modified."
+      },
+      {
+        "address": "0x140b55f78",
+        "references": [
+          {
+            "from": "0x14012039e",
+            "function": "sub_1401202b0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Are you sure you want to remove this palette?"
+      },
+      {
+        "address": "0x140b55fa8",
+        "references": [
+          {
+            "from": "0x14012ecf1",
+            "function": "sub_14012eba0"
+          },
+          {
+            "from": "0x14012efee",
+            "function": "sub_14012eeb0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Move Palette"
+      },
+      {
+        "address": "0x140b55fb8",
+        "references": [
+          {
+            "from": "0x14012c798",
+            "function": "sub_14012c690"
+          },
+          {
+            "from": "0x14012c7ba",
+            "function": "sub_14012c690"
+          }
+        ],
+        "section": ".rdata",
+        "text": "No current palette"
+      },
+      {
+        "address": "0x140b55fd0",
+        "references": [
+          {
+            "from": "0x14012c81f",
+            "function": "sub_14012c690"
+          },
+          {
+            "from": "0x14012c844",
+            "function": "sub_14012c690"
+          }
+        ],
+        "section": ".rdata",
+        "text": "The default color already exists in this palette"
+      },
+      {
+        "address": "0x140b56188",
+        "references": [
+          {
+            "from": "0x140127917",
+            "function": "sub_140127840"
+          },
+          {
+            "from": "0x140227846",
+            "function": "sub_140226ff0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Element Palettes"
+      },
+      {
+        "address": "0x140b561a0",
+        "references": [
+          {
+            "from": "0x1401279d6",
+            "function": "sub_140127840"
+          },
+          {
+            "from": "0x1402278f5",
+            "function": "sub_140226ff0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Scene Palettes"
+      },
+      {
+        "address": "0x140b56210",
+        "references": [
+          {
+            "from": "0x140123537",
+            "function": "sub_1401233e0"
+          },
+          {
+            "from": "0x14012362c",
+            "function": "sub_1401233e0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Unable to obtain the rights to modify the palette list."
+      },
+      {
+        "address": "0x140b56250",
+        "references": [
+          {
+            "from": "0x14012a254",
+            "function": "sub_14012a150"
+          }
+        ],
+        "section": ".rdata",
+        "text": "This palette list has been modified; if you release your rights to modify it, you will lose all changes. Do you want to continue?"
+      },
+      {
+        "address": "0x140b562d8",
+        "references": [
+          {
+            "from": "0x14012bcca",
+            "function": "sub_14012bc60"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Unable to obtain the rights to modify the palette."
+      },
+      {
+        "address": "0x140b56310",
+        "references": [
+          {
+            "from": "0x1401328e8",
+            "function": "sub_140132840"
+          }
+        ],
+        "section": ".rdata",
+        "text": "This palette must be saved before you release your rights to modify it. Do you want to continue?"
+      },
+      {
+        "address": "0x140b56378",
+        "references": [
+          {
+            "from": "0x14012e712",
+            "function": "sub_14012e4e0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "The rights to modify could not be obtained for some palettes."
+      },
+      {
+        "address": "0x140b56418",
+        "references": [
+          {
+            "from": "0x14012de62",
+            "function": "sub_14012dd70"
+          }
+        ],
+        "section": ".rdata",
+        "text": "The palette list could not be released on the server."
+      },
+      {
+        "address": "0x140b56450",
+        "references": [
+          {
+            "from": "0x14012dfc1",
+            "function": "sub_14012dd70"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Some palettes could not be released on the server."
+      },
+      {
+        "address": "0x140b564a0",
+        "references": [
+          {
+            "from": "0x140131a4e",
+            "function": "sub_1401319e0"
+          },
+          {
+            "from": "0x140131a73",
+            "function": "sub_1401319e0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Unable to obtain scene palette list lock to delete and/or remove unused palettes."
+      }
+    ],
+    "total": 1733
+  },
+  "summary": "1733 strings match \"(?i)zoom|frame ?rate|playback|substitut|ease|palette\".",
+  "confidence": "observed",
+  "authority": "original-files",
+  "environment": {
+    "clean_room": false,
+    "engine": "builtin",
+    "engine_version": "0.5.0",
+    "host": "windows-x86_64"
+  },
+  "limitations": [
+    {
+      "code": "data_sections_only",
+      "message": "only strings stored in the file are searched (absence is not proof)"
+    }
+  ],
+  "coverage": {
+    "status": "partial",
+    "examined": 200,
+    "total": 1733,
+    "next_offset": 200
+  },
+  "locations": [],
+  "links": []
+}

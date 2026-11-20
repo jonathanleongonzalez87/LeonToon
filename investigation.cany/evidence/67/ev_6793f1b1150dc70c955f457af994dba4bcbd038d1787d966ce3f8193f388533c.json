@@ -1,0 +1,54 @@
+{
+  "id": "ev_6793f1b1150dc70c955f457af994dba4bcbd038d1787d966ce3f8193f388533c",
+  "subject": {
+    "kind": "pe",
+    "sha256": "3444bc3c18f29168512fb92e5f56bfa466df99bbe5e937201cf448d99482897a",
+    "name": "HarmonyPremium.exe"
+  },
+  "operation": "native_strings_find",
+  "params": {
+    "case_sensitive": false,
+    "limit": 200,
+    "mode": "literal",
+    "offset": 0,
+    "pattern": "Fit To View"
+  },
+  "result": {
+    "matches": [
+      {
+        "address": "0x140c1b810",
+        "references": [
+          {
+            "from": "0x140529b3f",
+            "function": "sub_140529b10"
+          }
+        ],
+        "section": ".rdata",
+        "text": "WID_XmlEditorComFit To View"
+      }
+    ],
+    "total": 1
+  },
+  "summary": "1 strings match \"Fit To View\".",
+  "confidence": "observed",
+  "authority": "original-files",
+  "environment": {
+    "clean_room": false,
+    "engine": "builtin",
+    "engine_version": "0.5.0",
+    "host": "windows-x86_64"
+  },
+  "limitations": [
+    {
+      "code": "data_sections_only",
+      "message": "only strings stored in the file are searched (absence is not proof)"
+    }
+  ],
+  "coverage": {
+    "status": "complete",
+    "examined": 1,
+    "total": 1
+  },
+  "locations": [],
+  "links": []
+}

@@ -1,0 +1,78 @@
+{
+  "id": "ev_b3dc1f3c32f249168f71c25830d83644dc692802c7de2f6a739d659c89751350",
+  "subject": {
+    "kind": "pe",
+    "sha256": "3444bc3c18f29168512fb92e5f56bfa466df99bbe5e937201cf448d99482897a",
+    "name": "HarmonyPremium.exe"
+  },
+  "operation": "native_function_pseudocode",
+  "params": {
+    "function": "0x14003a780"
+  },
+  "result": {
+    "calls": [
+      "*(uint64_t*)(rax + 0x20",
+      "*(uint64_t*)(rax + 0xd8",
+      "??0QString@@QEAA@VQLatin1String@@@Z",
+      "??1QString@@QEAA@XZ",
+      "?application@WHO_Identity@@SA?AW4WHO_ApplicationIdentity@@XZ",
+      "?getBool@PR_Preference@@QEAAAEB_NAEBVQString@@@Z",
+      "?hide@QWidget@@QEAAXXZ",
+      "sub_140030fe0",
+      "sub_140058dc0"
+    ],
+    "engine": "clean-room lifter",
+    "entry": "0x14003a780",
+    "function": "sub_14003a780",
+    "gotos": 3,
+    "inline_asm": 0,
+    "pseudo_code": "int64_t sub_14003a780(int64_t rcx)\n{\n    stack_10 = rbx;\n    stack_18 = rsi;\n    rdi = rcx;\n    esi = 0;\n    stack_60 = esi;\n    rcx += 0xd0;\n    rax = *(uint64_t*)(rcx);\n    rax = (**(uint64_t*)(rax + 0x20))();\n    rax = sub_140030fe0(rdi, eax);\n    if (al == 0) {\n        rbx = stack_68;\n        rsi = stack_70;\n        return rax;\n    } else {\n        if (*(uint64_t*)(rdi + 0x1b0) != rsi) {\nlabel_14003a826:\n            bl = 0;\n        } else {\n            rax = ?application@WHO_Identity@@SA?AW4WHO_ApplicationIdentity@@XZ();\n            if (eax == 1) {\nlabel_14003a817:\n                rax = ?application@WHO_Identity@@SA?AW4WHO_ApplicationIdentity@@XZ();\n                if (eax == 0x31) {\n                    goto label_14003a826;\n                } else {\n                    bl = 1;\n                }\n            } else {\n                rax = __imp_?tuPref@@3PEAVPR_Preference@@EA;\n                rbx = *(uint64_t*)(rax);\n                rax = \"SHOW_WELCOME_SCREEN_ON_STARTUP\";\n                ??0QString@@QEAA@VQLatin1String@@@Z(&stack_30, &stack_20, r8, r9, 0x1e, rax);\n                esi = 1;\n                stack_60 = esi;\n                rax = ?getBool@PR_Preference@@QEAAAEB_NAEBVQString@@@Z(rbx, &stack_30);\n                if (*(uint8_t*)(rax) == 0) {\n                    goto label_14003a826;\n                } else {\n                    goto label_14003a817;\n                }\n            }\n        }\n        if ((sil & 1) != 0) {\n            ??1QString@@QEAA@XZ(&stack_30);\n        }\n        if (bl == 0) {\n            rcx = *(uint64_t*)(rdi + 0x158);\n            if (rcx != 0) {\n                rax = *(uint64_t*)(rcx);\n                (**(uint64_t*)(rax + 0xd8))(rcx, rdi + 0x150);\n            }\n            rbx = stack_68;\n            rsi = stack_70;\n            return rax;\n        } else {\n            ?hide@QWidget@@QEAAXXZ(rdi);\n            rbx = stack_68;\n            rsi = stack_70;\n            return sub_140058dc0(rdi); /* tail call */\n        }\n    }\n}\n",
+    "signature": "int64_t sub_14003a780(int64_t rcx)",
+    "strings": [
+      "SHOW_WELCOME_SCREEN_ON_STARTUP"
+    ],
+    "structured": false
+  },
+  "summary": "Pseudo-C for sub_14003a780 (64 lines, partly unstructured).",
+  "confidence": "inferred",
+  "authority": "original-files",
+  "environment": {
+    "clean_room": false,
+    "engine": "builtin",
+    "engine_version": "0.5.0",
+    "host": "windows-x86_64"
+  },
+  "limitations": [
+    {
+      "code": "register_level",
+      "message": "variables are machine registers and stack slots; types are not recovered"
+    },
+    {
+      "code": "calling_convention_assumed",
+      "message": "call arguments follow the usual x86_64 convention and may be wrong for unusual functions"
+    },
+    {
+      "code": "conditions_from_flags",
+      "message": "branch conditions are rebuilt from the last compare and may be approximate"
+    },
+    {
+      "code": "unstructured_flow",
+      "message": "3 gotos remain where the control flow isn't a simple if/loop"
+    },
+    {
+      "code": "deep_engine_unavailable",
+      "message": "Ghidra couldn't open this program (could not start Ghidra: Ghidra's analysis failed; see C:\\Users\\leont\\AppData\\Roaming\\craft-anything\\engines\\ghidra-cache\\3444bc3c18f29168-f2dfab6faedc84f0.log). So this came from the built-in decompiler, which is less exact."
+    }
+  ],
+  "coverage": {
+    "status": "unknown"
+  },
+  "locations": [
+    {
+      "kind": "address",
+      "value": "0x14003a780"
+    }
+  ],
+  "links": [],
+  "carries_target_content": true
+}

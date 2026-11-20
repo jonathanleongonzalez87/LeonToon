@@ -1,0 +1,77 @@
+{
+  "id": "ev_834bcb80c8549d817c639a01a4bc0bc8e80be8347b802938e2a856f91c498089",
+  "subject": {
+    "kind": "pe",
+    "sha256": "3444bc3c18f29168512fb92e5f56bfa466df99bbe5e937201cf448d99482897a",
+    "name": "HarmonyPremium.exe"
+  },
+  "operation": "native_function_pseudocode",
+  "params": {
+    "function": "0x1403a4870"
+  },
+  "result": {
+    "calls": [
+      "??0QString@@QEAA@PEBD@Z",
+      "??0QString@@QEAA@XZ",
+      "??1QString@@QEAA@XZ",
+      "??YQString@@QEAAAEAV0@PEBD@Z",
+      "?append@QString@@QEAAAEAV1@AEBV1@@Z",
+      "?save@PR_Preference@@QEAAXXZ",
+      "?setStringValue@PR_Preference@@QEAAXAEBVQString@@0@Z",
+      "sub_140026d80"
+    ],
+    "engine": "clean-room lifter",
+    "entry": "0x1403a4870",
+    "function": "sub_1403a4870",
+    "gotos": 4,
+    "inline_asm": 0,
+    "pseudo_code": "int64_t sub_1403a4870(int64_t rcx)\n{\n    stack_8 = rbx;\n    stack_10 = rbp;\n    stack_18 = rsi;\n    ??0QString@@QEAA@XZ(&stack_20);\n    rax = arg_10;\n    edx = *(uint32_t*)(rax + 16);\n    if (edx != 0) {\n        edi = 0;\n        esi = edx;\n        while (true) {\nlabel_1403a48a2:\n            if (stack_30 > 0) {\n                ??YQString@@QEAAAEAV0@PEBD@Z(&stack_20, &data_140bd7150);\n            }\n        }\n    }\nlabel_1403a491a:\n    rax = __imp_?tuPref@@3PEAVPR_Preference@@EA;\n    rbx = *(uint64_t*)(rax);\n    ??0QString@@QEAA@PEBD@Z(&stack_38, \"RECENT_SCENES_LIST\");\n    ?setStringValue@PR_Preference@@QEAAXAEBVQString@@0@Z(rbx, &stack_38, &stack_20);\n    ??1QString@@QEAA@XZ(&stack_38);\n    rcx = __imp_?tuPref@@3PEAVPR_Preference@@EA;\n    ?save@PR_Preference@@QEAAXXZ(*(uint64_t*)(rcx));\n    ??1QString@@QEAA@XZ(&stack_20);\n    rbx = stack_60;\n    rsi = stack_70;\n    return rax;\n    rbx = arg_10;\n    rax = *(uint64_t*)(rbx);\n    if (rax == 0) {\nlabel_1403a48cf:\n        sub_140026d80(rbx, 0, 0, 0);\n    } else {\n        eax = *(uint32_t*)(rax);\n        if (eax > 1) {\n            goto label_1403a48cf;\n        }\n    }\n    rax = *(uint64_t*)(rbx);\n    if (rax == 0) {\nlabel_1403a48ee:\n        sub_140026d80(rbx, 0, 0, 0);\n    } else {\n        eax = *(uint32_t*)(rax);\n        if (eax > 1) {\n            goto label_1403a48ee;\n        }\n    }\n    rdx = *(uint64_t*)(rbx + 8);\n    rdx += rdi;\n    ?append@QString@@QEAAAEAV1@AEBV1@@Z(&stack_20);\n    rdi += 0x18;\n    rsi -= 1;\n    if (rsi != 0) {\n        goto label_1403a48a2;\n    }\n    goto label_1403a491a;\n}\n",
+    "signature": "int64_t sub_1403a4870(int64_t rcx)",
+    "strings": [
+      "RECENT_SCENES_LIST"
+    ],
+    "structured": false
+  },
+  "summary": "Pseudo-C for sub_1403a4870 (61 lines, partly unstructured).",
+  "confidence": "inferred",
+  "authority": "original-files",
+  "environment": {
+    "clean_room": false,
+    "engine": "builtin",
+    "engine_version": "0.5.0",
+    "host": "windows-x86_64"
+  },
+  "limitations": [
+    {
+      "code": "register_level",
+      "message": "variables are machine registers and stack slots; types are not recovered"
+    },
+    {
+      "code": "calling_convention_assumed",
+      "message": "call arguments follow the usual x86_64 convention and may be wrong for unusual functions"
+    },
+    {
+      "code": "conditions_from_flags",
+      "message": "branch conditions are rebuilt from the last compare and may be approximate"
+    },
+    {
+      "code": "unstructured_flow",
+      "message": "4 gotos remain where the control flow isn't a simple if/loop"
+    },
+    {
+      "code": "deep_engine_unavailable",
+      "message": "Ghidra couldn't open this program (could not start Ghidra: Ghidra's analysis failed; see C:\\Users\\leont\\AppData\\Roaming\\craft-anything\\engines\\ghidra-cache\\3444bc3c18f29168-f2dfab6faedc84f0.log). So this came from the built-in decompiler, which is less exact."
+    }
+  ],
+  "coverage": {
+    "status": "unknown"
+  },
+  "locations": [
+    {
+      "kind": "address",
+      "value": "0x1403a4870"
+    }
+  ],
+  "links": [],
+  "carries_target_content": true
+}

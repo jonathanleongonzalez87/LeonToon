@@ -1,0 +1,361 @@
+{
+    "version":  1,
+    "values":  [
+                   {
+                       "name":  "onion skin nearest opacity",
+                       "group":  "onion skin",
+                       "value":  0.8,
+                       "source":  "function 0x1404e1200 reads DRAWING_ONIONSKIN_MAX_OPACITY; default 0.8 in resources/prefs.xml"
+                   },
+                   {
+                       "name":  "onion skin farthest opacity",
+                       "group":  "onion skin",
+                       "value":  0.2,
+                       "source":  "function 0x1404e1200 reads DRAWING_ONIONSKIN_MIN_OPACITY; default 0.2 in resources/prefs.xml"
+                   },
+                   {
+                       "name":  "onion skin opacity clamp max",
+                       "group":  "onion skin",
+                       "value":  1.0,
+                       "source":  "function 0x1404e1200 (minsd with f64 1.0 at 0x140b3a550)"
+                   },
+                   {
+                       "name":  "onion skin mode",
+                       "group":  "onion skin",
+                       "value":  "by frames",
+                       "source":  "DRAWING_ONIONSKIN_DRAWING_MODE=byFrames in resources/prefs.xml, read in 0x1404e1200"
+                   },
+                   {
+                       "name":  "onion exponential falloff",
+                       "group":  "onion skin",
+                       "value":  0.55,
+                       "source":  "person\u0027s LeonToon web app, engine/render.js onionWeight"
+                   },
+                   {
+                       "name":  "default fps",
+                       "group":  "scene",
+                       "value":  24,
+                       "unit":  "fps",
+                       "source":  "reference/picture-1.png (FPS 24) and web app"
+                   },
+                   {
+                       "name":  "default width",
+                       "group":  "scene",
+                       "value":  1280,
+                       "unit":  "px",
+                       "source":  "person\u0027s LeonToon web app, ui/commands.js newProjectDialog"
+                   },
+                   {
+                       "name":  "default height",
+                       "group":  "scene",
+                       "value":  720,
+                       "unit":  "px",
+                       "source":  "person\u0027s LeonToon web app, ui/commands.js newProjectDialog"
+                   },
+                   {
+                       "name":  "ease curve",
+                       "group":  "animation",
+                       "value":  "cubic in-out",
+                       "source":  "person\u0027s LeonToon web app, engine/anim.js"
+                   },
+                   {
+                       "name":  "interpolations",
+                       "group":  "animation",
+                       "value":  "linear, ease, step",
+                       "source":  "person\u0027s LeonToon web app, engine/anim.js"
+                   },
+                   {
+                       "name":  "animate tool rotate modifier",
+                       "group":  "controls",
+                       "value":  "shift+drag",
+                       "estimated":  true
+                   },
+                   {
+                       "name":  "animate tool scale modifier",
+                       "group":  "controls",
+                       "value":  "ctrl+drag",
+                       "estimated":  true
+                   },
+                   {
+                       "name":  "timebar height",
+                       "group":  "ui",
+                       "value":  58,
+                       "unit":  "px",
+                       "source":  "person\u0027s LeonToon web app, ui/timebar.js"
+                   },
+                   {
+                       "name":  "timebar min px per frame",
+                       "group":  "ui",
+                       "value":  3,
+                       "unit":  "px",
+                       "source":  "person\u0027s LeonToon web app, ui/timebar.js"
+                   },
+                   {
+                       "name":  "timebar max px per frame",
+                       "group":  "ui",
+                       "value":  48,
+                       "unit":  "px",
+                       "source":  "person\u0027s LeonToon web app, ui/timebar.js"
+                   },
+                   {
+                       "name":  "storyboard default panel duration",
+                       "group":  "storyboard",
+                       "value":  2,
+                       "unit":  "s",
+                       "source":  "person\u0027s LeonToon web app, core/model.js"
+                   },
+                   {
+                       "name":  "scene palettes",
+                       "group":  "palette",
+                       "value":  "Boceto, Limpieza, Color",
+                       "source":  "reference/picture-1.png (Paletas de escenas: Rough, CleanUp, Color)"
+                   },
+                   {
+                       "name":  "palette red",
+                       "group":  "palette",
+                       "value":  "#b33939",
+                       "source":  "reference/picture-1.png pixel (1430,654)"
+                   },
+                   {
+                       "name":  "palette green",
+                       "group":  "palette",
+                       "value":  "#3f833f",
+                       "source":  "reference/picture-1.png pixel (1430,674)"
+                   },
+                   {
+                       "name":  "palette blue",
+                       "group":  "palette",
+                       "value":  "#3f3f95",
+                       "source":  "reference/picture-1.png pixel (1430,694)"
+                   },
+                   {
+                       "name":  "selection handle size",
+                       "group":  "controls",
+                       "value":  9,
+                       "unit":  "px",
+                       "estimated":  true
+                   },
+                   {
+                       "name":  "video codec",
+                       "group":  "export",
+                       "value":  "H.264 yuv420p via ffmpeg",
+                       "estimated":  true
+                   },
+                   {
+                       "name":  "undo steps",
+                       "group":  "safety",
+                       "value":  150,
+                       "estimated":  true
+                   },
+                   {
+                       "name":  "autosave interval",
+                       "group":  "safety",
+                       "value":  30,
+                       "unit":  "s",
+                       "estimated":  true
+                   },
+                   {
+                       "name":  "onion weight step per drawing",
+                       "group":  "onion skin",
+                       "value":  0.1,
+                       "source":  "function 0x1404dbbc0 (10 weights from 1.0 decreasing by 1.0/10)"
+                   },
+                   {
+                       "name":  "onion max drawings per side",
+                       "group":  "onion skin",
+                       "value":  10,
+                       "source":  "function 0x1404dbbc0 (10 slots, mask 0x3ff)"
+                   },
+                   {
+                       "name":  "loop playback",
+                       "group":  "playback",
+                       "value":  false,
+                       "source":  "PLAY_ENABLE_LOOP=false in prefs.xml; stored by function 0x1404180b0"
+                   },
+                   {
+                       "name":  "end of loop delay",
+                       "group":  "playback",
+                       "value":  0,
+                       "unit":  "ms",
+                       "source":  "function 0x14041a1f0 reads PLAY_DELAY_END_OF_LOOP (code default 0)"
+                   },
+                   {
+                       "name":  "viewer zoom levels",
+                       "group":  "zoom",
+                       "value":  "1..80000 % (1, 1.25, 1.6, 2, 2.5, 3.3, 4, 5, 6.3, 8, 10 ...)",
+                       "source":  "string table 0x140c1b840-0x140c1b9a0"
+                   },
+                   {
+                       "name":  "wheel zoom steps per notch",
+                       "group":  "zoom",
+                       "value":  1,
+                       "source":  "function 0x14047b850 (threshold 2 x WHEEL_ZOOM_THRESHOLD=50 -\u003e 100 per 120-unit notch)"
+                   },
+                   {
+                       "name":  "zoom shortcuts on mouse",
+                       "group":  "zoom",
+                       "value":  false,
+                       "source":  "SHORTCUT_ZOOM_ON_MOUSE=false in prefs.xml"
+                   },
+                   {
+                       "name":  "xsheet row height at zoom 10",
+                       "group":  "xsheet",
+                       "value":  17,
+                       "unit":  "px",
+                       "source":  "function 0x140106d90 (UT_DPI::scale(17), initial zoom 10.0)"
+                   },
+                   {
+                       "name":  "xsheet default zoom",
+                       "group":  "xsheet",
+                       "value":  10,
+                       "source":  "function 0x140106d90 (0x4024000000000000 = 10.0)"
+                   },
+                   {
+                       "name":  "xsheet min zoom",
+                       "group":  "xsheet",
+                       "value":  5,
+                       "source":  "XSHEET_MIN_ZOOM in prefs.xml, read in 0x140106d90"
+                   },
+                   {
+                       "name":  "xsheet max zoom",
+                       "group":  "xsheet",
+                       "value":  16,
+                       "source":  "XSHEET_MAX_ZOOM in prefs.xml, read in 0x140106d90"
+                   },
+                   {
+                       "name":  "xsheet font size offset",
+                       "group":  "xsheet",
+                       "value":  "-5",
+                       "unit":  "px",
+                       "source":  "function 0x140106d90 (row*zoom/10.0 - UT_DPI::scale(5))"
+                   },
+                   {
+                       "name":  "onion frames before",
+                       "group":  "onion skin",
+                       "value":  2,
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), #obR value=2"
+                   },
+                   {
+                       "name":  "onion frames after",
+                       "group":  "onion skin",
+                       "value":  2,
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), #oaR value=2"
+                   },
+                   {
+                       "name":  "onion slider max",
+                       "group":  "onion skin",
+                       "value":  12,
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), #obR/#oaR max=12"
+                   },
+                   {
+                       "name":  "onion nearest opacity",
+                       "group":  "onion skin",
+                       "value":  0.4,
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), #ooR value=40 (range 10-80 %)"
+                   },
+                   {
+                       "name":  "onion fade shape",
+                       "group":  "onion skin",
+                       "value":  "0.2/0.8 + (1 - 0.2/0.8) * (1 - (d-1)/10)",
+                       "source":  "functions 0x1404dbbc0 and 0x1404e1200, scaled to the prototype\u0027s opacity"
+                   },
+                   {
+                       "name":  "onion colour before",
+                       "group":  "onion skin",
+                       "value":  "#fd6724",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), --onion-prev"
+                   },
+                   {
+                       "name":  "onion colour after",
+                       "group":  "onion skin",
+                       "value":  "#5f8fb4",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), --onion-next"
+                   },
+                   {
+                       "name":  "splash duration",
+                       "group":  "startup",
+                       "value":  3.4,
+                       "unit":  "s",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), runSplash D=3400"
+                   },
+                   {
+                       "name":  "splash hold",
+                       "group":  "startup",
+                       "value":  0.35,
+                       "unit":  "s",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), setTimeout(finish,350)"
+                   },
+                   {
+                       "name":  "splash easing",
+                       "group":  "startup",
+                       "value":  "1 - (1 - p)^2",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), runSplash"
+                   },
+                   {
+                       "name":  "room sets",
+                       "group":  "rooms",
+                       "value":  "trad 7, cutout 5, mg 4, story 2, animatic 3",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), ANIMT"
+                   },
+                   {
+                       "name":  "room types",
+                       "group":  "rooms",
+                       "value":  12,
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), ROOMT"
+                   },
+                   {
+                       "name":  "accent colour",
+                       "group":  "ui",
+                       "value":  "#fd6724",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), --accent"
+                   },
+                   {
+                       "name":  "right column width",
+                       "group":  "ui",
+                       "value":  268,
+                       "unit":  "px",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), .main grid 268px"
+                   },
+                   {
+                       "name":  "toolbar width",
+                       "group":  "ui",
+                       "value":  44,
+                       "unit":  "px",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), .toolbar"
+                   },
+                   {
+                       "name":  "titlebar height",
+                       "group":  "ui",
+                       "value":  32,
+                       "unit":  "px",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), #app grid rows"
+                   },
+                   {
+                       "name":  "tool head height",
+                       "group":  "ui",
+                       "value":  34,
+                       "unit":  "px",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), .center rows"
+                   },
+                   {
+                       "name":  "sheet width",
+                       "group":  "ui",
+                       "value":  330,
+                       "unit":  "px",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), --sheet-w"
+                   },
+                   {
+                       "name":  "N sidebar width",
+                       "group":  "ui",
+                       "value":  236,
+                       "unit":  "px",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), .nside"
+                   },
+                   {
+                       "name":  "tool keys",
+                       "group":  "controls",
+                       "value":  "V W Y C B L P Q E G I H R Z",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), keydown map"
+                   }
+               ]
+}

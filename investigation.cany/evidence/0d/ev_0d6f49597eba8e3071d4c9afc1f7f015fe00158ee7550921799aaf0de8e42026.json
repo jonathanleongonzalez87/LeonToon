@@ -1,0 +1,89 @@
+{
+  "id": "ev_0d6f49597eba8e3071d4c9afc1f7f015fe00158ee7550921799aaf0de8e42026",
+  "subject": {
+    "kind": "pe",
+    "sha256": "3444bc3c18f29168512fb92e5f56bfa466df99bbe5e937201cf448d99482897a",
+    "name": "HarmonyPremium.exe"
+  },
+  "operation": "native_function_pseudocode",
+  "params": {
+    "function": "0x1404dbbc0"
+  },
+  "result": {
+    "calls": [
+      "??0QObject@@QEAA@PEAV0@@Z",
+      "??0QString@@QEAA@VQLatin1String@@@Z",
+      "??1Connection@QMetaObject@@QEAA@XZ",
+      "??1QString@@QEAA@XZ",
+      "?application@WHO_Identity@@SA?AW4WHO_ApplicationIdentity@@XZ",
+      "?connect@QObject@@SA?AVConnection@QMetaObject@@PEBV1@PEBD01W4ConnectionType@Qt@@@Z",
+      "?getIntValue@PR_Preference@@QEBAHAEBVQString@@H@Z",
+      "memset@thunk",
+      "sub_1402773f0",
+      "sub_1402a5cb0",
+      "sub_1404e1200",
+      "sub_14064a9c0",
+      "sub_1409e6230"
+    ],
+    "engine": "clean-room lifter",
+    "entry": "0x1404dbbc0",
+    "function": "sub_1404dbbc0",
+    "gotos": 10,
+    "inline_asm": 34,
+    "pseudo_code": "int64_t sub_1404dbbc0(int64_t rcx)\n{\n    stack_18 = rbx;\n    stack_8 = rcx;\n    r13 = rcx;\n    ??0QObject@@QEAA@PEAV0@@Z(rcx, 0);\n    rax = &data_140c14bc8;\n    *(uint64_t*)(r13) = rax;\n    rax = &data_140c14c88;\n    *(uint64_t*)(r13 + 16) = rax;\n    r12d = 0;\n    *(uint64_t*)(r13 + 0x18) = r12;\n    *(uint16_t*)(r13 + 0x20) = r12w;\n    rax = __imp_?tuPref@@3PEAVPR_Preference@@EA;\n    rbx = *(uint64_t*)(rax);\n    var_30 = 0x1f;\n    rax = \"DRAWING_ONIONSKIN_PREV_DRAWINGS\";\n    var_28 = rax;\n    ??0QString@@QEAA@VQLatin1String@@@Z(&var_20, &var_30);\n    rax = ?getIntValue@PR_Preference@@QEBAHAEBVQString@@H@Z(rbx, &var_20, 0);\n    *(uint32_t*)(r13 + 0x24) = eax;\n    ??1QString@@QEAA@XZ(&var_20);\n    rax = __imp_?tuPref@@3PEAVPR_Preference@@EA;\n    rbx = *(uint64_t*)(rax);\n    var_30 = 0x1f;\n    rax = \"DRAWING_ONIONSKIN_NEXT_DRAWINGS\";\n    var_28 = rax;\n    ??0QString@@QEAA@VQLatin1String@@@Z(&var_20, &var_30);\n    rax = ?getIntValue@PR_Preference@@QEBAHAEBVQString@@H@Z(rbx, &var_20, 0);\n    *(uint32_t*)(r13 + 0x28) = eax;\n    ??1QString@@QEAA@XZ(&var_20);\n    *(uint32_t*)(r13 + 0x2c) = 1;\n    *(uint32_t*)(r13 + 0x30) = 1;\n    *(uint8_t*)(r13 + 0x34) = r12l;\n    *(uint8_t*)(r13 + 0x90) = r12l;\n    rbx = r13 + 0x98;\n    arg_48 = rbx;\n    *(uint64_t*)(rbx) = r12;\n    *(uint64_t*)(rbx + 8) = r12;\n    rax = sub_1409e6230(r12 + 0x20);\n    *(uint64_t*)(rax) = rax;\n    *(uint64_t*)(rax + 8) = rax;\n    *(uint64_t*)(rax + 16) = rax;\n    *(uint16_t*)(rax + 0x18) = 0x101;\n    *(uint64_t*)(rbx) = rax;\n    stack_20 = 0xff;\n    sub_14064a9c0(r13 + 0xa8, 0xff, 0, 0x19);\n    stack_20 = 0xff;\n    sub_14064a9c0(r13 + 0xb0, 0, 0xff, 0x19);\n    *(uint8_t*)(r13 + 0xb8) = r12l;\n    rax = ?application@WHO_Identity@@SA?AW4WHO_ApplicationIdentity@@XZ();\n    ecx = r12d;\n    __asm(\"sete cl\");\n    *(uint32_t*)(r13 + 0xbc) = ecx;\n    *(uint16_t*)(r13 + 0xc0) = 0x100;\n    *(uint8_t*)(r13 + 0xc2) = 1;\n    r15 = r13 + 0xc8;\n    *(uint64_t*)(r15) = r12;\n    *(uint64_t*)(r15 + 8) = r12;\n    *(uint64_t*)(r15 + 16) = r12;\n    r14 = r13 + 0xe0;\n    *(uint64_t*)(r14) = r12;\n    *(uint64_t*)(r14 + 8) = r12;\n    *(uint64_t*)(r14 + 16) = r12;\n    rdi = r13 + 0xf8;\n    *(uint64_t*)(rdi) = r12;\n    *(uint64_t*)(rdi + 8) = r12;\n    *(uint64_t*)(rdi + 16) = r12;\n    *(uint64_t*)(rdi + 0x18) = r12;\n    rsi = r13 + 0x118;\n    *(uint64_t*)(rsi) = r12;\n    *(uint64_t*)(rsi + 8) = r12;\n    *(uint64_t*)(rsi + 16) = r12;\n    *(uint64_t*)(rsi + 0x18) = r12;\n    r12 = *(uint64_t*)(r15 + 8);\n    rdx = *(uint64_t*)(r15);\n    rcx = r12;\n    rcx -= rdx;\n    rcx >>= 3;\n    if (rcx <= 10 /* unsigned */) {\n        if (!(/* AboveEq */ flags)) {\n            rax = *(uint64_t*)(r15 + 16);\n            rax -= rdx;\n            rax >>= 3;\n            if (rax >= 10 /* unsigned */) {\n                ebx = 10;\n                rbx -= rcx;\n                rbx <<= 3;\n                memset@thunk(r12, 0, rbx);\n                rax = r12 + rbx;\nlabel_1404dbdfc:\n                *(uint64_t*)(r15 + 8) = rax;\n            } else {\n                sub_1402773f0(r15, 10, &arg_48);\n            }\n        }\n    } else {\n        rax = rdx + 0x50;\n        goto label_1404dbdfc;\n    }\n    rdx = *(uint64_t*)(r14);\n    r12 = *(uint64_t*)(r14 + 8);\n    rcx = r12;\n    rcx -= rdx;\n    rcx >>= 3;\n    if (rcx <= 10 /* unsigned */) {\n        if (!(/* AboveEq */ flags)) {\n            rax = *(uint64_t*)(r14 + 16);\n            rax -= rdx;\n            rax >>= 3;\n            if (rax >= 10 /* unsigned */) {\n                ebx = 10;\n                rbx -= rcx;\n                rbx <<= 3;\n                memset@thunk(r12, 0, rbx);\n                rax = rbx + r12;\nlabel_1404dbe60:\n                *(uint64_t*)(r14 + 8) = rax;\n            } else {\n                sub_1402773f0(r14, 10, &arg_48);\n            }\n        }\n    } else {\n        rax = rdx + 0x50;\n        goto label_1404dbe60;\n    }\n    rcx = *(uint64_t*)(rdi);\n    *(uint64_t*)(rdi + 8) = rcx;\n    r12d = 0;\n    *(uint64_t*)(rdi + 0x18) = r12;\n    arg_48 = r12d;\n    rax = *(uint64_t*)(rdi + 16);\n    rax -= rcx;\n    rax >>= 2;\n    if (rax >= 1 /* unsigned */) {\n        rax = rcx + 4;\n        edx = 0;\n        *(uint32_t*)(rcx) = edx;\n        *(uint64_t*)(rdi + 8) = rax;\n    } else {\n        sub_1402a5cb0(rdi, r12 + 1, &arg_48);\n    }\n    rdx = *(uint64_t*)(rdi + 0x18);\n    if (rdx != 0) {\n        r10 = *(uint64_t*)(rdi);\n        if (rdx >= 0) {\nlabel_1404dbf28:\n            rax = rdx;\n            rax >>= 5;\n            rax = r10 + rax * 4;\n            var_30 = rax;\n        } else {\n            rax = rdx;\n            rax = -rax;\n            if (/* Eq */ flags) {\n                goto label_1404dbf28;\n            } else {\n                rax = rdx;\n                rax = ~rax;\n                rax >>= 5;\n                rax = rax * 4 + 4;\n                rcx = r10;\n                rcx -= rax;\n                var_30 = rcx;\n            }\n        }\n        rax = rdx;\n        eax &= 0x1f;\n        var_28 = rax;\n        rdx += 10;\n        *(uint64_t*)(rdi + 0x18) = rdx;\n        if (rdx >= 0) {\nlabel_1404dbf71:\n            rax = rdx;\n            rax >>= 5;\n            rax = r10 + rax * 4;\n            var_40 = rax;\n        } else {\n            rax = rdx;\n            rax = -rax;\n            if (/* Eq */ flags) {\n                goto label_1404dbf71;\n            } else {\n                rax = rdx;\n                rax = ~rax;\n                rax >>= 5;\n                rax = rax * 4 + 4;\n                rcx = r10;\n                rcx -= rax;\n                var_40 = rcx;\n            }\n        }\n        edx &= 0x1f;\n        var_38 = rdx;\n        __asm(\"movaps xmm0, [rbp-0x40]\");\n        __asm(\"movdqa [rbp-0x40], xmm0\");\n        __asm(\"movaps xmm1, [rbp-0x30]\");\n        __asm(\"movdqa [rbp-0x30], xmm1\");\n        rcx = var_28;\n        r9 = var_30;\n        rdx = var_38;\n        r8 = var_40;\n        while (true) {\n            if (r10 != r9) {\nlabel_1404dbfbe:\n                if (rcx == 0) {\n                    ecx = 0x1f;\n                    r9 -= 4;\n                } else {\n                    rcx--;\n                }\n                if (rdx == 0) {\n                    edx = 0x1f;\n                    r8 -= 4;\n                } else {\n                    rdx--;\n                }\n                eax = 1;\n                eax <<= cl;\n                eax = *(uint32_t*)(r8);\n                if ((*(uint32_t*)(r9) & eax) == 0) {\n                    __asm(\"btr eax, edx\");\n                    *(uint32_t*)(r8) = eax;\n                    continue;\n                } else {\n                    __asm(\"bts eax, edx\");\n                    *(uint32_t*)(r8) = eax;\n                    continue;\n                }\n            }\n        }\n    } else {\n        *(uint64_t*)(rdi + 0x18) = 10;\n    }\nlabel_1404dbeb7:\n    rbx = *(uint64_t*)(rdi);\n    *(uint32_t*)(rbx) |= 0x3ff;\n    rcx = *(uint64_t*)(rsi);\n    *(uint64_t*)(rsi + 8) = rcx;\n    *(uint64_t*)(rsi + 0x18) = r12;\n    arg_48 = r12d;\n    rax = *(uint64_t*)(rsi + 16);\n    rax -= rcx;\n    rax >>= 2;\n    if (rax >= 1 /* unsigned */) {\n        rax = rcx + 4;\n        edx = 0;\n        *(uint32_t*)(rcx) = edx;\n        *(uint64_t*)(rsi + 8) = rax;\n    } else {\n        sub_1402a5cb0(rsi, 1, &arg_48);\n    }\n    rdx = *(uint64_t*)(rsi + 0x18);\n    if (rdx != 0) {\n        r10 = *(uint64_t*)(rsi);\n        if (rdx >= 0) {\nlabel_1404dc078:\n            rax = rdx;\n            rax >>= 5;\n            rax = r10 + rax * 4;\n            var_40 = rax;\n        } else {\n            rax = rdx;\n            rax = -rax;\n            if (/* Eq */ flags) {\n                goto label_1404dc078;\n            } else {\n                rax = rdx;\n                rax = ~rax;\n                rax >>= 5;\n                rax = rax * 4 + 4;\n                rcx = r10;\n                rcx -= rax;\n                var_40 = rcx;\n            }\n        }\n        rax = rdx;\n        eax &= 0x1f;\n        var_38 = rax;\n        rdx += 10;\n        *(uint64_t*)(rsi + 0x18) = rdx;\n        if (rdx >= 0) {\nlabel_1404dc0c1:\n            rax = rdx;\n            rax >>= 5;\n            rax = r10 + rax * 4;\n            var_30 = rax;\n        } else {\n            rax = rdx;\n            rax = -rax;\n            if (/* Eq */ flags) {\n                goto label_1404dc0c1;\n            } else {\n                rax = rdx;\n                rax = ~rax;\n                rax >>= 5;\n                rax = rax * 4 + 4;\n                rcx = r10;\n                rcx -= rax;\n                var_30 = rcx;\n            }\n        }\n        edx &= 0x1f;\n        var_28 = rdx;\n        __asm(\"movaps xmm0, [rbp-0x30]\");\n        __asm(\"movdqa [rbp-0x20], xmm0\");\n        __asm(\"movaps xmm1, [rbp-0x40]\");\n        __asm(\"movdqa [rbp-0x30], xmm1\");\n        rcx = var_28;\n        r9 = var_30;\n        rdx = var_18;\n        r8 = var_20;\n        while (true) {\n            if (r10 != r9) {\nlabel_1404dc10e:\n                if (rcx == 0) {\n                    ecx = 0x1f;\n                    r9 -= 4;\n                } else {\n                    rcx--;\n                }\n                if (rdx == 0) {\n                    edx = 0x1f;\n                    r8 -= 4;\n                } else {\n                    rdx--;\n                }\n                eax = 1;\n                eax <<= cl;\n                eax = *(uint32_t*)(r8);\n                if ((*(uint32_t*)(r9) & eax) == 0) {\n                    __asm(\"btr eax, edx\");\n                    *(uint32_t*)(r8) = eax;\n                    continue;\n                } else {\n                    __asm(\"bts eax, edx\");\n                    *(uint32_t*)(r8) = eax;\n                    continue;\n                }\n            }\n        }\n    } else {\n        *(uint64_t*)(rsi + 0x18) = 10;\n    }\nlabel_1404dc020:\n    rbx = *(uint64_t*)(rsi);\n    *(uint32_t*)(rbx) |= 0x3ff;\n    rcx = *(uint64_t*)(r15 + 8);\n    rcx -= *(uint64_t*)(r15);\n    rcx >>= 3;\n    __asm(\"xorps xmm1, xmm1\");\n    if (rcx < 0) {\n        rax = rcx;\n        rax >>= 1;\n        ecx &= 1;\n        rax |= rcx;\n        __asm(\"cvtsi2sd xmm1, rax\");\n        __asm(\"addsd xmm1, xmm1\");\n    } else {\n        __asm(\"cvtsi2sd xmm1, rcx\");\n    }\n    __asm(\"movsd xmm0, [0x140b3a550]\");\n    __asm(\"movaps xmm3, xmm0\");\n    __asm(\"divsd xmm3, xmm1\");\n    __asm(\"movaps xmm1, xmm0\");\n    rcx = r12;\n    __asm(\"xorps xmm2, xmm2\");\n    while (true) {\n        __asm(\"comisd xmm1, xmm2\");\n        if (xmm1 < 0 /* unsigned */) {\n            break;\n        } else {\n            rax = *(uint64_t*)(r15);\n            __asm(\"movsd [rcx+rax], xmm1\");\n            rcx += 8;\n            __asm(\"subsd xmm1, xmm3\");\n            if (rcx >= 0x50) break;\n            continue;\n        }\n        break;\n    }\n    rcx = *(uint64_t*)(r14 + 8);\n    rcx -= *(uint64_t*)(r14);\n    rcx >>= 3;\n    __asm(\"xorps xmm3, xmm3\");\n    if (rcx < 0) {\n        rax = rcx;\n        rax >>= 1;\n        ecx &= 1;\n        rax |= rcx;\n        __asm(\"cvtsi2sd xmm3, rax\");\n        __asm(\"addsd xmm3, xmm3\");\n    } else {\n        __asm(\"cvtsi2sd xmm3, rcx\");\n    }\n    __asm(\"movaps xmm1, xmm0\");\n    __asm(\"divsd xmm1, xmm3\");\n    rcx = r12;\n    while (true) {\n        __asm(\"comisd xmm0, xmm2\");\n        if (xmm0 < 0 /* unsigned */) {\n            break;\n        } else {\n            rax = *(uint64_t*)(r14);\n            __asm(\"movsd [rcx+rax], xmm0\");\n            rcx += 8;\n            __asm(\"subsd xmm0, xmm1\");\n            if (rcx >= 0x50) break;\n            continue;\n        }\n        break;\n    }\n    rax = \"1loadPreferences()\";\n    rdx = __imp_?tuPref@@3PEAVPR_Preference@@EA;\n    ?connect@QObject@@SA?AVConnection@QMetaObject@@PEBV1@PEBD01W4ConnectionType@Qt@@@Z(&arg_48, *(uint64_t*)(rdx), \"2preferenceChanged()\", r13, rax, r12d);\n    ??1Connection@QMetaObject@@QEAA@XZ(&arg_48);\n    sub_1404e1200(r13);\n    rax = r13;\n    rbx = stack_c0;\n    return rax;\n    if (rcx != 0) {\n        goto label_1404dbfbe;\n    }\n    goto label_1404dbeb7;\n    if (rcx != 0) {\n        goto label_1404dc10e;\n    }\n    goto label_1404dc020;\n}\n",
+    "signature": "int64_t sub_1404dbbc0(int64_t rcx)",
+    "strings": [
+      "DRAWING_ONIONSKIN_PREV_DRAWINGS",
+      "DRAWING_ONIONSKIN_NEXT_DRAWINGS",
+      "1loadPreferences()",
+      "2preferenceChanged()"
+    ],
+    "structured": false
+  },
+  "summary": "Pseudo-C for sub_1404dbbc0 (429 lines, partly unstructured).",
+  "confidence": "inferred",
+  "authority": "original-files",
+  "environment": {
+    "clean_room": false,
+    "engine": "builtin",
+    "engine_version": "0.5.0",
+    "host": "windows-x86_64"
+  },
+  "limitations": [
+    {
+      "code": "register_level",
+      "message": "variables are machine registers and stack slots; types are not recovered"
+    },
+    {
+      "code": "calling_convention_assumed",
+      "message": "call arguments follow the usual x86_64 convention and may be wrong for unusual functions"
+    },
+    {
+      "code": "conditions_from_flags",
+      "message": "branch conditions are rebuilt from the last compare and may be approximate"
+    },
+    {
+      "code": "unstructured_flow",
+      "message": "10 gotos remain where the control flow isn't a simple if/loop"
+    },
+    {
+      "code": "inline_asm",
+      "message": "34 instructions have no C rule and are shown as __asm(...)"
+    },
+    {
+      "code": "deep_engine_unavailable",
+      "message": "Ghidra couldn't open this program (could not start Ghidra: Ghidra's analysis failed; see C:\\Users\\leont\\AppData\\Roaming\\craft-anything\\engines\\ghidra-cache\\3444bc3c18f29168-f2dfab6faedc84f0.log). So this came from the built-in decompiler, which is less exact."
+    }
+  ],
+  "coverage": {
+    "status": "unknown"
+  },
+  "locations": [
+    {
+      "kind": "address",
+      "value": "0x1404dbbc0"
+    }
+  ],
+  "links": [],
+  "carries_target_content": true
+}

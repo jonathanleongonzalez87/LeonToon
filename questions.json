@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "question": "Ya lo pude ejecutar, pero perdió muchos elementos de HarmonyPremium. Ten en cuenta que estamos haciendo un hibrido entre:\n1. \"C:\\Program Files (x86)\\Toon Boom Animation\\Toon Boom Harmony 24 Premium\\win64\\bin\\HarmonyPremium.exe\"\n2. \"C:\\Program Files\\OpenToonz\\OpenToonz.exe\"\n3. \"C:\\Program Files\\Adobe\\Adobe Animate 2023\\Animate.exe\"\n4. \"C:\\Program Files\\Adobe\\Adobe After Effects CC 2019\\Support Files\\AfterFX.exe\"\n\n¿Qué necesitas saber antes de continuar?",
+      "answer": "Antes de seguir necesito que me respondas unas preguntas. Cada uno de esos cuatro programas tiene miles de funciones, y juntos son demasiadas para hacerlas todas a la vez sin perder estabilidad. Por eso hay que elegir qué parte de cada uno se usa de verdad.\n\n**1. ¿Qué elementos de Harmony echas de menos?**\nLo más útil es una lista corta o capturas de las ventanas que usas. Por ejemplo:\n- la vista de nodos para conectar capas y efectos\n- huesos y deformadores\n- las «pegs» (capas de movimiento que llevan a otras)\n- la vista de cámara\n- las propiedades de herramienta\n- la librería de plantillas\n- el editor de curvas de animación\n- los colores bloqueados en paleta\n\n**2. ¿Qué tomamos de cada programa?** Mi propuesta, para que la corrijas:\n- **Harmony:** el esqueleto del trabajo. Nodos, huesos y deformadores, pegs, sustitución de dibujos y paletas.\n- **OpenToonz:** las salas, la hoja de exposición (Xsheet) y los niveles de dibujo vectorial o de mapa de bits.\n- **Animate:** la línea de tiempo con capas, los símbolos reutilizables, las interpolaciones automáticas entre dos posiciones y su forma de dibujar vectores.\n- **After Effects:** la composición con efectos (desenfoque, brillo, máscaras), el editor de gráficas de velocidad y el render final.\n\n**3. ¿Qué animas tú normalmente?**\n- dibujo cuadro a cuadro\n- personajes recortables con huesos\n- gráficos en movimiento\n- una mezcla de varias\n\n¿Y para qué es el resultado: series, cortos, redes sociales o videojuegos (sprites)? Esto decide qué se construye primero.\n\n**4. ¿Qué aspecto quieres?** ¿Mantengo el estilo de tu versión web, oscuro con naranja, o lo acerco al de Harmony? El de Harmony es gris con el lienzo claro, como en tus capturas. ¿Quieres también poder mover y acoplar los paneles a tu gusto, como en estos programas?\n\n**5. ¿Necesitas abrir archivos de esos programas?** Me refiero a escenas de Harmony, OpenToonz, Animate o After Effects. Eso es muy difícil y poco fiable. Lo realista es importar imágenes, PSD, SVG y secuencias, y exportar vídeo, imágenes y sprites.\n\n**6. ¿Usas tableta gráfica con presión?** Si es así, ¿de qué marca? La sensibilidad a la presión todavía no está hecha.\n\n**7. Tus tres prioridades para la siguiente ronda.** Por ejemplo: «nodos y efectos», «huesos» e «interpolación automática como en Animate».\n\nTe sugiero seguir así: en cada ronda hago un bloque concreto, lo pruebo y tú lo usas antes de pasar al siguiente. Así la aplicación sigue estable mientras crece. Si quieres, también puedo estudiar OpenToonz, Animate y After Effects como hice con Harmony, para sacar sus valores reales.",
+      "from_session": true,
+      "backend": "Claude Code",
+      "after": 166,
+      "at_ms": 1795020293142,
+      "deep": true,
+      "told": true
+    },
+    {
+      "question": "¿En qué lenguajes está hecho LeonToon?",
+      "answer": "LeonToon, la versión de escritorio que construimos, está hecha en un solo lenguaje: **Rust**.\n\n- **La ventana y los botones** usan egui (con eframe), una biblioteca de Rust para hacer interfaces.\n- **Las imágenes que exportas** (PNG, hojas de sprites y GIF) se dibujan con tiny-skia y gif, también escritas en Rust.\n- **El vídeo MP4** lo genera ffmpeg, un programa gratuito aparte que LeonToon busca en tu equipo y usa.\n\nHay otros archivos que no son código:\n- **Tus proyectos** (.ltoon) se guardan como texto en formato JSON.\n- **La hoja de valores** sacados del programa original está en Markdown y en JSON.\n\nTu versión anterior, la que funciona en el navegador, estaba hecha en otros lenguajes: JavaScript, HTML y CSS. De ella tomé el diseño y las salas, pero todo se volvió a escribir en Rust y no se copió su código.",
+      "from_session": true,
+      "backend": "Claude Code",
+      "after": 166,
+      "at_ms": 1795095578380,
+      "deep": true,
+      "told": true
+    }
+  ]
+}

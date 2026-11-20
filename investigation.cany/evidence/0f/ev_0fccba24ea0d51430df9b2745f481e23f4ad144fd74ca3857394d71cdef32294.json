@@ -1,0 +1,87 @@
+{
+  "id": "ev_0fccba24ea0d51430df9b2745f481e23f4ad144fd74ca3857394d71cdef32294",
+  "subject": {
+    "kind": "pe",
+    "sha256": "3444bc3c18f29168512fb92e5f56bfa466df99bbe5e937201cf448d99482897a",
+    "name": "HarmonyPremium.exe"
+  },
+  "operation": "native_function_pseudocode",
+  "params": {
+    "function": "0x1404e1200"
+  },
+  "result": {
+    "calls": [
+      "??0QString@@QEAA@VQLatin1String@@@Z",
+      "??1QString@@QEAA@XZ",
+      "?GetInstance@PR_RunTimePrefs@@SAPEAV1@XZ",
+      "?application@WHO_Identity@@SA?AW4WHO_ApplicationIdentity@@XZ",
+      "?getBool@PR_Preference@@QEAAAEB_NAEBVQString@@@Z",
+      "?getBoolValue@PR_Preference@@QEBA_NAEBVQString@@_N@Z",
+      "?getDouble@PR_Preference@@QEAAAEBNAEBVQString@@@Z",
+      "?getEnumValue@PR_Preference@@QEBAHAEBVQString@@H@Z",
+      "?hasOnionSkinView@WHO_Features@@SA_NXZ",
+      "sub_1402a6650",
+      "sub_1404e0db0",
+      "sub_1404e1040",
+      "sub_14064d9d0"
+    ],
+    "engine": "clean-room lifter",
+    "entry": "0x1404e1200",
+    "function": "sub_1404e1200",
+    "gotos": 0,
+    "inline_asm": 33,
+    "pseudo_code": "int64_t sub_1404e1200(int64_t rcx)\n{\n    stack_8 = rbx;\n    stack_10 = rsi;\n    stack_18 = rdi;\n    __asm(\"movaps [rsp+0x70], xmm6\");\n    __asm(\"movaps [rsp+0x60], xmm7\");\n    __asm(\"movaps [rsp+0x50], xmm8\");\n    rsi = rcx;\n    rax = ?GetInstance@PR_RunTimePrefs@@SAPEAV1@XZ();\n    edx = *(uint32_t*)(rax + 0x60);\n    *(uint32_t*)(rsi + 0x38) = edx;\n    rax = ?GetInstance@PR_RunTimePrefs@@SAPEAV1@XZ();\n    edx = *(uint32_t*)(rax + 0x64);\n    *(uint32_t*)(rsi + 0x3c) = edx;\n    rax = ?GetInstance@PR_RunTimePrefs@@SAPEAV1@XZ();\n    __asm(\"setne al\");\n    *(uint8_t*)(rsi + 0x40) = al;\n    rax = ?GetInstance@PR_RunTimePrefs@@SAPEAV1@XZ();\n    ecx = *(uint32_t*)(rax + 0x38);\n    *(uint32_t*)(rsi + 0x68) = ecx;\n    rax = ?GetInstance@PR_RunTimePrefs@@SAPEAV1@XZ();\n    ecx = *(uint32_t*)(rax + 0x3c);\n    *(uint32_t*)(rsi + 0x6c) = ecx;\n    rax = ?GetInstance@PR_RunTimePrefs@@SAPEAV1@XZ();\n    ecx = *(uint32_t*)(rax + 0x40);\n    *(uint32_t*)(rsi + 0x70) = ecx;\n    rax = ?GetInstance@PR_RunTimePrefs@@SAPEAV1@XZ();\n    ecx = *(uint32_t*)(rax + 0x44);\n    *(uint32_t*)(rsi + 0x74) = ecx;\n    rax = ?GetInstance@PR_RunTimePrefs@@SAPEAV1@XZ();\n    ecx = *(uint32_t*)(rax + 0x48);\n    *(uint32_t*)(rsi + 0x78) = ecx;\n    rax = ?GetInstance@PR_RunTimePrefs@@SAPEAV1@XZ();\n    ecx = *(uint32_t*)(rax + 0x4c);\n    *(uint32_t*)(rsi + 0x7c) = ecx;\n    rax = ?GetInstance@PR_RunTimePrefs@@SAPEAV1@XZ();\n    ecx = *(uint32_t*)(rax + 0x50);\n    *(uint32_t*)(rsi + 0x80) = ecx;\n    rax = ?GetInstance@PR_RunTimePrefs@@SAPEAV1@XZ();\n    ecx = *(uint32_t*)(rax + 0x54);\n    *(uint32_t*)(rsi + 0x84) = ecx;\n    rax = ?GetInstance@PR_RunTimePrefs@@SAPEAV1@XZ();\n    ecx = *(uint32_t*)(rax + 0x58);\n    *(uint32_t*)(rsi + 0x88) = ecx;\n    rax = ?GetInstance@PR_RunTimePrefs@@SAPEAV1@XZ();\n    ecx = *(uint32_t*)(rax + 0x5c);\n    *(uint32_t*)(rsi + 0x8c) = ecx;\n    rax = __imp_?tuPref@@3PEAVPR_Preference@@EA;\n    rbx = *(uint64_t*)(rax);\n    var_60 = 0x26;\n    rax = \"DRAWING_ONIONSKIN_MINIMUM_WASH_PERCENT\";\n    var_58 = rax;\n    ??0QString@@QEAA@VQLatin1String@@@Z(&var_50, &var_60);\n    rax = ?getDouble@PR_Preference@@QEAAAEBNAEBVQString@@@Z(rbx, &var_50);\n    __asm(\"movsd xmm8, [rax]\");\n    ??1QString@@QEAA@XZ(&var_50);\n    __asm(\"xorps xmm6, xmm6\");\n    __asm(\"movsd xmm7, [0x140b3a550]\");\n    __asm(\"comisd xmm6, xmm8\");\n    if (xmm6 <= 0 /* unsigned */) {\n        __asm(\"movaps xmm0, xmm7\");\n        __asm(\"minsd xmm0, xmm8\");\n    } else {\n        __asm(\"xorps xmm0, xmm0\");\n    }\n    __asm(\"movsd [rsi+0x48], xmm0\");\n    rax = __imp_?tuPref@@3PEAVPR_Preference@@EA;\n    rbx = *(uint64_t*)(rax);\n    var_60 = 0x26;\n    rax = \"DRAWING_ONIONSKIN_MAXIMUM_WASH_PERCENT\";\n    var_58 = rax;\n    ??0QString@@QEAA@VQLatin1String@@@Z(&var_50, &var_60);\n    rax = ?getDouble@PR_Preference@@QEAAAEBNAEBVQString@@@Z(rbx, &var_50);\n    __asm(\"movsd xmm8, [rax]\");\n    ??1QString@@QEAA@XZ(&var_50);\n    __asm(\"comisd xmm6, xmm8\");\n    if (xmm6 <= 0 /* unsigned */) {\n        __asm(\"movaps xmm0, xmm7\");\n        __asm(\"minsd xmm0, xmm8\");\n    } else {\n        __asm(\"xorps xmm0, xmm0\");\n    }\n    __asm(\"movsd [rsi+0x50], xmm0\");\n    rax = __imp_?tuPref@@3PEAVPR_Preference@@EA;\n    rbx = *(uint64_t*)(rax);\n    var_60 = 0x1d;\n    rax = \"DRAWING_ONIONSKIN_MIN_OPACITY\";\n    var_58 = rax;\n    ??0QString@@QEAA@VQLatin1String@@@Z(&var_50, &var_60);\n    rax = ?getDouble@PR_Preference@@QEAAAEBNAEBVQString@@@Z(rbx, &var_50);\n    __asm(\"movsd xmm8, [rax]\");\n    ??1QString@@QEAA@XZ(&var_50);\n    __asm(\"comisd xmm6, xmm8\");\n    if (xmm6 <= 0 /* unsigned */) {\n        __asm(\"movaps xmm0, xmm7\");\n        __asm(\"minsd xmm0, xmm8\");\n    } else {\n        __asm(\"xorps xmm0, xmm0\");\n    }\n    __asm(\"movsd [rsi+0x58], xmm0\");\n    rax = __imp_?tuPref@@3PEAVPR_Preference@@EA;\n    rbx = *(uint64_t*)(rax);\n    var_60 = 0x1d;\n    rax = \"DRAWING_ONIONSKIN_MAX_OPACITY\";\n    var_58 = rax;\n    ??0QString@@QEAA@VQLatin1String@@@Z(&var_50, &var_60);\n    rax = ?getDouble@PR_Preference@@QEAAAEBNAEBVQString@@@Z(rbx, &var_50);\n    __asm(\"movsd xmm8, [rax]\");\n    ??1QString@@QEAA@XZ(&var_50);\n    __asm(\"comisd xmm6, xmm8\");\n    if (xmm6 <= 0 /* unsigned */) {\n        __asm(\"movaps xmm6, xmm7\");\n        __asm(\"minsd xmm6, xmm8\");\n    }\n    __asm(\"movsd [rsi+0x60], xmm6\");\n    rax = __imp_?tuPref@@3PEAVPR_Preference@@EA;\n    rbx = *(uint64_t*)(rax);\n    var_60 = 0x1b;\n    rax = \"DRAWING_ENHANCED_ONION_SKIN\";\n    var_58 = rax;\n    ??0QString@@QEAA@VQLatin1String@@@Z(&var_50, &var_60);\n    rax = ?getBool@PR_Preference@@QEAAAEB_NAEBVQString@@@Z(rbx, &var_50);\n    ecx = *(uint8_t*)(rax);\n    *(uint8_t*)(rsi + 0x90) = cl;\n    ??1QString@@QEAA@XZ(&var_50);\n    rax = __imp_?tuPref@@3PEAVPR_Preference@@EA;\n    rdi = *(uint64_t*)(rax);\n    rax = ?application@WHO_Identity@@SA?AW4WHO_ApplicationIdentity@@XZ();\n    ebx = 0;\n    __asm(\"sete bl\");\n    var_60 = 0x1e;\n    rax = \"DRAWING_ONIONSKIN_DRAWING_MODE\";\n    var_58 = rax;\n    ??0QString@@QEAA@VQLatin1String@@@Z(&var_50, &var_60);\n    rax = ?getEnumValue@PR_Preference@@QEBAHAEBVQString@@H@Z(rdi, &var_50, ebx);\n    *(uint32_t*)(rsi + 0xbc) = eax;\n    ??1QString@@QEAA@XZ(&var_50);\n    rax = ?hasOnionSkinView@WHO_Features@@SA_NXZ();\n    if (al != 0) {\n        rax = __imp_?tuPref@@3PEAVPR_Preference@@EA;\n        rax = ?getBoolValue@PR_Preference@@QEBA_NAEBVQString@@_N@Z(*(uint64_t*)(rax), &data_140fb94b8, 0);\n        *(uint8_t*)(rsi + 0xc0) = al;\n        rax = __imp_?tuPref@@3PEAVPR_Preference@@EA;\n        rax = ?getBoolValue@PR_Preference@@QEBA_NAEBVQString@@_N@Z(*(uint64_t*)(rax), &data_140fb9530, 0);\n        *(uint8_t*)(rsi + 0xc1) = al;\n    }\n    rax = __imp_?tuPref@@3PEAVPR_Preference@@EA;\n    rax = ?getBoolValue@PR_Preference@@QEBA_NAEBVQString@@_N@Z(*(uint64_t*)(rax), &data_140fb9548, 1);\n    *(uint8_t*)(rsi + 0xc2) = al;\n    sub_1404e1040(rsi + 0xc8, &data_140fb94d0);\n    sub_1404e1040(rsi + 0xe0, &data_140fb94e8);\n    sub_1404e0db0(rsi + 0xf8, &data_140fb9500);\n    sub_1404e0db0(rsi + 0x118, &data_140fb9518);\n    rdx = *(uint64_t*)(rsi + 0xd0);\n    rdx -= *(uint64_t*)(rsi + 0xc8);\n    rdx >>= 3;\n    if (*(uint64_t*)(rsi + 0x110) != rdx) {\n        sub_1402a6650(rsi + 0xf8, rdx, 1);\n    }\n    rdx = *(uint64_t*)(rsi + 0xe8);\n    rdx -= *(uint64_t*)(rsi + 0xe0);\n    rdx >>= 3;\n    if (*(uint64_t*)(rsi + 0x130) != rdx) {\n        sub_1402a6650(rsi + 0x118, rdx, 1);\n    }\n    r11 = &stack_80;\n    rbx = *(uint64_t*)(r11 + 0x20);\n    rsi = *(uint64_t*)(r11 + 0x28);\n    rdi = *(uint64_t*)(r11 + 0x30);\n    __asm(\"movaps xmm6, [rsp+0x70]\");\n    __asm(\"movaps xmm7, [rsp+0x60]\");\n    __asm(\"movaps xmm8, [r11-0x30]\");\n    return sub_14064d9d0(rsi); /* tail call */\n}\n",
+    "signature": "int64_t sub_1404e1200(int64_t rcx)",
+    "strings": [
+      "DRAWING_ONIONSKIN_MINIMUM_WASH_PERCENT",
+      "DRAWING_ONIONSKIN_MAXIMUM_WASH_PERCENT",
+      "DRAWING_ONIONSKIN_MIN_OPACITY",
+      "DRAWING_ONIONSKIN_MAX_OPACITY",
+      "DRAWING_ENHANCED_ONION_SKIN",
+      "DRAWING_ONIONSKIN_DRAWING_MODE"
+    ],
+    "structured": true
+  },
+  "summary": "Pseudo-C for sub_1404e1200 (175 lines).",
+  "confidence": "inferred",
+  "authority": "original-files",
+  "environment": {
+    "clean_room": false,
+    "engine": "builtin",
+    "engine_version": "0.5.0",
+    "host": "windows-x86_64"
+  },
+  "limitations": [
+    {
+      "code": "register_level",
+      "message": "variables are machine registers and stack slots; types are not recovered"
+    },
+    {
+      "code": "calling_convention_assumed",
+      "message": "call arguments follow the usual x86_64 convention and may be wrong for unusual functions"
+    },
+    {
+      "code": "conditions_from_flags",
+      "message": "branch conditions are rebuilt from the last compare and may be approximate"
+    },
+    {
+      "code": "inline_asm",
+      "message": "33 instructions have no C rule and are shown as __asm(...)"
+    },
+    {
+      "code": "deep_engine_unavailable",
+      "message": "Ghidra couldn't open this program (could not start Ghidra: Ghidra's analysis failed; see C:\\Users\\leont\\AppData\\Roaming\\craft-anything\\engines\\ghidra-cache\\3444bc3c18f29168-f2dfab6faedc84f0.log). So this came from the built-in decompiler, which is less exact."
+    }
+  ],
+  "coverage": {
+    "status": "unknown"
+  },
+  "locations": [
+    {
+      "kind": "address",
+      "value": "0x1404e1200"
+    }
+  ],
+  "links": [],
+  "carries_target_content": true
+}

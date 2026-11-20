@@ -1,0 +1,24 @@
+[package]
+name = "leontoon"
+version = "0.1.0"
+edition = "2021"
+description = "LeonToon - estudio de animación 2D cuadro a cuadro"
+
+[[bin]]
+name = "leontoon"
+path = "src/main.rs"
+
+[dependencies]
+eframe = "0.31"
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = "1"
+rfd = "0.15"
+tiny-skia = "0.11"
+gif = "0.13"
+image = { version = "0.25", default-features = false, features = ["webp"] }
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 2

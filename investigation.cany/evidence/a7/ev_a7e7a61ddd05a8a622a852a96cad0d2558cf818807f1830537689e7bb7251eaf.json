@@ -1,0 +1,148 @@
+{
+  "id": "ev_a7e7a61ddd05a8a622a852a96cad0d2558cf818807f1830537689e7bb7251eaf",
+  "subject": {
+    "kind": "pe",
+    "sha256": "3444bc3c18f29168512fb92e5f56bfa466df99bbe5e937201cf448d99482897a",
+    "name": "HarmonyPremium.exe"
+  },
+  "operation": "native_function_pseudocode",
+  "params": {
+    "function": "0x140106d90"
+  },
+  "result": {
+    "calls": [
+      "*(uint64_t*)(rax + 0x38",
+      "*(uint64_t*)(rax + 0xa0",
+      "*(uint64_t*)(rax + 0xb0",
+      "??0QString@@QEAA@PEBD@Z",
+      "??0QWidget@@QEAA@PEAV0@V?$QFlags@W4WindowType@Qt@@@@@Z",
+      "??0TUVBoxLayoutView@@QEAA@PEAVAC_Manager@@AEBVQString@@PEAVQWidget@@PEBDV?$QFlags@W4WindowType@Qt@@@@@Z",
+      "??1QFont@@QEAA@XZ",
+      "??1QScriptValue@@QEAA@XZ",
+      "??1QString@@QEAA@XZ",
+      "?addWidget@QLayout@@QEAAXPEAVQWidget@@@Z",
+      "?application@WHO_Identity@@SA?AW4WHO_ApplicationIdentity@@XZ",
+      "?font@QApplication@@SA?AVQFont@@XZ",
+      "?getBoolValue@PR_Preference@@QEBA_NAEBVQString@@_N@Z",
+      "?getIntValue@PR_Preference@@QEBAHAEBVQString@@H@Z",
+      "?getXsheetShow3dRotationCols@PR_CachedPreferences@@SAAEB_NXZ",
+      "?getXsheetShow3dpathCols@PR_CachedPreferences@@SAAEB_NXZ",
+      "?getXsheetShowAnnotationCols@PR_CachedPreferences@@SAAEB_NXZ",
+      "?getXsheetShowDrawingCols@PR_CachedPreferences@@SAAEB_NXZ",
+      "?getXsheetShowFunctionCols@PR_CachedPreferences@@SAAEB_NXZ",
+      "?getXsheetShowGrouping@PR_CachedPreferences@@SAAEB_NXZ",
+      "?getXsheetShowMinimalHeaders@PR_CachedPreferences@@SAAEB_NXZ",
+      "?getXsheetShowSelection@PR_CachedPreferences@@SAAEB_NXZ",
+      "?getXsheetShowSoundCols@PR_CachedPreferences@@SAAEB_NXZ",
+      "?globalObject@QScriptEngine@@QEBA?AVQScriptValue@@XZ",
+      "?hasAnonymousFunction@WHO_Features@@SA_NXZ",
+      "?indexOf@QSplitter@@QEBAHPEAVQWidget@@@Z",
+      "?instance@QCoreApplication@@SAPEAV1@XZ",
+      "?layout@QWidget@@QEBAPEAVQLayout@@XZ",
+      "?mode@WHO_Identity@@SA?AW4WHO_ModeIdentity@@XZ",
+      "?newQObject@QScriptEngine@@QEAA?AVQScriptValue@@PEAVQObject@@W4ValueOwnership@1@AEBV?$QFlags@W4QObjectWrapOption@QScriptEngine@@@@@Z",
+      "?scale@UT_DPI@@SAHH@Z",
+      "?setCurrentCell@QTableWidget@@QEAAXHH@Z",
+      "?setFont@QWidget@@QEAAXAEBVQFont@@@Z",
+      "?setHorizontalStretch@QSizePolicy@@QEAAXH@Z",
+      "?setMenu@TULayoutView@@UEAAXPEAVAC_Manager@@PEBDW4MenuType@1@@Z",
+      "?setPixelSize@QFont@@QEAAXH@Z",
+      "?setProperty@QScriptValue@@QEAAXAEBVQString@@AEBV1@AEBV?$QFlags@W4PropertyFlag@QScriptValue@@@@@Z",
+      "?setSizePolicy@QWidget@@QEAAXVQSizePolicy@@@Z",
+      "?setStretchFactor@QSplitter@@QEAAXHH@Z",
+      "?sizePolicy@QWidget@@QEBA?AVQSizePolicy@@XZ",
+      "?verticalHeader@QTableView@@QEBAPEAVQHeaderView@@XZ",
+      "rbx",
+      "sub_1400d5dc0",
+      "sub_14010b860",
+      "sub_140115ce0",
+      "sub_140116f80",
+      "sub_1401409c0",
+      "sub_14014ba80",
+      "sub_140175840",
+      "sub_14019de40",
+      "sub_1401cd6b0",
+      "sub_1401ce2e0",
+      "sub_1401ce930",
+      "sub_1401d1110",
+      "sub_1401d11c0",
+      "sub_1401d35c0",
+      "sub_14048cc80",
+      "sub_1404e3a10",
+      "sub_1404e3cd0",
+      "sub_1404e3d00",
+      "sub_14082bcd0",
+      "sub_14082cca0",
+      "sub_14083e710",
+      "sub_14083e730",
+      "sub_14083eef0",
+      "sub_1408a6570",
+      "sub_1409e6230"
+    ],
+    "engine": "clean-room lifter",
+    "entry": "0x140106d90",
+    "function": "sub_140106d90",
+    "gotos": 11,
+    "inline_asm": 16,
+    "pseudo_code": "int64_t sub_140106d90(int64_t rcx, int64_t rdx, int64_t r8, int64_t r9)\n{\n    rax = rsp;\n    *(uint64_t*)(rax + 16) = rbx;\n    *(uint64_t*)(rax + 8) = rcx;\n    rbp = rax - 0x57;\n    __asm(\"movaps [rax-0x48], xmm6\");\n    r14 = r9;\n    rbx = r8;\n    rdi = rdx;\n    rsi = rcx;\n    r12d = 0;\n    ??0QString@@QEAA@PEBD@Z(&var_29, \"xsheetView\");\n    rax = \"XsheetView\";\n    ??0TUVBoxLayoutView@@QEAA@PEAVAC_Manager@@AEBVQString@@PEAVQWidget@@PEBDV?$QFlags@W4WindowType@Qt@@@@@Z(rsi, rdi, &var_29, rbx, rax, r12d);\n    ??1QString@@QEAA@XZ(&var_29);\n    rax = &data_140b52c08;\n    *(uint64_t*)(rsi) = rax;\n    rax = &data_140b52d80;\n    *(uint64_t*)(rsi + 16) = rax;\n    rax = &data_140b52dc0;\n    *(uint64_t*)(rsi + 0x28) = rax;\n    rax = &data_140b52e60;\n    *(uint64_t*)(rsi + 0x68) = rax;\n    *(uint64_t*)(rsi + 0x120) = r14;\n    rax = sub_14083e730(r14);\n    *(uint64_t*)(rsi + 0x128) = rax;\n    rax = arg_7f;\n    *(uint64_t*)(rsi + 0x130) = rax;\n    rax = 0x4024000000000000;\n    *(uint64_t*)(rsi + 0x138) = rax;\n    rax = __imp_?tuPref@@3PEAVPR_Preference@@EA;\n    rbx = *(uint64_t*)(rax);\n    ??0QString@@QEAA@PEBD@Z(&var_11, \"XSHEET_MAX_ZOOM\");\n    rax = ?getIntValue@PR_Preference@@QEBAHAEBVQString@@H@Z(rbx, &var_11, r12 + 0x14);\n    __asm(\"movd xmm0, eax\");\n    __asm(\"cvtdq2pd xmm0, xmm0\");\n    __asm(\"movsd [rsi+0x140], xmm0\");\n    ??1QString@@QEAA@XZ(&var_11);\n    rax = __imp_?tuPref@@3PEAVPR_Preference@@EA;\n    rbx = *(uint64_t*)(rax);\n    ??0QString@@QEAA@PEBD@Z(&var_11, \"XSHEET_MIN_ZOOM\");\n    rax = ?getIntValue@PR_Preference@@QEBAHAEBVQString@@H@Z(rbx, &var_11, r12 + 1);\n    __asm(\"movd xmm0, eax\");\n    __asm(\"cvtdq2pd xmm0, xmm0\");\n    __asm(\"movsd [rsi+0x148], xmm0\");\n    ??1QString@@QEAA@XZ(&var_11);\n    rax = ?scale@UT_DPI@@SAHH@Z(r12 + 0x11);\n    *(uint32_t*)(rsi + 0x150) = eax;\n    rax = sub_1409e6230(r12 + 0x60);\n    arg_7f = rax;\n    rax = sub_1401ce2e0(rax, rsi);\n    *(uint64_t*)(rsi + 0x158) = rax;\n    rax = sub_1409e6230(r12 + 0x38);\n    arg_7f = rax;\n    rax = sub_1401d11c0(rax, rsi);\n    *(uint64_t*)(rsi + 0x160) = rax;\n    rax = sub_1409e6230(r12 + 0x28);\n    rbx = rax;\n    arg_7f = rax;\n    ??0QWidget@@QEAA@PEAV0@V?$QFlags@W4WindowType@Qt@@@@@Z(rax, *(uint64_t*)(rsi + 0x160), r12d);\n    rax = &data_140b52658;\n    *(uint64_t*)(rbx) = rax;\n    rax = &data_140b527c8;\n    *(uint64_t*)(rbx + 16) = rax;\n    *(uint64_t*)(rsi + 0x168) = rbx;\n    *(uint64_t*)(rsi + 0x170) = r12;\n    *(uint64_t*)(rsi + 0x178) = r12;\n    rax = sub_1409e6230(0x588);\n    arg_7f = rax;\n    rax = sub_1401409c0(rax, *(uint64_t*)(rsi + 0x168), r14, rsi);\n    *(uint64_t*)(rsi + 0x180) = rax;\n    *(uint64_t*)(rsi + 0x188) = r12;\n    *(uint64_t*)(rsi + 0x190) = r12;\n    *(uint64_t*)(rsi + 0x198) = r12;\n    *(uint64_t*)(rsi + 0x1a0) = r12;\n    *(uint64_t*)(rsi + 0x1a8) = r12;\n    *(uint64_t*)(rsi + 0x1b0) = r12;\n    *(uint64_t*)(rsi + 0x1b8) = r12;\n    *(uint64_t*)(rsi + 0x1c0) = r12;\n    *(uint64_t*)(rsi + 0x1c8) = r12;\n    *(uint32_t*)(rsi + 0x1d0) = r12d;\n    *(uint64_t*)(rsi + 0x1d8) = r12;\n    *(uint64_t*)(rsi + 0x1e0) = r12;\n    *(uint64_t*)(rsi + 0x1f0) = r12;\n    *(uint64_t*)(rsi + 0x1f8) = r12;\n    *(uint64_t*)(rsi + 0x208) = r12;\n    *(uint64_t*)(rsi + 0x210) = r12;\n    *(uint64_t*)(rsi + 0x218) = r12;\n    *(uint64_t*)(rsi + 0x220) = r12;\n    *(uint64_t*)(rsi + 0x228) = r12;\n    *(uint32_t*)(rsi + 0x230) = r12d;\n    *(uint64_t*)(rsi + 0x238) = r12;\n    *(uint32_t*)(rsi + 0x240) = r12d;\n    *(uint64_t*)(rsi + 0x248) = r12;\n    *(uint32_t*)(rsi + 0x250) = r12d;\n    *(uint32_t*)(rsi + 0x260) = r12d;\n    *(uint64_t*)(rsi + 0x268) = r12;\n    *(uint16_t*)(rsi + 0x270) = 0x100;\n    rax = sub_14083e710(*(uint64_t*)(rsi + 0x120));\n    if (rax != 0) {\n        rax = sub_14083e710(*(uint64_t*)(rsi + 0x120));\n        rax = sub_14082bcd0(rax);\n        rbx = rax;\n        arg_7f = r12d;\n        rax = *(uint64_t*)0x140fb30f0;\n        if (rax == 0) {\n            rax = sub_1409e6230(rax + 0x20);\n            arg_77 = rax;\n            rax = sub_1400d5dc0(rax, 0, \"column\");\n            *(uint64_t*)0x140fb30f0 = rax;\n        }\n        rcx = &arg_7f;\n        ?newQObject@QScriptEngine@@QEAA?AVQScriptValue@@PEAVQObject@@W4ValueOwnership@1@AEBV?$QFlags@W4QObjectWrapOption@QScriptEngine@@@@@Z(rbx, &var_49, rax, 0, rcx);\n        rax = sub_14083e710(*(uint64_t*)(rsi + 0x120));\n        rax = sub_14082bcd0(rax);\n        rax = ?globalObject@QScriptEngine@@QEBA?AVQScriptValue@@XZ(rax, &var_41);\n        rbx = rax;\n        arg_77 = 0x800;\n        ??0QString@@QEAA@PEBD@Z(&var_11, \"column\");\n        ?setProperty@QScriptValue@@QEAAXAEBVQString@@AEBV1@AEBV?$QFlags@W4PropertyFlag@QScriptValue@@@@@Z(rbx, &var_11, &var_49, &arg_77);\n        ??1QString@@QEAA@XZ(&var_11);\n        ??1QScriptValue@@QEAA@XZ(&var_41);\n        rdi = *(uint64_t*)0x140fb30f0;\n        if (rdi == 0) {\n            rax = sub_1409e6230(rdi + 0x20);\n            arg_77 = rax;\n            rax = sub_1400d5dc0(rax, 0, \"column\");\n            *(uint64_t*)0x140fb30f0 = rax;\n            rdi = rax;\n        }\n        rax = *(uint64_t*)(rdi);\n        rbx = *(uint64_t*)(rax + 0x58);\n        rax = sub_14083e710(*(uint64_t*)(rsi + 0x120));\n        rax = sub_14082cca0(rax);\n        (*rbx)(rdi, rax);\n        ??1QScriptValue@@QEAA@XZ(&var_49);\n    }\n    rax = sub_14083e710(*(uint64_t*)(rsi + 0x120));\n    if (rax != 0) {\n        rax = sub_14083e710(*(uint64_t*)(rsi + 0x120));\n        rax = sub_14082bcd0(rax);\n        rbx = rax;\n        arg_7f = r12d;\n        rax = *(uint64_t*)0x140fbe8a0;\n        if (rax == 0) {\n            rax = sub_1409e6230(rax + 0x20);\n            arg_77 = rax;\n            rax = sub_1408a6570(rax, 0, \"xsheet\");\n            *(uint64_t*)0x140fbe8a0 = rax;\n        }\n        rcx = &arg_7f;\n        ?newQObject@QScriptEngine@@QEAA?AVQScriptValue@@PEAVQObject@@W4ValueOwnership@1@AEBV?$QFlags@W4QObjectWrapOption@QScriptEngine@@@@@Z(rbx, &var_49, rax, 0, rcx);\n        rax = sub_14083e710(*(uint64_t*)(rsi + 0x120));\n        rax = sub_14082bcd0(rax);\n        rax = ?globalObject@QScriptEngine@@QEBA?AVQScriptValue@@XZ(rax, &var_41);\n        rbx = rax;\n        arg_77 = 0x800;\n        ??0QString@@QEAA@PEBD@Z(&var_11, \"xsheet\");\n        ?setProperty@QScriptValue@@QEAAXAEBVQString@@AEBV1@AEBV?$QFlags@W4PropertyFlag@QScriptValue@@@@@Z(rbx, &var_11, &var_49, &arg_77);\n        ??1QString@@QEAA@XZ(&var_11);\n        ??1QScriptValue@@QEAA@XZ(&var_41);\n        rdi = *(uint64_t*)0x140fbe8a0;\n        if (rdi == 0) {\n            rax = sub_1409e6230(rdi + 0x20);\n            arg_77 = rax;\n            rax = sub_1408a6570(rax, 0, \"xsheet\");\n            *(uint64_t*)0x140fbe8a0 = rax;\n            rdi = rax;\n        }\n        rax = *(uint64_t*)(rdi);\n        rbx = *(uint64_t*)(rax + 0x58);\n        rax = sub_14083e710(*(uint64_t*)(rsi + 0x120));\n        rax = sub_14082cca0(rax);\n        (*rbx)(rdi, rax);\n        ??1QScriptValue@@QEAA@XZ(&var_49);\n    }\n    rax = __imp_?tuPref@@3PEAVPR_Preference@@EA;\n    rbx = *(uint64_t*)(rax);\n    ??0QString@@QEAA@PEBD@Z(&var_11, \"XSHEET_TAIMUSHITOMODO\");\n    rax = ?getBoolValue@PR_Preference@@QEBA_NAEBVQString@@_N@Z(rbx, &var_11, 0);\n    *(uint8_t*)(rsi + 0x272) = al;\n    ??1QString@@QEAA@XZ(&var_11);\n    rax = ?hasAnonymousFunction@WHO_Features@@SA_NXZ();\n    if (al != 0) {\n        *(uint32_t*)(rsi + 0x260) = 1;\n    }\n    rax = ?layout@QWidget@@QEBAPEAVQLayout@@XZ(rsi);\n    ?addWidget@QLayout@@QEAAXPEAVQWidget@@@Z(rax, *(uint64_t*)(rsi + 0x160));\n    rax = sub_1409e6230(0x48);\n    rbx = rax;\n    arg_7f = rax;\n    rax = ?mode@WHO_Identity@@SA?AW4WHO_ModeIdentity@@XZ();\n    if (eax == 3) {\nlabel_1401073ab:\n        al = 1;\n    } else {\n        rax = ?application@WHO_Identity@@SA?AW4WHO_ApplicationIdentity@@XZ();\n        if (eax == 4) {\n            goto label_1401073ab;\n        } else {\n            rax = ?hasAnonymousFunction@WHO_Features@@SA_NXZ();\n            if (al == 0) {\n                goto label_1401073ab;\n            } else {\n                eax = 0;\n            }\n        }\n    }\n    stack_20 = al;\n    rax = sub_1401d1110(rbx, r14, *(uint64_t*)(rsi + 0x160), rsi);\n    *(uint64_t*)(rsi + 0x170) = rax;\n    ?setMenu@TULayoutView@@UEAAXPEAVAC_Manager@@PEBDW4MenuType@1@@Z(rsi + 0x68, *(uint64_t*)(rsi + 0x30), \"Xsheet Menu\", 0);\n    rdi = *(uint64_t*)(rsi + 0x30);\n    rax = *(uint64_t*)(rdi);\n    rbx = *(uint64_t*)(rax + 0x50);\n    ??0QString@@QEAA@PEBD@Z(&var_11, \"Xsheet Header Menu\");\n    rax = (*rbx)(rdi, &var_11, rsi, rsi);\n    *(uint64_t*)(rsi + 0x258) = rax;\n    ??1QString@@QEAA@XZ(&var_11);\n    rax = sub_1409e6230(0x78);\n    arg_7f = rax;\n    rax = sub_1401cd6b0(rax, rsi, r14, *(uint64_t*)(rsi + 0x180));\n    *(uint64_t*)(rsi + 0x178) = rax;\n    rax = ?layout@QWidget@@QEBAPEAVQLayout@@XZ(rsi);\n    ?addWidget@QLayout@@QEAAXPEAVQWidget@@@Z(rax, *(uint64_t*)(rsi + 0x178));\n    rbx = *(uint64_t*)(rsi + 0x160);\n    rax = ?indexOf@QSplitter@@QEBAHPEAVQWidget@@@Z(rbx, *(uint64_t*)(rsi + 0x168));\n    ?setStretchFactor@QSplitter@@QEAAXHH@Z(rbx, eax, 1);\n    sub_140175840(*(uint64_t*)(rsi + 0x180), 0);\n    ?sizePolicy@QWidget@@QEBA?AVQSizePolicy@@XZ(*(uint64_t*)(rsi + 0x168), &var_51);\n    ?setHorizontalStretch@QSizePolicy@@QEAAXH@Z(&var_51, 0xff);\n    ?setSizePolicy@QWidget@@QEAAXVQSizePolicy@@@Z(*(uint64_t*)(rsi + 0x168), var_51);\n    sub_14010b860(rsi);\n    rax = ?getXsheetShowSelection@PR_CachedPreferences@@SAAEB_NXZ();\n    eax = *(uint8_t*)(rax);\n    arg_77 = al;\n    rax = *(uint64_t*)(rsi + 0x158);\n    var_41 = rax;\n    rax = ?mode@WHO_Identity@@SA?AW4WHO_ModeIdentity@@XZ();\n    if (eax == 3) {\nlabel_140107506:\n        arg_7f = 1;\n    } else {\n        rax = ?application@WHO_Identity@@SA?AW4WHO_ApplicationIdentity@@XZ();\n        arg_7f = 0;\n        if (eax == 4) {\n            goto label_140107506;\n        }\n    }\n    rax = ?getXsheetShowAnnotationCols@PR_CachedPreferences@@SAAEB_NXZ();\n    r13d = *(uint8_t*)(rax);\n    rax = ?getXsheetShowSoundCols@PR_CachedPreferences@@SAAEB_NXZ();\n    r12d = *(uint8_t*)(rax);\n    rax = ?getXsheetShow3dRotationCols@PR_CachedPreferences@@SAAEB_NXZ();\n    r15d = *(uint8_t*)(rax);\n    rax = ?getXsheetShow3dpathCols@PR_CachedPreferences@@SAAEB_NXZ();\n    r14d = *(uint8_t*)(rax);\n    rax = ?getXsheetShowFunctionCols@PR_CachedPreferences@@SAAEB_NXZ();\n    esi = *(uint8_t*)(rax);\n    rax = ?getXsheetShowDrawingCols@PR_CachedPreferences@@SAAEB_NXZ();\n    edi = *(uint8_t*)(rax);\n    rax = ?getXsheetShowMinimalHeaders@PR_CachedPreferences@@SAAEB_NXZ();\n    ebx = *(uint8_t*)(rax);\n    ?getXsheetShowGrouping@PR_CachedPreferences@@SAAEB_NXZ();\n    edx = arg_7f;\n    stack_50 = dl;\n    stack_48 = r13l;\n    stack_40 = r12l;\n    stack_38 = r15l;\n    stack_30 = r14l;\n    stack_28 = sil;\n    stack_20 = dil;\n    sub_1401ce930(var_41, *(uint8_t*)(rax), bl, arg_77);\n    ?instance@QCoreApplication@@SAPEAV1@XZ();\n    ?font@QApplication@@SA?AVQFont@@XZ(&var_39);\n    r15 = arg_5f;\n    __asm(\"movd xmm6, [r15+0x150]\");\n    __asm(\"cvtdq2pd xmm6, xmm6\");\n    __asm(\"mulsd xmm6, [r15+0x138]\");\n    __asm(\"divsd xmm6, [0x140b52248]\");\n    rax = ?scale@UT_DPI@@SAHH@Z(5);\n    __asm(\"movd xmm0, eax\");\n    __asm(\"cvtdq2pd xmm0, xmm0\");\n    __asm(\"subsd xmm6, xmm0\");\n    __asm(\"cvttsd2si eax, xmm6\");\n    edx = 1;\n    ?setPixelSize@QFont@@QEAAXH@Z(&var_39, eax);\n    rax = ?verticalHeader@QTableView@@QEBAPEAVQHeaderView@@XZ(*(uint64_t*)(r15 + 0x180));\n    ?setFont@QWidget@@QEAAXAEBVQFont@@@Z(rax, &var_39);\n    sub_140115ce0(r15, 1);\n    ?setCurrentCell@QTableWidget@@QEAAXHH@Z(*(uint64_t*)(r15 + 0x180), 0, 0);\n    r13 = *(uint64_t*)(r15 + 0x180);\n    rax = sub_14083eef0(*(uint64_t*)(r15 + 0x120));\n    r12 = rax;\n    if (rax == 0) {\nlabel_140107713:\n        r14d = 0xffffffff;\n    } else {\n        rax = sub_14048cc80(rax);\n        if (al == 0) {\n            goto label_140107713;\n        } else {\n            r14d = 0xffffffff;\n            rbx = *(uint64_t*)(r15 + 0x188);\n            if (rbx == *(uint64_t*)(r15 + 0x190)) {\n                goto label_140107713;\n            } else {\n                while (true) {\n                    rax = sub_1404e3d00(*(uint64_t*)(rbx));\n                    if (al == 0) {\nlabel_140107702:\n                        rbx += 8;\n                        if (rbx != *(uint64_t*)(r15 + 0x190)) {\n                            continue;\n                        } else {\n                            goto label_140107713;\n                        }\n                        break;\n                    } else {\n                        rax = sub_14019de40(*(uint64_t*)(rbx));\n                        rsi = rax;\n                        if (rax == 0) {\n                            goto label_140107702;\n                        } else {\n                            rax = sub_1404e3cd0(*(uint64_t*)(rbx));\n                            if (al == 0) {\n                                edi = 1;\n                                rax = *(uint64_t*)(rsi);\n                                rax = (**(uint64_t*)(rax + 0x38))(rsi);\n                                if (eax >= edi /* unsigned */) {\n                                    while (true) {\nlabel_1401076b3:\n                                        rax = sub_1404e3a10(*(uint64_t*)(rbx), edi);\n                                        if (al != 0) {\n                                            r14d++;\n                                        }\n                                    }\n                                }\n                            } else {\n                                r14d++;\n                            }\nlabel_1401076d3:\n                            rax = *(uint64_t*)(r12);\n                            rax = (**(uint64_t*)(rax + 0xa0))(r12);\n                            if (rsi != rax) {\n                                goto label_140107702;\n                            } else {\n                                rax = *(uint64_t*)(r12);\n                                rax = (**(uint64_t*)(rax + 0xb0))(r12);\n                                rdi = rax;\n                                rax = sub_1401d35c0(*(uint64_t*)(rbx));\n                                if (rax == rdi) {\n                                    break;\n                                } else {\n                                    goto label_140107702;\n                                }\n                                break;\n                            }\n                            break;\n                        }\n                        break;\n                    }\n                    break;\n                }\n            }\n        }\n    }\n    stack_20 = r14d;\n    sub_14014ba80(r13, 0, 0, 0);\n    sub_140116f80(r15);\n    ??1QFont@@QEAA@XZ(&var_39);\n    rax = r15;\n    rbx = stack_118;\n    __asm(\"movaps xmm6, [rsp+0xc0]\");\n    return rax;\n    edi++;\n    rax = *(uint64_t*)(rsi);\n    rax = (**(uint64_t*)(rax + 0x38))(rsi);\n    if (edi <= eax /* unsigned */) {\n        goto label_1401076b3;\n    }\n    goto label_1401076d3;\n}\n",
+    "signature": "int64_t sub_140106d90(int64_t rcx, int64_t rdx, int64_t r8, int64_t r9)",
+    "strings": [
+      "xsheetView",
+      "XsheetView",
+      "XSHEET_MAX_ZOOM",
+      "XSHEET_MIN_ZOOM",
+      "column",
+      "xsheet",
+      "XSHEET_TAIMUSHITOMODO",
+      "Xsheet Menu",
+      "Xsheet Header Menu"
+    ],
+    "structured": false
+  },
+  "summary": "Pseudo-C for sub_140106d90 (384 lines, partly unstructured).",
+  "confidence": "inferred",
+  "authority": "original-files",
+  "environment": {
+    "clean_room": false,
+    "engine": "builtin",
+    "engine_version": "0.5.0",
+    "host": "windows-x86_64"
+  },
+  "limitations": [
+    {
+      "code": "register_level",
+      "message": "variables are machine registers and stack slots; types are not recovered"
+    },
+    {
+      "code": "calling_convention_assumed",
+      "message": "call arguments follow the usual x86_64 convention and may be wrong for unusual functions"
+    },
+    {
+      "code": "conditions_from_flags",
+      "message": "branch conditions are rebuilt from the last compare and may be approximate"
+    },
+    {
+      "code": "unstructured_flow",
+      "message": "11 gotos remain where the control flow isn't a simple if/loop"
+    },
+    {
+      "code": "inline_asm",
+      "message": "16 instructions have no C rule and are shown as __asm(...)"
+    },
+    {
+      "code": "deep_engine_unavailable",
+      "message": "Ghidra couldn't open this program (could not start Ghidra: Ghidra's analysis failed; see C:\\Users\\leont\\AppData\\Roaming\\craft-anything\\engines\\ghidra-cache\\3444bc3c18f29168-f2dfab6faedc84f0.log). So this came from the built-in decompiler, which is less exact."
+    }
+  ],
+  "coverage": {
+    "status": "unknown"
+  },
+  "locations": [
+    {
+      "kind": "address",
+      "value": "0x140106d90"
+    }
+  ],
+  "links": [],
+  "carries_target_content": true
+}

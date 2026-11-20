@@ -1,0 +1,42 @@
+{
+  "id": "ev_03b8b5ef419f90e5dd967cbb261f9dc8aad3d1726d8722fd65ab62bd9d49ddde",
+  "subject": {
+    "kind": "pe",
+    "sha256": "3444bc3c18f29168512fb92e5f56bfa466df99bbe5e937201cf448d99482897a",
+    "name": "HarmonyPremium.exe"
+  },
+  "operation": "native_bytes_show",
+  "params": {
+    "address": "0x140c1b7c0",
+    "length": 128
+  },
+  "result": {
+    "address": "0x140c1b7c0",
+    "ascii": "ame>:<line-number> ) :..%2......Editor error : %s.......WID_XmlEditorComponent*.WID_XmlEditorComFit To View.....SP_ZoomSelector.",
+    "file_offset": 12688320,
+    "hex": "616d653e3a3c6c696e652d6e756d6265723e2029203a0a0a25320a0a00000000456469746f72206572726f72203a2025730a0000000000005749445f586d6c456469746f72436f6d706f6e656e742a005749445f586d6c456469746f72436f6d46697420546f2056696577000000000053505f5a6f6f6d53656c6563746f7200",
+    "length": 128
+  },
+  "summary": "128 bytes at 0x140c1b7c0.",
+  "confidence": "observed",
+  "authority": "original-files",
+  "environment": {
+    "clean_room": false,
+    "engine": "builtin",
+    "engine_version": "0.5.0",
+    "host": "windows-x86_64"
+  },
+  "limitations": [],
+  "coverage": {
+    "status": "complete",
+    "examined": 128,
+    "total": 128
+  },
+  "locations": [
+    {
+      "kind": "address",
+      "value": "0x140c1b7c0"
+    }
+  ],
+  "links": []
+}

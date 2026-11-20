@@ -1,0 +1,882 @@
+{
+  "id": "ev_e746dd566ecf43fa36254fe85d2e447ed2ff0fbd2ff7bf2d31b01b6b7b531c6b",
+  "subject": {
+    "kind": "pe",
+    "sha256": "3444bc3c18f29168512fb92e5f56bfa466df99bbe5e937201cf448d99482897a",
+    "name": "HarmonyPremium.exe"
+  },
+  "operation": "native_strings_find",
+  "params": {
+    "case_sensitive": false,
+    "limit": 80,
+    "mode": "regex",
+    "offset": 0,
+    "pattern": "(?i)workspace|onion ?skin"
+  },
+  "result": {
+    "matches": [
+      {
+        "address": "0x140b333e0",
+        "references": [
+          {
+            "from": "0x14001ea61",
+            "function": "sub_140018390"
+          }
+        ],
+        "section": ".rdata",
+        "text": "RESTART_IN_JAPAN_WORKSPACE"
+      },
+      {
+        "address": "0x140b36fc8",
+        "references": [
+          {
+            "from": "0x14003822f",
+            "function": "sub_1400375c0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "onionSkins"
+      },
+      {
+        "address": "0x140b36fd8",
+        "references": [
+          {
+            "from": "0x14003829c",
+            "function": "sub_1400375c0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "OnionSkinAdvancedModeToggle"
+      },
+      {
+        "address": "0x140b36ff8",
+        "references": [
+          {
+            "from": "0x1400382a5",
+            "function": "sub_1400375c0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "OnionSkinToggle"
+      },
+      {
+        "address": "0x140b37008",
+        "references": [
+          {
+            "from": "0x14002faa7",
+            "function": "sub_14002f840"
+          },
+          {
+            "from": "0x14002fb08",
+            "function": "sub_14002f840"
+          },
+          {
+            "from": "0x14002fbf6",
+            "function": "sub_14002f840"
+          },
+          {
+            "from": "0x14002fc57",
+            "function": "sub_14002f840"
+          },
+          {
+            "from": "0x14002feff",
+            "function": "sub_14002f840"
+          },
+          {
+            "from": "0x14002ff67",
+            "function": "sub_14002f840"
+          },
+          {
+            "from": "0x14003010a",
+            "function": "sub_14002fff0"
+          },
+          {
+            "from": "0x1400382d7",
+            "function": "sub_1400375c0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "OnionSkinToolbar"
+      },
+      {
+        "address": "0x140b370e8",
+        "references": [
+          {
+            "from": "0x140038ed6",
+            "function": "sub_1400375c0"
+          },
+          {
+            "from": "0x140038f28",
+            "function": "sub_1400375c0"
+          },
+          {
+            "from": "0x1402828b2",
+            "function": "sub_140282610"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Onion Skin"
+      },
+      {
+        "address": "0x140b392c0",
+        "references": [
+          {
+            "from": "0x140033f36",
+            "function": "sub_140033e90"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Workspace"
+      },
+      {
+        "address": "0x140b74480",
+        "references": [
+          {
+            "from": "0x1401fbd94",
+            "function": "sub_1401fb690"
+          },
+          {
+            "from": "0x1403ead9a",
+            "function": "sub_1403eabd0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "1OnOnionSkinChanged()"
+      },
+      {
+        "address": "0x140b74498",
+        "references": [
+          {
+            "from": "0x1401fbda3",
+            "function": "sub_1401fb690"
+          },
+          {
+            "from": "0x1402cbddc",
+            "function": "sub_1402cb540"
+          },
+          {
+            "from": "0x1403b67b5",
+            "function": "sub_1403b5d10"
+          },
+          {
+            "from": "0x1403ead6f",
+            "function": "sub_1403eabd0"
+          },
+          {
+            "from": "0x1403eada9",
+            "function": "sub_1403eabd0"
+          },
+          {
+            "from": "0x1404d8541",
+            "function": "sub_1404d71a0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "2onionSkinChanged()"
+      },
+      {
+        "address": "0x140b87578",
+        "references": [],
+        "section": ".rdata",
+        "text": "Add to Onion Skin"
+      },
+      {
+        "address": "0x140b87590",
+        "references": [],
+        "section": ".rdata",
+        "text": "Remove from Onion Skin"
+      },
+      {
+        "address": "0x140b8d4ab",
+        "references": [],
+        "section": ".rdata",
+        "text": "OnOnionSkinChanged"
+      },
+      {
+        "address": "0x140b8d730",
+        "references": [],
+        "section": ".rdata",
+        "text": "onionSkinCtrl"
+      },
+      {
+        "address": "0x140b8d73e",
+        "references": [],
+        "section": ".rdata",
+        "text": "OS_OnionSkinCtrl*"
+      },
+      {
+        "address": "0x140ba0780",
+        "references": [],
+        "section": ".rdata",
+        "text": "timeline/noonionskin"
+      },
+      {
+        "address": "0x140ba0898",
+        "references": [],
+        "section": ".rdata",
+        "text": "timeline/onionskin"
+      },
+      {
+        "address": "0x140bd9c60",
+        "references": [
+          {
+            "from": "0x1403b67a6",
+            "function": "sub_1403b5d10"
+          }
+        ],
+        "section": ".rdata",
+        "text": "1onOnionSkinChanged()"
+      },
+      {
+        "address": "0x140be1940",
+        "references": [
+          {
+            "from": "0x1403ea1c2",
+            "function": "sub_1403e9cd0"
+          },
+          {
+            "from": "0x14049b282",
+            "function": "sub_14049b160"
+          },
+          {
+            "from": "0x1404ae55e",
+            "function": "sub_1404aa9b0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Apply to Onion Skin Range"
+      },
+      {
+        "address": "0x140bee7d1",
+        "references": [],
+        "section": ".rdata",
+        "text": "onOnionSkinChanged"
+      },
+      {
+        "address": "0x140bf1be8",
+        "references": [
+          {
+            "from": "0x14043d23f",
+            "function": "sub_14043d1d0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "timeline/noonionskin.png"
+      },
+      {
+        "address": "0x140bf1c08",
+        "references": [
+          {
+            "from": "0x14043d2f9",
+            "function": "sub_14043d1d0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "timeline/onionskin.png"
+      },
+      {
+        "address": "0x140bfdd3c",
+        "references": [],
+        "section": ".rdata",
+        "text": "OnOnionSkinChanged"
+      },
+      {
+        "address": "0x140c063b8",
+        "references": [],
+        "section": ".rdata",
+        "text": "VL_OnionSkinLabel"
+      },
+      {
+        "address": "0x140c065f8",
+        "references": [
+          {
+            "from": "0x140f68f38",
+            "function": null
+          }
+        ],
+        "section": ".rdata",
+        "text": "VL_OnionSkinLabel"
+      },
+      {
+        "address": "0x140c0ef90",
+        "references": [
+          {
+            "from": "0x14049b255",
+            "function": "sub_14049b160"
+          },
+          {
+            "from": "0x1404ae582",
+            "function": "sub_1404aa9b0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Apply to Onion Skin Range\nSelect and modify drawings visible in the onion skins."
+      },
+      {
+        "address": "0x140c0efe8",
+        "references": [
+          {
+            "from": "0x14049b2b4",
+            "function": "sub_14049b160"
+          }
+        ],
+        "section": ".rdata",
+        "text": "toolproperties/applytoonionskinrange.svg"
+      },
+      {
+        "address": "0x140c133e8",
+        "references": [
+          {
+            "from": "0x1404c5d82",
+            "function": "sub_1404c5c70"
+          },
+          {
+            "from": "0x1404e12ef",
+            "function": "sub_1404e1200"
+          }
+        ],
+        "section": ".rdata",
+        "text": "DRAWING_ONIONSKIN_MINIMUM_WASH_PERCENT"
+      },
+      {
+        "address": "0x140c13410",
+        "references": [
+          {
+            "from": "0x1404c5dec",
+            "function": "sub_1404c5c70"
+          },
+          {
+            "from": "0x1404e135b",
+            "function": "sub_1404e1200"
+          }
+        ],
+        "section": ".rdata",
+        "text": "DRAWING_ONIONSKIN_MAXIMUM_WASH_PERCENT"
+      },
+      {
+        "address": "0x140c13a58",
+        "references": [
+          {
+            "from": "0x1404d582d",
+            "function": "sub_1404d5800"
+          }
+        ],
+        "section": ".rdata",
+        "text": "onionSkinResponder"
+      },
+      {
+        "address": "0x140c13e00",
+        "references": [
+          {
+            "from": "0x1404d6b63",
+            "function": "sub_1404d6b30"
+          }
+        ],
+        "section": ".rdata",
+        "text": "OnionSkinView"
+      },
+      {
+        "address": "0x140c13e10",
+        "references": [
+          {
+            "from": "0x1404d6b86",
+            "function": "sub_1404d6b30"
+          }
+        ],
+        "section": ".rdata",
+        "text": "onionSkinView"
+      },
+      {
+        "address": "0x140c13e20",
+        "references": [
+          {
+            "from": "0x1404d6d19",
+            "function": "sub_1404d6b30"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Onion Skin View Menu"
+      },
+      {
+        "address": "0x140c13e38",
+        "references": [
+          {
+            "from": "0x1404d7389",
+            "function": "sub_1404d71a0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "/forms/DUI_OnionSkin.ui"
+      },
+      {
+        "address": "0x140c13e88",
+        "references": [
+          {
+            "from": "0x1404d76fb",
+            "function": "sub_1404d71a0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "drawingtool/onionskin_advanced.png"
+      },
+      {
+        "address": "0x140c13eb0",
+        "references": [
+          {
+            "from": "0x1404d7783",
+            "function": "sub_1404d71a0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "Advanced Onion Skin"
+      },
+      {
+        "address": "0x140c13f38",
+        "references": [
+          {
+            "from": "0x1404d7d51",
+            "function": "sub_1404d71a0"
+          },
+          {
+            "from": "0x1404de9d4",
+            "function": "sub_1404de990"
+          },
+          {
+            "from": "0x1404e14d3",
+            "function": "sub_1404e1200"
+          },
+          {
+            "from": "0x1404e2012",
+            "function": "sub_1404e1f00"
+          },
+          {
+            "from": "0x1404e20f6",
+            "function": "sub_1404e20b0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "DRAWING_ONIONSKIN_DRAWING_MODE"
+      },
+      {
+        "address": "0x140c13f70",
+        "references": [
+          {
+            "from": "0x1404d82e2",
+            "function": "sub_1404d71a0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "1onActionToggleOnionSkinForCustomMarkedType(QString)"
+      },
+      {
+        "address": "0x140c13fc0",
+        "references": [
+          {
+            "from": "0x1404d832f",
+            "function": "sub_1404d71a0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "1onActionOnionSkinToggleAdvancedMode()"
+      },
+      {
+        "address": "0x140c14010",
+        "references": [
+          {
+            "from": "0x1404d839c",
+            "function": "sub_1404d71a0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "1onActionOnionSkinToggleAdvancedNext(int)"
+      },
+      {
+        "address": "0x140c14040",
+        "references": [
+          {
+            "from": "0x1404d83d5",
+            "function": "sub_1404d71a0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "1onActionOnionSkinToggleAdvancedPrev(int)"
+      },
+      {
+        "address": "0x140c14070",
+        "references": [
+          {
+            "from": "0x1404d840e",
+            "function": "sub_1404d71a0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "1onActionOnionSkinAdvancedNextSliderChanged(int,int)"
+      },
+      {
+        "address": "0x140c140c8",
+        "references": [
+          {
+            "from": "0x1404d8443",
+            "function": "sub_1404d71a0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "1onActionOnionSkinAdvancedPrevSliderChanged(int,int)"
+      },
+      {
+        "address": "0x140c14120",
+        "references": [
+          {
+            "from": "0x1404d8478",
+            "function": "sub_1404d71a0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "1onActionOnionSkinDrawingMode(int)"
+      },
+      {
+        "address": "0x140c14188",
+        "references": [
+          {
+            "from": "0x1404d8532",
+            "function": "sub_1404d71a0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "1onOnionSkinSettingChanged()"
+      },
+      {
+        "address": "0x140c141a8",
+        "references": [
+          {
+            "from": "0x1404d856c",
+            "function": "sub_1404d71a0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "2onionSkinSettingChanged()"
+      },
+      {
+        "address": "0x140c14a30",
+        "references": [
+          {
+            "from": "0x140007064",
+            "function": "sub_140007060"
+          }
+        ],
+        "section": ".rdata",
+        "text": "DRAWING_ONIONSKIN_ADVANCED_MODE"
+      },
+      {
+        "address": "0x140c14a50",
+        "references": [
+          {
+            "from": "0x1400070a4",
+            "function": "sub_1400070a0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "DRAWING_ONIONSKIN_ADV_NEXT"
+      },
+      {
+        "address": "0x140c14a70",
+        "references": [
+          {
+            "from": "0x140007124",
+            "function": "sub_140007120"
+          }
+        ],
+        "section": ".rdata",
+        "text": "DRAWING_ONIONSKIN_ADV_PREV"
+      },
+      {
+        "address": "0x140c14a90",
+        "references": [
+          {
+            "from": "0x1400070e4",
+            "function": "sub_1400070e0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "DRAWING_ONIONSKIN_ADV_NEXT_ON"
+      },
+      {
+        "address": "0x140c14ab0",
+        "references": [
+          {
+            "from": "0x140007164",
+            "function": "sub_140007160"
+          }
+        ],
+        "section": ".rdata",
+        "text": "DRAWING_ONIONSKIN_ADV_PREV_ON"
+      },
+      {
+        "address": "0x140c14ad0",
+        "references": [
+          {
+            "from": "0x1400071a4",
+            "function": "sub_1400071a0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "DRAWING_ONIONSKIN_APPLY_COLOUR_WASH"
+      },
+      {
+        "address": "0x140c14af8",
+        "references": [
+          {
+            "from": "0x1400071e4",
+            "function": "sub_1400071e0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "DRAWING_ONIONSKIN_LINK_SLIDERS"
+      },
+      {
+        "address": "0x140c14c90",
+        "references": [
+          {
+            "from": "0x1404dbc1c",
+            "function": "sub_1404dbbc0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "DRAWING_ONIONSKIN_PREV_DRAWINGS"
+      },
+      {
+        "address": "0x140c14cb0",
+        "references": [
+          {
+            "from": "0x1404dbc66",
+            "function": "sub_1404dbbc0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "DRAWING_ONIONSKIN_NEXT_DRAWINGS"
+      },
+      {
+        "address": "0x140c14ce8",
+        "references": [
+          {
+            "from": "0x1404e13bc",
+            "function": "sub_1404e1200"
+          }
+        ],
+        "section": ".rdata",
+        "text": "DRAWING_ONIONSKIN_MIN_OPACITY"
+      },
+      {
+        "address": "0x140c14d08",
+        "references": [
+          {
+            "from": "0x1404e141d",
+            "function": "sub_1404e1200"
+          },
+          {
+            "from": "0x1404e16bb",
+            "function": "sub_1404e1650"
+          }
+        ],
+        "section": ".rdata",
+        "text": "DRAWING_ONIONSKIN_MAX_OPACITY"
+      },
+      {
+        "address": "0x140c14f60",
+        "references": [
+          {
+            "from": "0x1404e21a3",
+            "function": "sub_1404e2170"
+          },
+          {
+            "from": "0x140863514",
+            "function": "sub_14085d860"
+          }
+        ],
+        "section": ".rdata",
+        "text": "DRAWING_ONIONSKIN_RENDER_MODE"
+      },
+      {
+        "address": "0x140c14f80",
+        "references": [
+          {
+            "from": "0x1404e2253",
+            "function": "sub_1404e2220"
+          }
+        ],
+        "section": ".rdata",
+        "text": "DRAWING_ONIONSKIN_RENDER_ORDER"
+      },
+      {
+        "address": "0x140c14fa0",
+        "references": [
+          {
+            "from": "0x1404e1b27",
+            "function": "sub_1404e1ae0"
+          },
+          {
+            "from": "0x140863566",
+            "function": "sub_14085d860"
+          }
+        ],
+        "section": ".rdata",
+        "text": "DRAWING_ONIONSKIN_BRIGHTNESS_AS_ALPHA"
+      },
+      {
+        "address": "0x140c1dbb9",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionToggleApplyToOnionSkinFrames"
+      },
+      {
+        "address": "0x140c1dbde",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionToggleApplyToOnionSkinFramesValidate"
+      },
+      {
+        "address": "0x140c36c58",
+        "references": [
+          {
+            "from": "0x140648302",
+            "function": "sub_1406482e0"
+          }
+        ],
+        "section": ".rdata",
+        "text": "OS_OnionSkinResponder"
+      },
+      {
+        "address": "0x140c36c6e",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionOnionSkinToggle"
+      },
+      {
+        "address": "0x140c36c87",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionOnionSkinToggleValidate"
+      },
+      {
+        "address": "0x140c36cb6",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionOnionSkinToggleCenterline"
+      },
+      {
+        "address": "0x140c36cd8",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionOnionSkinToggleCenterlineValidate"
+      },
+      {
+        "address": "0x140c36d02",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionOnionSkinToggleFramesToDrawingsMode"
+      },
+      {
+        "address": "0x140c36d2e",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionOnionSkinToggleFramesToDrawingsModeValidate"
+      },
+      {
+        "address": "0x140c36d62",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionOnionSkinNoPrevDrawings"
+      },
+      {
+        "address": "0x140c36d82",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionOnionSkinNoPrevDrawingsValidate"
+      },
+      {
+        "address": "0x140c36db3",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionOnionSkin1PrevDrawing"
+      },
+      {
+        "address": "0x140c36dd1",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionOnionSkin1PrevDrawingValidate"
+      },
+      {
+        "address": "0x140c36df7",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionOnionSkin2PrevDrawings"
+      },
+      {
+        "address": "0x140c36e16",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionOnionSkin2PrevDrawingsValidate"
+      },
+      {
+        "address": "0x140c36e3d",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionOnionSkin3PrevDrawings"
+      },
+      {
+        "address": "0x140c36e5c",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionOnionSkin3PrevDrawingsValidate"
+      },
+      {
+        "address": "0x140c36e83",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionOnionSkinNoNextDrawings"
+      },
+      {
+        "address": "0x140c36ea3",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionOnionSkinNoNextDrawingsValidate"
+      },
+      {
+        "address": "0x140c36ecb",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionOnionSkin1NextDrawing"
+      },
+      {
+        "address": "0x140c36ee9",
+        "references": [],
+        "section": ".rdata",
+        "text": "onActionOnionSkin1NextDrawingValidate"
+      }
+    ],
+    "total": 176
+  },
+  "summary": "176 strings match \"(?i)workspace|onion ?skin\".",
+  "confidence": "observed",
+  "authority": "original-files",
+  "environment": {
+    "clean_room": false,
+    "engine": "builtin",
+    "engine_version": "0.5.0",
+    "host": "windows-x86_64"
+  },
+  "limitations": [
+    {
+      "code": "data_sections_only",
+      "message": "only strings stored in the file are searched (absence is not proof)"
+    }
+  ],
+  "coverage": {
+    "status": "partial",
+    "examined": 80,
+    "total": 176,
+    "next_offset": 80
+  },
+  "locations": [],
+  "links": []
+}

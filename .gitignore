@@ -1,0 +1,14 @@
+# Compilacion y copias
+app/target/
+app/src_backup_*/
+
+# Registros y datos de sesion
+agent-session.jsonl
+build-activity.log
+usage.json
+feed.json
+craft.json
+inbox/
+pinned/
+checks/
+*.bak
