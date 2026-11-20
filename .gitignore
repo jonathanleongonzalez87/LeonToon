@@ -12,3 +12,6 @@ inbox/
 pinned/
 checks/
 *.bak
+
+# Capturas con pinceles comerciales de Adobe (no se suben)
+app/shots/abr_*.png
