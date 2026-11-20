@@ -528,6 +528,9 @@ impl LeonApp {
                     if t == Tool::Brush && bitmap {
                         self.brush_presets_ui(ui);
                     }
+                    if t == Tool::Vector {
+                        self.vector_presets_ui(ui);
+                    }
                     if t.draws() {
                         let size = match t {
                             Tool::Brush => &mut self.brush_size,
@@ -568,8 +571,11 @@ impl LeonApp {
                         if t == Tool::Brush && !bitmap {
                             muted(ui, "Sobre una capa vectorial el Pincel dibuja un trazo vectorial simple (grosor, opacidad y suavizado). El motor con dureza, flujo, dinámicas y presets es solo para capas de mapa de bits; para trazos vectoriales con grosor variable usa el Lápiz vectorial (L).");
                         }
-                        if matches!(t, Tool::Vector | Tool::Pen) {
+                        if t == Tool::Vector {
                             self.vector_style_ui(ui);
+                        }
+                        if t == Tool::Pen {
+                            muted(ui, "La Pluma vectorial (curvas Bézier y nodos) llegará en la fase 4 y usará los mismos pinceles vectoriales del Lápiz.");
                         }
                         if t == Tool::Shape {
                             for (k, n) in [(ShapeKind::Line, "Línea"), (ShapeKind::Rect, "Rectángulo"), (ShapeKind::Ellipse, "Elipse")] {
