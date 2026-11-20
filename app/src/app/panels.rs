@@ -551,26 +551,7 @@ impl LeonApp {
                     });
                     if t == Tool::Brush {
                         self.brush_preview(ui);
-                        panel_header(ui, "Dinámica de forma");
-                        param_row(ui, "Var. tamaño", |ui| pct_slider(ui, &mut self.brush.size_jitter, 0.0, 100.0));
-                        param_row(ui, "Ctrl. tamaño", |ui| control_combo(ui, "ctl_size", &mut self.brush.size_control));
-                        if self.brush.size_control != crate::brush::Control::Off {
-                            param_row(ui, "Tamaño mín.", |ui| pct_slider(ui, &mut self.brush.min_size, 0.0, 100.0));
-                        }
-                        param_row(ui, "Var. ángulo", |ui| pct_slider(ui, &mut self.brush.angle_jitter, 0.0, 100.0));
-                        param_row(ui, "Var. redond.", |ui| pct_slider(ui, &mut self.brush.roundness_jitter, 0.0, 100.0));
-                        if self.brush.roundness_jitter > 0.0 {
-                            param_row(ui, "Redond. mín.", |ui| pct_slider(ui, &mut self.brush.min_roundness, 5.0, 100.0));
-                        }
-                        panel_header(ui, "Transferencia");
-                        param_row(ui, "Var. opac.", |ui| pct_slider(ui, &mut self.brush.opacity_jitter, 0.0, 100.0));
-                        param_row(ui, "Ctrl. opac.", |ui| control_combo(ui, "ctl_opacity", &mut self.brush.opacity_control));
-                        param_row(ui, "Var. flujo", |ui| pct_slider(ui, &mut self.brush.flow_jitter, 0.0, 100.0));
-                        param_row(ui, "Ctrl. flujo", |ui| control_combo(ui, "ctl_flow", &mut self.brush.flow_control));
-                        if self.brush.has_dynamics() {
-                            ui.label(RichText::new("Dinámicas activas en este pincel").size(11.0).color(ACCENT2));
-                        }
-                        muted(ui, "El control por presión usa el lápiz de tableta (la vista previa simula una presión que sube y baja). La inclinación solo actúa si el dispositivo la entrega; hoy el programa no la recibe, y sin dato no cambia nada.");
+                        self.brush_sections(ui);
                         if self.layer().kind != LayerKind::Bitmap {
                             muted(ui, "Dureza, espaciado, flujo, redondez y ángulo actúan en capas de mapa de bits. En capas vectoriales el pincel solo usa tamaño, opacidad y suavizado.");
                         }
@@ -633,11 +614,178 @@ fn pct_slider(ui: &mut egui::Ui, v: &mut f32, lo: f32, hi: f32) {
     }
 }
 
+/// Sección plegable del panel N (cerrada al principio).
+fn fold(ui: &mut egui::Ui, id: &str, title: &str, add: impl FnOnce(&mut egui::Ui)) {
+    egui::CollapsingHeader::new(RichText::new(title).font(semi(12.0)).color(TX)).id_salt(id).default_open(std::env::var("LEONTOON_FOLDS").is_ok()).show(ui, add);
+}
+
 impl LeonApp {
+    /// Especificación del pincel actual para el motor (con las imágenes de punta y de textura cargadas).
+    pub(super) fn brush_spec(&self, color: [u8; 3], size: f32, seed: u64) -> crate::brush::BrushSpec {
+        let [r, g, b, _] = rgba(self.fill_color);
+        crate::brush::BrushSpec::new(size, self.stroke_opacity, color, self.brush, seed)
+            .with_color2([r, g, b])
+            .with_images(self.brush_tip_img.as_ref().map(|(_, g)| g.clone()), self.brush_tex_img.as_ref().map(|(_, g)| g.clone()))
+    }
+
+    /// Pide una imagen PNG o WebP y la carga como punta o como textura del pincel.
+    fn pick_brush_image(&mut self, tip: bool) {
+        let Some(path) = rfd::FileDialog::new().add_filter("Imagen (PNG o WebP)", &["png", "webp"]).pick_file() else { return };
+        match crate::brush::load_gray(&path) {
+            Ok(g) => {
+                let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                let msg = format!("{} cargada: {name} ({}×{})", if tip { "Punta" } else { "Textura" }, g.w, g.h);
+                if tip {
+                    self.brush_tip_img = Some((name, std::sync::Arc::new(g)));
+                    self.brush.use_tip_image = true;
+                } else {
+                    self.brush_tex_img = Some((name, std::sync::Arc::new(g)));
+                    self.brush.texture = crate::brush::TexKind::Image;
+                }
+                self.say(msg);
+            }
+            Err(e) => self.say(e),
+        }
+    }
+
+    /// Dinámica de forma, transferencia, dispersión, textura, doble pincel, color y bordes húmedos.
+    fn brush_sections(&mut self, ui: &mut egui::Ui) {
+        use crate::brush::{Control, TexKind, TexMode};
+        fold(ui, "fold_shape", "Dinámica de forma", |ui| {
+            param_row(ui, "Var. tamaño", |ui| pct_slider(ui, &mut self.brush.size_jitter, 0.0, 100.0));
+            param_row(ui, "Ctrl. tamaño", |ui| control_combo(ui, "ctl_size", &mut self.brush.size_control));
+            if self.brush.size_control != Control::Off {
+                param_row(ui, "Tamaño mín.", |ui| pct_slider(ui, &mut self.brush.min_size, 0.0, 100.0));
+            }
+            param_row(ui, "Var. ángulo", |ui| pct_slider(ui, &mut self.brush.angle_jitter, 0.0, 100.0));
+            param_row(ui, "Var. redond.", |ui| pct_slider(ui, &mut self.brush.roundness_jitter, 0.0, 100.0));
+            if self.brush.roundness_jitter > 0.0 {
+                param_row(ui, "Redond. mín.", |ui| pct_slider(ui, &mut self.brush.min_roundness, 5.0, 100.0));
+            }
+        });
+        fold(ui, "fold_transfer", "Transferencia", |ui| {
+            param_row(ui, "Var. opac.", |ui| pct_slider(ui, &mut self.brush.opacity_jitter, 0.0, 100.0));
+            param_row(ui, "Ctrl. opac.", |ui| control_combo(ui, "ctl_opacity", &mut self.brush.opacity_control));
+            param_row(ui, "Var. flujo", |ui| pct_slider(ui, &mut self.brush.flow_jitter, 0.0, 100.0));
+            param_row(ui, "Ctrl. flujo", |ui| control_combo(ui, "ctl_flow", &mut self.brush.flow_control));
+            muted(ui, "El control por presión usa el lápiz de tableta (la vista previa simula una presión que sube y baja). La inclinación solo actúa si el dispositivo la entrega; hoy el programa no la recibe, y sin dato no cambia nada.");
+        });
+        fold(ui, "fold_scatter", "Dispersión", |ui| {
+            param_row(ui, "Dispersión", |ui| {
+                let mut p = self.brush.scatter * 100.0;
+                if ui.add(egui::Slider::new(&mut p, 0.0..=1000.0).logarithmic(true).max_decimals(0).suffix(" %")).changed() {
+                    self.brush.scatter = p / 100.0;
+                }
+            });
+            param_row(ui, "Ejes", |ui| {
+                ui.checkbox(&mut self.brush.scatter_both, "Ambos ejes");
+            });
+            param_row(ui, "Cantidad", |ui| {
+                let mut n = self.brush.scatter_count as f32;
+                if ui.add(egui::Slider::new(&mut n, 1.0..=16.0).max_decimals(0)).changed() {
+                    self.brush.scatter_count = n.round() as u8;
+                }
+            });
+            param_row(ui, "Var. cantidad", |ui| pct_slider(ui, &mut self.brush.count_jitter, 0.0, 100.0));
+            if self.brush.scatter <= 0.0 {
+                muted(ui, "Sube la dispersión para que las marcas se repartan; la cantidad solo actúa con dispersión.");
+            }
+        });
+        fold(ui, "fold_texture", "Textura", |ui| {
+            param_row(ui, "Patrón", |ui| {
+                let before = self.brush.texture;
+                egui::ComboBox::from_id_salt("tex_kind").selected_text(self.brush.texture.label()).width(ui.available_width() - 8.0).show_ui(ui, |ui| {
+                    for k in TexKind::ALL {
+                        ui.selectable_value(&mut self.brush.texture, k, k.label());
+                    }
+                });
+                if self.brush.texture == TexKind::Image && before != TexKind::Image && self.brush_tex_img.is_none() {
+                    self.brush.texture = before;
+                    self.pick_brush_image(false);
+                }
+            });
+            if self.brush.texture == TexKind::Image {
+                let name = self.brush_tex_img.as_ref().map_or("ninguna".to_string(), |(n, _)| n.clone());
+                ui.horizontal(|ui| {
+                    if ui.small_button("Cargar imagen…").clicked() {
+                        self.pick_brush_image(false);
+                    }
+                    ui.label(RichText::new(name).size(11.0).color(MU));
+                });
+            }
+            if self.brush.texture != TexKind::None {
+                param_row(ui, "Escala", |ui| pct_slider(ui, &mut self.brush.texture_scale, 10.0, 800.0));
+                param_row(ui, "Profundidad", |ui| pct_slider(ui, &mut self.brush.texture_depth, 0.0, 100.0));
+                param_row(ui, "Modo", |ui| {
+                    egui::ComboBox::from_id_salt("tex_mode").selected_text(self.brush.texture_mode.label()).width(ui.available_width() - 8.0).show_ui(ui, |ui| {
+                        for m in TexMode::ALL {
+                            ui.selectable_value(&mut self.brush.texture_mode, m, m.label());
+                        }
+                    });
+                });
+                param_row(ui, "Comportamiento", |ui| {
+                    ui.checkbox(&mut self.brush.texture_per_tip, "Por marca");
+                });
+            }
+        });
+        fold(ui, "fold_dual", "Doble pincel", |ui| {
+            param_row(ui, "Activar", |ui| {
+                ui.checkbox(&mut self.brush.dual, "Segunda punta");
+            });
+            if self.brush.dual {
+                param_row(ui, "Tamaño", |ui| pct_slider(ui, &mut self.brush.dual_size, 5.0, 150.0));
+                param_row(ui, "Cantidad", |ui| {
+                    let mut n = self.brush.dual_count as f32;
+                    if ui.add(egui::Slider::new(&mut n, 1.0..=40.0).max_decimals(0)).changed() {
+                        self.brush.dual_count = n.round() as u8;
+                    }
+                });
+                param_row(ui, "Reparto", |ui| pct_slider(ui, &mut self.brush.dual_spread, 0.0, 150.0));
+            }
+        });
+        fold(ui, "fold_color", "Dinámica de color", |ui| {
+            param_row(ui, "Princ./secund.", |ui| pct_slider(ui, &mut self.brush.fg_bg_jitter, 0.0, 100.0));
+            param_row(ui, "Var. tono", |ui| pct_slider(ui, &mut self.brush.hue_jitter, 0.0, 100.0));
+            param_row(ui, "Var. saturación", |ui| pct_slider(ui, &mut self.brush.sat_jitter, 0.0, 100.0));
+            param_row(ui, "Var. brillo", |ui| pct_slider(ui, &mut self.brush.bri_jitter, 0.0, 100.0));
+            muted(ui, "El color secundario es el de relleno de las formas.");
+        });
+        fold(ui, "fold_other", "Punta y bordes", |ui| {
+            param_row(ui, "Punta", |ui| {
+                ui.checkbox(&mut self.brush.use_tip_image, "Usar imagen");
+            });
+            if self.brush.use_tip_image {
+                if self.brush_tip_img.is_none() {
+                    self.pick_brush_image(true);
+                    if self.brush_tip_img.is_none() {
+                        self.brush.use_tip_image = false;
+                    }
+                }
+                let name = self.brush_tip_img.as_ref().map_or("ninguna".to_string(), |(n, _)| n.clone());
+                ui.horizontal(|ui| {
+                    if ui.small_button("Cargar punta…").clicked() {
+                        self.pick_brush_image(true);
+                    }
+                    ui.label(RichText::new(name).size(11.0).color(MU));
+                });
+                muted(ui, "Con una imagen, lo oscuro (o lo opaco, si tiene transparencia) es pintura. La dureza no se aplica.");
+            }
+            param_row(ui, "Bordes húmedos", |ui| pct_slider(ui, &mut self.brush.wet_edges, 0.0, 100.0));
+        });
+        if self.brush.has_dynamics() {
+            ui.label(RichText::new("Dinámicas activas en este pincel").size(11.0).color(ACCENT2));
+        }
+        if self.brush.has_effects() {
+            ui.label(RichText::new("Efectos activos en este pincel").size(11.0).color(ACCENT2));
+        }
+    }
+
     /// Muestra un trazo de muestra con el pincel actual, hecho con el mismo motor que pinta en la escena.
     fn brush_preview(&mut self, ui: &mut egui::Ui) {
-        let spec = crate::brush::BrushSpec { size: self.brush_size.min(34.0), opacity: self.stroke_opacity, color: [232, 232, 232], params: self.brush, seed: 7 };
-        let key = format!("{:.2}|{:.2}|{:?}", spec.size, spec.opacity, spec.params);
+        let colorful = self.brush.hue_jitter > 0.0 || self.brush.sat_jitter > 0.0 || self.brush.bri_jitter > 0.0 || self.brush.fg_bg_jitter > 0.0;
+        let spec = self.brush_spec(if colorful { [240, 130, 60] } else { [232, 232, 232] }, self.brush_size.min(34.0), 7).with_color2(if colorful { [60, 150, 240] } else { [232, 232, 232] });
+        let names = (self.brush_tip_img.as_ref().map(|(n, _)| n.clone()), self.brush_tex_img.as_ref().map(|(n, _)| n.clone()));
+        let key = format!("{:.2}|{:.2}|{:?}|{:?}", spec.size, spec.opacity, spec.params, names);
         if self.brush_prev.as_ref().map(|(k, _)| k) != Some(&key) {
             let r = crate::brush::preview(spec, 240, 60);
             let img = egui::ColorImage::from_rgba_premultiplied([240, 60], &r.data);

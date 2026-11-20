@@ -400,11 +400,8 @@ impl LeonApp {
         }
         if let (Some(b), Some(tex)) = (ls.take_dirty(), self.brush_tex.as_mut()) {
             let (bw, bh) = ((b[2] - b[0]) as usize, (b[3] - b[1]) as usize);
-            let mut px = Vec::with_capacity(bw * bh * 4);
-            for y in b[1]..b[3] {
-                let i = ((y * ls.buf.w + b[0]) * 4) as usize;
-                px.extend_from_slice(&ls.buf.data[i..i + bw * 4]);
-            }
+            // Con los bordes húmedos aplicados, para que lo que se ve al dibujar sea lo que queda.
+            let px = ls.region_rgba(b);
             let img = egui::ColorImage::from_rgba_premultiplied([bw, bh], &px);
             tex.set_partial([b[0] as usize, b[1] as usize], img, egui::TextureOptions::LINEAR);
         }
