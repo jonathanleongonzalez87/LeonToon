@@ -178,12 +178,15 @@ impl VStyle {
 }
 
 /// Longitud acumulada de la línea, de 0 a 1 en cada punto.
-fn arc_fractions(points: &[[f32; 2]]) -> Vec<f32> {
+/// En un trazo cerrado el largo incluye el tramo que une el último punto con el primero, así el perfil es continuo
+/// en toda la vuelta: empieza en el primer punto (t = 0) y vuelve a él (t = 1).
+fn arc_fractions(points: &[[f32; 2]], closed: bool) -> Vec<f32> {
     let mut acc = vec![0.0f32; points.len()];
     for i in 1..points.len() {
         acc[i] = acc[i - 1] + dist(points[i - 1], points[i]);
     }
-    let total = acc.last().copied().unwrap_or(0.0);
+    let closing = if closed && points.len() > 2 { dist(points[points.len() - 1], points[0]) } else { 0.0 };
+    let total = acc.last().copied().unwrap_or(0.0) + closing;
     if total <= 1e-6 {
         return vec![0.0; points.len()];
     }
@@ -202,20 +205,17 @@ fn smooth(x: f32) -> f32 {
 /// Grosor en cada punto: el grosor base por el perfil por la presión.
 pub fn widths(points: &[[f32; 2]], pressure: &[f32], base: f32, style: &VStyle, closed: bool) -> Vec<f32> {
     let st = style.clone().clamped();
-    let t = arc_fractions(points);
+    let t = arc_fractions(points, closed);
     let use_pressure = st.pressure && pressure.len() == points.len();
     (0..points.len())
         .map(|i| {
-            let prof = if closed {
-                1.0
-            } else {
-                match st.profile {
-                    Profile::Uniform => 1.0,
-                    Profile::TaperStart => smooth(t[i] / st.taper),
-                    Profile::TaperEnd => smooth((1.0 - t[i]) / st.taper),
-                    Profile::TaperBoth => smooth(t[i] / st.taper).min(smooth((1.0 - t[i]) / st.taper)),
-                    Profile::Custom => shape_at(&st.shape, t[i]),
-                }
+            // El perfil se aplica también a los trazos cerrados: recorre la figura entera desde su primer punto.
+            let prof = match st.profile {
+                Profile::Uniform => 1.0,
+                Profile::TaperStart => smooth(t[i] / st.taper),
+                Profile::TaperEnd => smooth((1.0 - t[i]) / st.taper),
+                Profile::TaperBoth => smooth(t[i] / st.taper).min(smooth((1.0 - t[i]) / st.taper)),
+                Profile::Custom => shape_at(&st.shape, t[i]),
             };
             let pf = if use_pressure {
                 let p = pressure[i].clamp(0.0, 1.0).powf(st.curve);
