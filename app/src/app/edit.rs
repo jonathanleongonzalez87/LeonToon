@@ -62,13 +62,14 @@ impl LeonApp {
             return;
         }
         let f = self.frame;
-        if self.layer().drawing_at(f).map_or(true, |d| d.strokes.is_empty()) {
+        if self.layer().drawing_at(f).map_or(true, |d| d.is_empty()) {
             self.say("El dibujo ya está vacío");
             return;
         }
         self.checkpoint();
         if let Some(d) = self.project.layers[self.cl].drawing_at_mut(f) {
             d.strokes.clear();
+            d.raster = None;
         }
         self.say("Dibujo vaciado");
     }
@@ -413,6 +414,10 @@ impl LeonApp {
     fn fill_at(&mut self, p: [f32; 2]) {
         let f = self.frame;
         let color = rgba(self.color);
+        if self.layer().kind == LayerKind::Bitmap {
+            self.say("El relleno en capas de mapa de bits está pendiente: dibuja la forma con pincel o usa una capa vectorial");
+            return;
+        }
         let Some(d) = self.project.layers[self.cl].drawing_at_mut(f) else {
             self.say("No hay dibujo aquí para rellenar");
             return;
@@ -431,7 +436,17 @@ impl LeonApp {
     fn erase_segment(&mut self, a: [f32; 2], b: [f32; 2]) {
         let r = self.eraser_size * 0.5;
         let f = self.frame;
+        let size = self.eraser_size;
+        let bitmap = self.layer().kind == LayerKind::Bitmap;
         let Some(d) = self.project.layers[self.cl].drawing_at_mut(f) else { return };
+        if bitmap {
+            // Mapa de bits: el borrador quita píxeles.
+            if let Some(ra) = d.raster.as_mut() {
+                crate::render::erase_segment(Arc::make_mut(ra), a, b, size);
+                self.changed = true;
+            }
+            return;
+        }
         let len = ((b[0] - a[0]).powi(2) + (b[1] - a[1]).powi(2)).sqrt();
         let n = (len / (r * 0.5).max(0.5)).ceil().max(1.0) as usize;
         let mut changed = false;
@@ -542,12 +557,20 @@ impl LeonApp {
 
     fn commit_stroke(&mut self, s: Stroke) {
         let f = self.frame;
+        let (w, h) = (self.project.width, self.project.height);
         let layer = &mut self.project.layers[self.cl];
+        let bitmap = layer.kind == LayerKind::Bitmap;
         if layer.drawing_at(f).is_none() {
             layer.keys.insert(f, Default::default());
         }
         if let Some(d) = layer.drawing_at_mut(f) {
-            d.strokes.push(s);
+            if bitmap {
+                // Capa de mapa de bits: el trazo se pinta en los píxeles.
+                let r = d.raster.get_or_insert_with(|| Arc::new(crate::raster::Raster::new(w, h)));
+                crate::render::stamp_stroke(Arc::make_mut(r), &s);
+            } else {
+                d.strokes.push(s);
+            }
             self.changed = true;
         }
     }

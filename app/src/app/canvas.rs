@@ -223,7 +223,9 @@ impl LeonApp {
                             Pos2::new(origin.x + q[0] * z, origin.y + q[1] * z)
                         };
                         if let Some(dr) = layer.keys.get(&k) {
-                            paint_drawing(painter, dr, &mapg, z * tg.s.abs(), Some(tint), self.onion_weight(d, n) * op);
+                            let wgt = self.onion_weight(d, n) * op;
+                            paint_raster(painter, dr, &mapg, wgt, if dir < 0 { 1 } else { 2 });
+                            paint_drawing(painter, dr, &mapg, z * tg.s.abs(), Some(tint), wgt);
                         }
                     }
                 }
@@ -234,6 +236,7 @@ impl LeonApp {
                 painter.rect_filled(cam, 0.0, with_alpha(c32(layer.solid), alpha));
             }
             if let Some(d) = layer.drawing_at(f) {
+                paint_raster(painter, d, &map, alpha, 0);
                 paint_drawing(painter, d, &map, zs, None, alpha);
             }
             if live && li == self.cl {
@@ -318,13 +321,70 @@ pub(super) fn glow(p: &egui::Painter, c: Pos2, r0: f32, r1: f32, col: Color32) {
     p.add(Shape::mesh(mesh));
 }
 
+// ---------- Capas de mapa de bits en pantalla ----------
+
+thread_local! {
+    /// Texturas de los mapas de bits: (versión, tinte) → (textura, último pase en que se usó).
+    static RASTER_TEX: std::cell::RefCell<std::collections::HashMap<(u64, u8), (egui::TextureHandle, u64)>> = Default::default();
+}
+
+/// Textura de un mapa de bits. `tint`: 0 sin tinte, 1 papel cebolla anterior, 2 posterior.
+fn raster_tex_id(ctx: &egui::Context, r: &crate::raster::Raster, tint: u8) -> egui::TextureId {
+    let now = ctx.cumulative_pass_nr();
+    RASTER_TEX.with(|c| {
+        let mut c = c.borrow_mut();
+        let e = c.entry((r.ver, tint)).or_insert_with(|| {
+            let size = [r.w as usize, r.h as usize];
+            let img = if tint == 0 {
+                egui::ColorImage::from_rgba_premultiplied(size, &r.data)
+            } else {
+                let t = if tint == 1 { ONION_BEFORE } else { ONION_AFTER };
+                let mut px = Vec::with_capacity(r.data.len());
+                for p in r.data.chunks_exact(4) {
+                    let a = p[3] as u32;
+                    px.extend_from_slice(&[(t.r() as u32 * a / 255) as u8, (t.g() as u32 * a / 255) as u8, (t.b() as u32 * a / 255) as u8, p[3]]);
+                }
+                egui::ColorImage::from_rgba_premultiplied(size, &px)
+            };
+            (ctx.load_texture("raster", img, egui::TextureOptions::LINEAR), now)
+        });
+        e.1 = now;
+        e.0.id()
+    })
+}
+
+/// Libera las texturas de mapas de bits que hace rato que no se muestran.
+pub(super) fn prune_raster_tex(now: u64) {
+    RASTER_TEX.with(|c| c.borrow_mut().retain(|_, v| now.saturating_sub(v.1) < 600));
+}
+
+/// Dibuja los píxeles de un dibujo con la transformación `map` (2D, 3D, miniaturas y papel cebolla).
+pub(super) fn paint_raster(p: &egui::Painter, d: &Drawing, map: &dyn Fn([f32; 2]) -> Pos2, alpha: f32, tint: u8) {
+    let Some(r) = &d.raster else { return };
+    if r.is_blank() || alpha <= 0.0 {
+        return;
+    }
+    let id = raster_tex_id(p.ctx(), r, tint);
+    let (w, h) = (r.w as f32, r.h as f32);
+    let col = Color32::from_white_alpha((alpha.clamp(0.0, 1.0) * 255.0).round() as u8);
+    let mut mesh = egui::Mesh::with_texture(id);
+    for (pt, uv) in [([0.0, 0.0], Pos2::new(0.0, 0.0)), ([w, 0.0], Pos2::new(1.0, 0.0)), ([w, h], Pos2::new(1.0, 1.0)), ([0.0, h], Pos2::new(0.0, 1.0))] {
+        mesh.vertices.push(egui::epaint::Vertex { pos: map(pt), uv, color: col });
+    }
+    mesh.add_triangle(0, 1, 2);
+    mesh.add_triangle(0, 2, 3);
+    p.add(Shape::mesh(mesh));
+}
+
 /// Miniatura de un dibujo (en coordenadas de la escena w×h) dentro de `rect`.
 pub(super) fn paint_thumb(painter: &egui::Painter, rect: Rect, d: &Drawing, w: f32, h: f32, bg: Color32) {
     painter.rect_filled(rect, 1.0, bg);
     let z = (rect.width() / w).min(rect.height() / h);
     let o = rect.center() - Vec2::new(w, h) * z * 0.5;
     let clip = painter.with_clip_rect(rect.intersect(painter.clip_rect()));
-    paint_drawing(&clip, d, &|p| Pos2::new(o.x + p[0] * z, o.y + p[1] * z), z, None, 1.0);
+    let map = |p: [f32; 2]| Pos2::new(o.x + p[0] * z, o.y + p[1] * z);
+    paint_raster(&clip, d, &map, 1.0, 0);
+    paint_drawing(&clip, d, &map, z, None, 1.0);
 }
 
 // ---------- Dibujo de trazos en pantalla ----------

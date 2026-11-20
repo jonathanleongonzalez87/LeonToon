@@ -230,9 +230,17 @@ pub fn simplify(pts: &[[f32; 2]], eps: f32) -> Vec<[f32; 2]> {
 #[derive(Clone, Default, Serialize, Deserialize, Debug)]
 pub struct Drawing {
     pub strokes: Vec<Stroke>,
+    /// Píxeles de las capas de mapa de bits (las capas vectoriales no lo usan).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub raster: Option<Arc<crate::raster::Raster>>,
 }
 
 impl Drawing {
+    /// Sin trazos ni píxeles visibles.
+    pub fn is_empty(&self) -> bool {
+        self.strokes.is_empty() && self.raster.as_ref().map_or(true, |r| r.is_blank())
+    }
+
     pub fn erase(&mut self, p: [f32; 2], r: f32) -> bool {
         let mut changed = false;
         let mut out = Vec::with_capacity(self.strokes.len());
@@ -266,7 +274,7 @@ impl Drawing {
                 return s.fill;
             }
         }
-        None
+        self.raster.as_ref().and_then(|r| r.pick(p))
     }
 }
 
@@ -1003,7 +1011,7 @@ mod tests {
     fn xsheet_operations() {
         let mut l = Layer::new("a");
         for k in [0u32, 2, 4] {
-            l.keys.insert(k, Arc::new(Drawing { strokes: vec![Stroke::shape(ShapeKind::Line, [k as f32, 0.0], [1.0, 1.0], [0; 4], 1.0, None)] }));
+            l.keys.insert(k, Arc::new(Drawing { strokes: vec![Stroke::shape(ShapeKind::Line, [k as f32, 0.0], [1.0, 1.0], [0; 4], 1.0, None)], ..Default::default() }));
         }
         l.double_timing();
         assert_eq!(l.keys.keys().copied().collect::<Vec<_>>(), vec![0, 4, 8]);

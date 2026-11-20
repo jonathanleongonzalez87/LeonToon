@@ -152,7 +152,7 @@ impl LeonApp {
                 let r = cell_rect(c, f);
                 let key_idx = if layer.keys.contains_key(&f) { numbers.iter().position(|(k, _)| *k == f).map(|i| numbers[i].1) } else { None };
                 let shown = layer.key_at_or_before(f);
-                let empty = shown.map_or(true, |k| layer.keys[&k].strokes.is_empty());
+                let empty = shown.map_or(true, |k| layer.keys[&k].is_empty());
                 let mut bg = if shown.is_some() && !empty { Color32::from_gray(0x3a) } else { BG };
                 if key_idx.is_none() && shown.is_some() && !empty {
                     bg = Color32::from_gray(0x33);
@@ -169,7 +169,7 @@ impl LeonApp {
                 }
                 let txt_col = if !layer.visible { Color32::from_gray(0x66) } else { TX };
                 if let Some(i) = key_idx {
-                    let label = if layer.keys[&f].strokes.is_empty() { "×".to_string() } else { format!("{}", i + 1) };
+                    let label = if layer.keys[&f].is_empty() { "×".to_string() } else { format!("{}", i + 1) };
                     painter.text(r.center(), Align2::CENTER_CENTER, label, FontId::proportional((row_h - 5.0).clamp(8.0, 16.0)), txt_col);
                 } else if shown.is_some() && !empty {
                     let (a, b) = if horiz {
