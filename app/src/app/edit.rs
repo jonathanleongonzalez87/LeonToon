@@ -389,7 +389,7 @@ impl LeonApp {
                 let pencil = self.tool == Tool::Vector;
                 let (pressure, style) = if pencil { (vec![self.cur_pen().pressure], Some(self.vstyle.clone().clamped())) } else { (Vec::new(), None) };
                 Gesture::Paint {
-                    stroke: Stroke { kind: ShapeKind::Free, points: vec![p], color, width, closed: false, fill: None, pressure, style },
+                    stroke: Stroke { kind: ShapeKind::Free, points: vec![p], color, width, closed: false, fill: None, pressure, style, original: None },
                     smooth: p,
                     last_raw: p,
                 }
