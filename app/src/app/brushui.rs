@@ -67,7 +67,7 @@ impl LeonApp {
     }
 
     /// Máscara de una imagen guardada en el proyecto (se decodifica una vez y se guarda en memoria).
-    fn gray_by_id(&mut self, id: &str) -> Option<Arc<Gray>> {
+    pub(super) fn gray_by_id(&mut self, id: &str) -> Option<Arc<Gray>> {
         if let Some(g) = self.brush_img_cache.get(id) {
             return Some(g.clone());
         }
@@ -107,7 +107,7 @@ impl LeonApp {
     }
 
     /// Quita del proyecto las imágenes que ya no usa ningún preset ni el pincel en uso.
-    fn prune_images(&mut self) {
+    pub(super) fn prune_images(&mut self) {
         let mut used: Vec<String> = Vec::new();
         for s in self.project.brush_presets.iter().map(|p| &p.setup).chain(std::iter::once(&self.brush_setup_now())) {
             used.extend(s.tip.clone());
@@ -139,12 +139,9 @@ impl LeonApp {
         self.brush_preset = Some(p.key());
     }
 
-    /// Al abrir o crear un proyecto: le suma los pinceles de la biblioteca que no tenga y recupera el pincel guardado.
+    /// Al abrir o crear un proyecto: recupera el pincel guardado. Los pinceles de la biblioteca NO se mezclan solos con
+    /// el proyecto (un paquete grande lo haría crecer varios MB): se traen desde «Biblioteca…».
     pub(super) fn adopt_project_brush(&mut self) {
-        if let Some(dir) = safety::data_dir() {
-            let lib = presets::load_library(&dir);
-            presets::merge_library(&mut self.project.brush_presets, &mut self.project.brush_images, lib);
-        }
         self.brush_img_cache.clear();
         if let Some(st) = self.project.brush_state.clone() {
             self.apply_setup(&st.setup);
@@ -152,13 +149,75 @@ impl LeonApp {
         }
     }
 
-    /// Guarda en la biblioteca del usuario los pinceles del proyecto, para tenerlos en los demás proyectos.
-    fn save_library_now(&mut self) {
+    /// Pone en la biblioteca del usuario los pinceles del proyecto (sin pisar los demás) y quita los eliminados,
+    /// para poder traerlos a otros proyectos. Las capturas de pantalla de prueba no tocan la biblioteca.
+    pub(super) fn save_library_now(&mut self) {
+        if self.shot.is_some() {
+            self.brush_lib_removed.clear();
+            return;
+        }
+        let removed = std::mem::take(&mut self.brush_lib_removed);
         if let Some(dir) = safety::data_dir() {
-            let lib = presets::library_from(&self.project.brush_presets, &self.project.brush_images);
-            if let Err(e) = presets::save_library(&dir, &lib) {
+            if let Err(e) = presets::update_library(&dir, &self.project.brush_presets, &self.project.brush_images, &removed) {
                 safety::log_line(&format!("No se pudo guardar la biblioteca de pinceles: {e}"));
             }
+        }
+    }
+
+    /// Abre la ventana de la biblioteca con lo que hay guardado en el equipo.
+    pub(super) fn open_library_window(&mut self) {
+        let lib = safety::data_dir().map(|d| presets::load_library(&d)).unwrap_or_default();
+        self.lib_window = Some(lib);
+    }
+
+    /// Trae al proyecto los pinceles de una categoría de la biblioteca (o de todas, con None).
+    fn bring_from_library(&mut self, category: Option<&str>) {
+        let Some(lib) = self.lib_window.clone() else { return };
+        let filtered = presets::Library { presets: lib.presets.iter().filter(|p| category.map_or(true, |c| p.category == c)).cloned().collect(), ..lib.clone() };
+        let n = presets::merge_library(&mut self.project.brush_presets, &mut self.project.brush_images, filtered);
+        self.say(format!("{n} pinceles traídos de la biblioteca al proyecto"));
+    }
+
+    /// Ventana «Biblioteca de pinceles»: qué hay en el equipo que este proyecto todavía no tiene.
+    pub(super) fn library_dialog(&mut self, ctx: &egui::Context) {
+        let Some(lib) = &self.lib_window else { return };
+        let offer = presets::library_offer(&self.project.brush_presets, lib);
+        let total = lib.presets.len();
+        let mut close = false;
+        let mut bring: Option<Option<String>> = None;
+        egui::Window::new("Biblioteca de pinceles").collapsible(false).resizable(false).anchor(Align2::CENTER_CENTER, [0.0, 0.0]).show(ctx, |ui| {
+            ui.set_width(400.0);
+            ui.label(RichText::new(format!("Tu biblioteca guarda {total} pinceles en este equipo. Los pinceles que guardas o importas se copian aquí; un proyecto solo lleva los que le traes, para no crecer de más.")).size(11.5).color(MU));
+            ui.add_space(4.0);
+            if offer.is_empty() {
+                ui.label("No hay pinceles en la biblioteca que este proyecto no tenga.");
+            } else {
+                egui::ScrollArea::vertical().max_height(240.0).id_salt("lib_scroll").show(ui, |ui| {
+                    for (cat, n, bytes) in &offer {
+                        ui.horizontal(|ui| {
+                            ui.label(format!("{cat} · {n} {}", if *n == 1 { "pincel" } else { "pinceles" }));
+                            ui.label(RichText::new(format!("≈ {:.1} MB", *bytes as f32 / 1_000_000.0)).size(11.0).color(INK3));
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                if ui.small_button("Traer").clicked() {
+                                    bring = Some(Some(cat.clone()));
+                                }
+                            });
+                        });
+                    }
+                });
+                if offer.len() > 1 && ui.button("Traer todo").clicked() {
+                    bring = Some(None);
+                }
+            }
+            if ui.button("Cerrar").clicked() {
+                close = true;
+            }
+        });
+        if let Some(cat) = bring {
+            self.bring_from_library(cat.as_deref());
+        }
+        if close {
+            self.lib_window = None;
         }
     }
 
@@ -171,12 +230,17 @@ impl LeonApp {
                 let setup = self.brush_setup_now();
                 Ok((presets::save_new(&mut self.project.brush_presets, &name, &cat, setup), "guardado"))
             }
-            PresetEdit::Rename => key.ok_or_else(need).and_then(|k| presets::rename(&mut self.project.brush_presets, &k, &name)).map(|k| (k, "renombrado")),
-            PresetEdit::Category => key.ok_or_else(need).and_then(|k| presets::set_category(&mut self.project.brush_presets, &k, &cat)).map(|k| (k, "movido de categoría")),
+            PresetEdit::Rename => key.clone().ok_or_else(need).and_then(|k| presets::rename(&mut self.project.brush_presets, &k, &name)).map(|k| (k, "renombrado")),
+            PresetEdit::Category => key.clone().ok_or_else(need).and_then(|k| presets::set_category(&mut self.project.brush_presets, &k, &cat)).map(|k| (k, "movido de categoría")),
             PresetEdit::None => return,
         };
         match res {
             Ok((k, what)) => {
+                if self.preset_ui.edit != PresetEdit::SaveAs {
+                    if let Some(old) = key {
+                        self.brush_lib_removed.push(old);
+                    }
+                }
                 self.say(format!("Pincel «{}» {what} en «{}»", k.1, k.0));
                 self.brush_preset = Some(k);
                 self.preset_ui = PresetUi::default();
@@ -278,16 +342,36 @@ impl LeonApp {
             if !user_sel && selected.is_some() {
                 muted(ui, "Los pinceles incluidos no se modifican: duplícalo para tener tu propia copia.");
             }
+            ui.horizontal_wrapped(|ui| {
+                if ui.small_button("Importar .abr…").on_hover_text("Pinceles de Photoshop: formas y parámetros que se puedan leer; avisa de lo demás").clicked() {
+                    self.abr_start_import();
+                }
+                if ui.small_button("Biblioteca…").on_hover_text("Trae al proyecto pinceles guardados antes en este equipo").clicked() {
+                    self.open_library_window();
+                }
+                if ui.small_button("Exportar .abr…").on_hover_text("Guarda pinceles en un archivo de Photoshop (versión 2) y avisa de lo que no cabe").clicked() {
+                    self.abr_start_export();
+                }
+            });
+            // Lo que no se conservó al importar este pincel.
+            if let Some(p) = selected.as_ref().filter(|p| !p.notes.is_empty()) {
+                egui::CollapsingHeader::new(RichText::new(format!("No se conservó de Photoshop ({})", p.notes.len())).size(11.5).color(ACCENT2)).id_salt("preset_notes").show(ui, |ui| {
+                    for n in &p.notes {
+                        ui.label(RichText::new(format!("• {n}")).size(11.0).color(MU));
+                    }
+                });
+            }
 
             // Confirmar la eliminación
             if self.preset_ui.confirm_delete {
                 if let Some(k) = cur.clone().filter(|_| user_sel) {
-                    ui.label(RichText::new(format!("¿Eliminar «{}»? No se puede deshacer.", k.1)).size(11.5).color(ACCENT2));
+                    ui.label(RichText::new(format!("¿Eliminar «{}» de este proyecto y de tu biblioteca? No se puede deshacer.", k.1)).size(11.5).color(ACCENT2));
                     ui.horizontal(|ui| {
                         if ui.small_button("Sí, eliminar").clicked() {
                             match presets::remove(&mut self.project.brush_presets, &k) {
                                 Ok(()) => {
-                                    self.say(format!("Pincel «{}» eliminado", k.1));
+                                    self.say(format!("Pincel «{}» eliminado del proyecto y de la biblioteca", k.1));
+                                    self.brush_lib_removed.push(k.clone());
                                     self.brush_preset = None;
                                     self.preset_ui = PresetUi::default();
                                     self.prune_images();

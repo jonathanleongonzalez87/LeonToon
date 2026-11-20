@@ -13,6 +13,7 @@ mod start;
 mod select;
 mod shell;
 mod storyboard;
+mod abrui;
 mod brushui;
 mod hud;
 mod view3d;
@@ -258,6 +259,13 @@ pub struct LeonApp {
     /// Preset del que viene el pincel en uso (categoría y nombre) y editor de presets del panel N.
     brush_preset: Option<crate::presets::PresetKey>,
     preset_ui: brushui::PresetUi,
+    /// Pinceles eliminados o renombrados que hay que quitar de la biblioteca del usuario, y su ventana.
+    brush_lib_removed: Vec<crate::presets::PresetKey>,
+    lib_window: Option<crate::presets::Library>,
+    /// Ventanas de importar y exportar pinceles de Photoshop (.abr) y su informe.
+    abr_import: Option<abrui::ImportUi>,
+    abr_export: Option<abrui::ExportUi>,
+    abr_report: Option<abrui::ReportUi>,
     /// Máscaras ya decodificadas de las imágenes guardadas en el proyecto.
     brush_img_cache: std::collections::HashMap<String, std::sync::Arc<crate::brush::Gray>>,
     brush_tex: Option<egui::TextureHandle>,
@@ -478,6 +486,11 @@ impl LeonApp {
             brush_preset: None,
             preset_ui: Default::default(),
             brush_img_cache: Default::default(),
+            brush_lib_removed: Vec::new(),
+            lib_window: None,
+            abr_import: None,
+            abr_export: None,
+            abr_report: None,
             brush_tex: None,
             brush_prev: None,
             view3d: false,
@@ -589,6 +602,9 @@ impl LeonApp {
                     app.apply_preset(&p);
                 }
             }
+        }
+        if let Ok(p) = std::env::var("LEONTOON_ABR") {
+            app.abr_screenshot_demo(std::path::Path::new(&p));
         }
         if let Some(p) = open {
             app.load_from(&p);

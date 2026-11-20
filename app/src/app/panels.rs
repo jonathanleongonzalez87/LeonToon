@@ -93,7 +93,7 @@ impl LeonApp {
                     Tool::Eraser => &mut self.eraser_size,
                     _ => &mut self.shape_width,
                 };
-                ui.add(egui::Slider::new(size, 1.0..=300.0).logarithmic(true).max_decimals(0));
+                ui.add(egui::Slider::new(size, 1.0..=1000.0).logarithmic(true).max_decimals(0));
                 if t != Tool::Eraser {
                     ui.label(RichText::new("Suavizado").color(MU));
                     let mut s = self.smoothing * 100.0;
@@ -530,7 +530,7 @@ impl LeonApp {
                         _ => &mut self.shape_width,
                     };
                     param_row(ui, if t == Tool::Brush { "Tamaño" } else { "Grosor" }, |ui| {
-                        ui.add(egui::Slider::new(size, 1.0..=300.0).logarithmic(true).max_decimals(0).suffix(" px"));
+                        ui.add(egui::Slider::new(size, 1.0..=1000.0).logarithmic(true).max_decimals(0).suffix(" px"));
                     });
                     if t != Tool::Eraser {
                         param_row(ui, "Opacidad", |ui| pct_slider(ui, &mut self.stroke_opacity, 15.0, 100.0));
@@ -669,8 +669,14 @@ impl LeonApp {
         fold(ui, "fold_transfer", "Transferencia", |ui| {
             param_row(ui, "Var. opac.", |ui| pct_slider(ui, &mut self.brush.opacity_jitter, 0.0, 100.0));
             param_row(ui, "Ctrl. opac.", |ui| control_combo(ui, "ctl_opacity", &mut self.brush.opacity_control));
+            if self.brush.opacity_control != Control::Off {
+                param_row(ui, "Opac. mín.", |ui| pct_slider(ui, &mut self.brush.opacity_min, 0.0, 100.0));
+            }
             param_row(ui, "Var. flujo", |ui| pct_slider(ui, &mut self.brush.flow_jitter, 0.0, 100.0));
             param_row(ui, "Ctrl. flujo", |ui| control_combo(ui, "ctl_flow", &mut self.brush.flow_control));
+            if self.brush.flow_control != Control::Off {
+                param_row(ui, "Flujo mín.", |ui| pct_slider(ui, &mut self.brush.flow_min, 0.0, 100.0));
+            }
             muted(ui, "El control por presión usa el lápiz de tableta (la vista previa simula una presión que sube y baja). La inclinación solo actúa si el dispositivo la entrega; hoy el programa no la recibe, y sin dato no cambia nada.");
         });
         fold(ui, "fold_scatter", "Dispersión", |ui| {

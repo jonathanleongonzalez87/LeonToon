@@ -41,7 +41,7 @@ impl BrushSetup {
     /// Valores dentro de los rangos que acepta la interfaz.
     pub fn clamped(mut self) -> Self {
         self.params = self.params.clamped();
-        self.size = if self.size.is_finite() { self.size.clamp(1.0, 300.0) } else { 8.0 };
+        self.size = if self.size.is_finite() { self.size.clamp(1.0, 1000.0) } else { 8.0 };
         self.opacity = if self.opacity.is_finite() { self.opacity.clamp(0.05, 1.0) } else { 1.0 };
         self.smoothing = if self.smoothing.is_finite() { self.smoothing.clamp(0.0, 0.85) } else { 0.35 };
         self
@@ -58,6 +58,9 @@ pub struct BrushPreset {
     /// Los pinceles incluidos con el programa no se guardan en los archivos ni se pueden modificar.
     #[serde(skip)]
     pub builtin: bool,
+    /// Lo que no se pudo conservar al importar el pincel de otro programa (vacío si no viene de un archivo).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub notes: Vec<String>,
 }
 
 /// Identificador de un preset: categoría y nombre.
@@ -127,7 +130,7 @@ impl BrushImage {
 // ---------------- Pinceles incluidos ----------------
 
 fn builtin_preset(category: &str, name: &str, size: f32, opacity: f32, params: BrushParams) -> BrushPreset {
-    BrushPreset { name: name.into(), category: category.into(), setup: BrushSetup { params, size, opacity, ..Default::default() }, builtin: true }
+    BrushPreset { name: name.into(), category: category.into(), setup: BrushSetup { params, size, opacity, ..Default::default() }, builtin: true, notes: Vec::new() }
 }
 
 /// Los pinceles que trae el programa, en cuatro categorías.
@@ -201,9 +204,14 @@ fn clean_category(c: &str) -> String {
 
 /// Guarda la configuración como pincel nuevo (con un nombre libre si el pedido ya existe).
 pub fn save_new(user: &mut Vec<BrushPreset>, name: &str, category: &str, setup: BrushSetup) -> PresetKey {
+    save_new_with_notes(user, name, category, setup, Vec::new())
+}
+
+/// Igual que save_new, anotando lo que no se pudo conservar al importar el pincel de otro programa.
+pub fn save_new_with_notes(user: &mut Vec<BrushPreset>, name: &str, category: &str, setup: BrushSetup, notes: Vec<String>) -> PresetKey {
     let category = clean_category(category);
     let name = unique_name(user, &category, name);
-    user.push(BrushPreset { name: name.clone(), category: category.clone(), setup: setup.clamped(), builtin: false });
+    user.push(BrushPreset { name: name.clone(), category: category.clone(), setup: setup.clamped(), builtin: false, notes });
     (category, name)
 }
 
@@ -212,7 +220,7 @@ pub fn duplicate(user: &mut Vec<BrushPreset>, key: &PresetKey) -> Result<PresetK
     let src = find(user, key).ok_or("Ese pincel ya no existe")?;
     let category = if src.builtin { USER_CATEGORY.to_string() } else { src.category.clone() };
     let name = unique_name(user, &category, &format!("{} (copia)", src.name));
-    user.push(BrushPreset { name: name.clone(), category: category.clone(), setup: src.setup, builtin: false });
+    user.push(BrushPreset { name: name.clone(), category: category.clone(), setup: src.setup, builtin: false, notes: src.notes });
     Ok((category, name))
 }
 
@@ -356,15 +364,44 @@ pub fn save_library(dir: &Path, lib: &Library) -> Result<(), String> {
     std::fs::rename(&tmp, dir.join(LIBRARY_FILE)).map_err(|e| e.to_string())
 }
 
-/// Arma la biblioteca con los presets del proyecto y solo las imágenes que usan.
-pub fn library_from(user: &[BrushPreset], images: &[BrushImage]) -> Library {
-    let used = |id: &Option<String>| id.clone();
-    let mut ids: Vec<String> = Vec::new();
-    for p in user {
-        ids.extend(used(&p.setup.tip));
-        ids.extend(used(&p.setup.texture));
+/// Actualiza el archivo de la biblioteca SIN pisar lo que ya tenía: quita los pinceles eliminados, pone o reemplaza
+/// los dados (con sus imágenes) y deja solo las imágenes que algún pincel usa. Los demás pinceles de la biblioteca no se tocan.
+pub fn update_library(dir: &Path, upserts: &[BrushPreset], images: &[BrushImage], removed: &[PresetKey]) -> Result<(), String> {
+    let mut lib = load_library(dir);
+    lib.presets.retain(|p| !removed.contains(&p.key()));
+    for u in upserts {
+        match lib.presets.iter_mut().find(|p| p.key() == u.key()) {
+            Some(slot) => *slot = u.clone(),
+            None => lib.presets.push(u.clone()),
+        }
     }
-    Library { version: 1, presets: user.to_vec(), images: images.iter().filter(|im| ids.contains(&im.id)).cloned().collect() }
+    for id in upserts.iter().flat_map(|p| [p.setup.tip.clone(), p.setup.texture.clone()]).flatten() {
+        if !lib.images.iter().any(|i| i.id == id) {
+            if let Some(im) = images.iter().find(|i| i.id == id) {
+                lib.images.push(im.clone());
+            }
+        }
+    }
+    let used: Vec<String> = lib.presets.iter().flat_map(|p| [p.setup.tip.clone(), p.setup.texture.clone()]).flatten().collect();
+    lib.images.retain(|i| used.contains(&i.id));
+    save_library(dir, &lib)
+}
+
+/// Pinceles de la biblioteca que el proyecto todavía no tiene, por categoría, con su número y el tamaño aproximado
+/// (en bytes) de las imágenes que traerían.
+pub fn library_offer(user: &[BrushPreset], lib: &Library) -> Vec<(String, usize, usize)> {
+    let mut out: Vec<(String, usize, usize)> = Vec::new();
+    for p in lib.presets.iter().filter(|p| !taken(user, &p.category, &p.name)) {
+        let bytes: usize = [&p.setup.tip, &p.setup.texture].into_iter().flatten().filter_map(|id| lib.images.iter().find(|i| &i.id == id)).map(|i| i.png.len()).sum();
+        match out.iter_mut().find(|(c, _, _)| *c == p.category) {
+            Some(e) => {
+                e.1 += 1;
+                e.2 += bytes;
+            }
+            None => out.push((p.category.clone(), 1, bytes)),
+        }
+    }
+    out
 }
 
 /// Añade al proyecto los presets de la biblioteca que no tiene (por categoría y nombre), con sus imágenes.

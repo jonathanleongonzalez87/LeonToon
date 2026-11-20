@@ -125,8 +125,12 @@ pub struct BrushParams {
     // ---- Transferencia ----
     pub opacity_jitter: f32,
     pub opacity_control: Control,
+    /// Opacidad mínima de la marca cuando el control está al mínimo, 0 a 1.
+    pub opacity_min: f32,
     pub flow_jitter: f32,
     pub flow_control: Control,
+    /// Flujo mínimo de la marca cuando el control está al mínimo, 0 a 1.
+    pub flow_min: f32,
 
     // ---- Dispersión ----
     /// Distancia de dispersión, como múltiplo del tamaño (0 = sin dispersión, 10 = 1000 %).
@@ -188,8 +192,10 @@ impl Default for BrushParams {
             min_roundness: 0.25,
             opacity_jitter: 0.0,
             opacity_control: Control::Off,
+            opacity_min: 0.0,
             flow_jitter: 0.0,
             flow_control: Control::Off,
+            flow_min: 0.0,
             scatter: 0.0,
             scatter_both: false,
             scatter_count: 1,
@@ -228,7 +234,9 @@ impl BrushParams {
             roundness_jitter: u(self.roundness_jitter),
             min_roundness: self.min_roundness.clamp(0.05, 1.0),
             opacity_jitter: u(self.opacity_jitter),
+            opacity_min: u(self.opacity_min),
             flow_jitter: u(self.flow_jitter),
+            flow_min: u(self.flow_min),
             scatter: self.scatter.clamp(0.0, 10.0),
             scatter_count: self.scatter_count.clamp(1, 16),
             count_jitter: u(self.count_jitter),
@@ -589,8 +597,9 @@ impl LiveStroke {
         let angle = p.angle + p.angle_jitter * 180.0 * (self.rng.next() * 2.0 - 1.0);
         let min_r = p.min_roundness.min(p.roundness);
         let roundness = (p.roundness - (p.roundness - min_r) * p.roundness_jitter * self.rng.next()).clamp(0.05, 1.0);
-        let flow = (p.flow * (1.0 - p.flow_jitter * self.rng.next()) * control_factor(p.flow_control, pen)).clamp(0.0, 1.0);
-        let cap = ((1.0 - p.opacity_jitter * self.rng.next()) * control_factor(p.opacity_control, pen)).clamp(0.0, 1.0);
+        let with_min = |c: Control, min: f32| if c == Control::Off { 1.0 } else { min + (1.0 - min) * control_factor(c, pen) };
+        let flow = (p.flow * (1.0 - p.flow_jitter * self.rng.next()) * with_min(p.flow_control, p.flow_min)).clamp(0.0, 1.0);
+        let cap = ((1.0 - p.opacity_jitter * self.rng.next()) * with_min(p.opacity_control, p.opacity_min)).clamp(0.0, 1.0);
 
         // Color: variación entre principal y secundario, y luego de tono, saturación y brillo.
         let fg = [self.spec.color[0] as f32 / 255.0, self.spec.color[1] as f32 / 255.0, self.spec.color[2] as f32 / 255.0];
@@ -687,6 +696,11 @@ impl LiveStroke {
         let tex_on = p.texture != TexKind::None;
         let w = self.buf.w;
         let tip = self.spec.tip.clone();
+        let tip_aspect = match &tip {
+            Some(t) if t.w >= t.h => (1.0, t.h as f32 / t.w as f32),
+            Some(t) => (t.w as f32 / t.h as f32, 1.0),
+            None => (1.0, 1.0),
+        };
         let tex_img = self.spec.texture_img.clone();
         for y in y0..y1 {
             for x in x0..x1 {
@@ -694,7 +708,9 @@ impl LiveStroke {
                 let u = dx * ca + dy * sa;
                 let v = -dx * sa + dy * ca;
                 let mut cover = if let Some(t) = &tip {
-                    let (tu, tv) = (u / r, v / minor);
+                    // La imagen mantiene su proporción: el lado mayor mide el diámetro de la marca.
+                    let (ax, ay) = tip_aspect;
+                    let (tu, tv) = (u / (r * ax), v / (r * ay * m.roundness));
                     if tu.abs() >= 1.0 || tv.abs() >= 1.0 {
                         continue;
                     }

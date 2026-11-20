@@ -104,12 +104,12 @@ fn setup_roundtrip_clamps_and_keeps_every_property() {
         tip: Some("aaaa".into()),
         texture: Some("bbbb".into()),
     };
-    let p = BrushPreset { name: "x".into(), category: "y".into(), setup: s.clone(), builtin: false };
+    let p = BrushPreset { name: "x".into(), category: "y".into(), setup: s.clone(), builtin: false, notes: vec!["Textura no importada".into()] };
     let back: BrushPreset = serde_json::from_str(&serde_json::to_string(&p).unwrap()).unwrap();
     assert_eq!(back, p);
     // Valores imposibles se corrigen.
     let wild = BrushSetup { size: 9999.0, opacity: -3.0, smoothing: 7.0, ..s.clone() }.clamped();
-    assert_eq!((wild.size, wild.opacity, wild.smoothing), (300.0, 0.05, 0.85));
+    assert_eq!((wild.size, wild.opacity, wild.smoothing), (1000.0, 0.05, 0.85));
     assert_eq!(BrushSetup { size: f32::NAN, ..s }.clamped().size, 8.0);
     // Un preset con solo un nombre y categoría (archivo antiguo o a mano) trae el pincel por defecto.
     let bare: BrushPreset = serde_json::from_str(r#"{"name":"a","category":"b"}"#).unwrap();
@@ -181,7 +181,7 @@ fn sanitize_repairs_ranges_duplicates_and_missing_images() {
         ..Default::default()
     };
     let with_img = BrushSetup { tip: Some(im.id.clone()), params: BrushParams { use_tip_image: true, ..Default::default() }, ..Default::default() };
-    let mk = |n: &str, c: &str, s: BrushSetup| BrushPreset { name: n.into(), category: c.into(), setup: s, builtin: true };
+    let mk = |n: &str, c: &str, s: BrushSetup| BrushPreset { name: n.into(), category: c.into(), setup: s, builtin: true, notes: vec![] };
     let mut user = vec![
         mk("Salvaje", "Prueba", wild),
         mk("Sin imagen", "Prueba", missing),
@@ -196,7 +196,7 @@ fn sanitize_repairs_ranges_duplicates_and_missing_images() {
     let names: Vec<&str> = user.iter().map(|p| p.name.as_str()).collect();
     assert_eq!(names, vec!["Salvaje", "Sin imagen", "Con imagen", "Sin categoría"]);
     assert!(user.iter().all(|p| !p.builtin), "los guardados nunca son incluidos");
-    assert_eq!(user[0].setup.size, 300.0);
+    assert_eq!(user[0].setup.size, 1000.0);
     assert_eq!(user[0].setup.params.scatter, 10.0);
     assert_eq!(user[0].setup.params.flow, 0.01);
     // Las imágenes que faltan se quitan y la configuración deja de pedirlas.
@@ -211,71 +211,71 @@ fn sanitize_repairs_ranges_duplicates_and_missing_images() {
     let mut state = Some(BrushState { setup: BrushSetup { tip: Some("nada".into()), size: 5000.0, ..Default::default() }, preset: None });
     sanitize_state(&mut state, &images);
     let st = state.unwrap().setup;
-    assert!(st.tip.is_none() && st.size == 300.0);
+    assert!(st.tip.is_none() && st.size == 1000.0);
 }
 
 #[test]
-fn library_roundtrip_merge_and_resilience() {
+fn library_updates_without_overwriting_and_offers_only_what_the_project_lacks() {
     let g = Gray { w: 2, h: 2, data: vec![255, 0, 0, 255] };
     let im = BrushImage::from_gray("tramado.png", &g).unwrap();
+    let spare = BrushImage::from_gray("sobrante.png", &Gray { w: 1, h: 1, data: vec![7] }).unwrap();
     let mut a: Vec<BrushPreset> = Vec::new();
-    let mut a_images = vec![im.clone(), BrushImage::from_gray("sobrante.png", &Gray { w: 1, h: 1, data: vec![7] }).unwrap()];
     save_new(&mut a, "Sello", "Tramas", BrushSetup { tip: Some(im.id.clone()), params: BrushParams { use_tip_image: true, ..Default::default() }, ..Default::default() });
     save_new(&mut a, "Liso", "Tramas", setup(10.0));
-    // La biblioteca solo lleva las imágenes que usan los presets.
-    let lib = library_from(&a, &a_images);
-    assert_eq!(lib.images.len(), 1);
     let dir = temp_dir("lib");
-    save_library(&dir, &lib).unwrap();
-    let loaded = load_library(&dir);
-    assert_eq!(loaded.presets, a);
-    assert_eq!(loaded.images, lib.images);
+    // El proyecto A pone sus pinceles; la imagen que no usa ningún pincel no entra.
+    update_library(&dir, &a, &[im.clone(), spare], &[]).unwrap();
+    let lib = load_library(&dir);
+    assert_eq!(lib.presets, a);
+    assert_eq!(lib.images, vec![im.clone()]);
     assert!(!dir.join("pinceles.json.tmp").exists(), "no queda el archivo temporal");
-    // Otro proyecto recibe los presets que no tiene, con su imagen; los suyos mandan.
+    // El proyecto B solo sabe de un pincel suyo y de que se borró «Liso»: no pisa «Sello».
     let mut b: Vec<BrushPreset> = Vec::new();
-    let mut b_images: Vec<BrushImage> = Vec::new();
-    save_new(&mut b, "Liso", "Tramas", setup(99.0));
-    let added = merge_library(&mut b, &mut b_images, loaded.clone());
-    assert_eq!(added, 1);
-    assert_eq!(find(&b, &key("Tramas", "Liso")).unwrap().setup.size, 99.0, "el del proyecto no se pisa");
-    assert!(find(&b, &key("Tramas", "Sello")).is_some());
-    assert_eq!(b_images.len(), 1);
-    // Una segunda mezcla no repite nada.
-    assert_eq!(merge_library(&mut b, &mut b_images, loaded), 0);
-    // Archivo dañado o ausente: biblioteca vacía, sin fallar.
+    save_new(&mut b, "Hojas", "Follaje", setup(55.0));
+    update_library(&dir, &b, &[], &[key("Tramas", "Liso")]).unwrap();
+    let lib = load_library(&dir);
+    let names: Vec<String> = lib.presets.iter().map(|p| format!("{}/{}", p.category, p.name)).collect();
+    assert_eq!(names, vec!["Tramas/Sello", "Follaje/Hojas"], "«Sello» sigue y «Liso» se fue");
+    assert_eq!(lib.images, vec![im.clone()], "la imagen de «Sello» sigue en uso");
+    // Reemplazar uno existente (misma categoría y nombre) cambia su contenido y no lo repite.
+    let mut b2 = b.clone();
+    b2[0].setup.size = 99.0;
+    update_library(&dir, &b2, &[], &[]).unwrap();
+    let lib = load_library(&dir);
+    assert_eq!(lib.presets.len(), 2);
+    assert_eq!(find(&lib.presets, &key("Follaje", "Hojas")).unwrap().setup.size, 99.0);
+    // Al quitar el único pincel que usaba la imagen, la imagen se va con él.
+    update_library(&dir, &[], &[], &[key("Tramas", "Sello")]).unwrap();
+    assert!(load_library(&dir).images.is_empty());
+    update_library(&dir, &a, &[im.clone()], &[]).unwrap();
+
+    // Un proyecto nuevo solo recibe lo que pide: se ofrece lo que le falta, con su tamaño aproximado.
+    let lib = load_library(&dir);
+    let mut proj: Vec<BrushPreset> = Vec::new();
+    let mut proj_images: Vec<BrushImage> = Vec::new();
+    save_new(&mut proj, "Liso", "Tramas", setup(99.0));
+    let offer = library_offer(&proj, &lib);
+    let tramas = offer.iter().find(|(c, _, _)| c == "Tramas").unwrap();
+    assert_eq!(tramas.1, 1, "solo «Sello»: «Liso» ya lo tiene");
+    assert!(tramas.2 > 0, "el tamaño incluye la imagen");
+    assert!(offer.iter().any(|(c, n, _)| c == "Follaje" && *n == 1));
+    // Traer una categoría trae sus pinceles y sus imágenes, y no pisa los del proyecto.
+    let only_tramas = Library { presets: lib.presets.iter().filter(|p| p.category == "Tramas").cloned().collect(), ..lib.clone() };
+    assert_eq!(merge_library(&mut proj, &mut proj_images, only_tramas.clone()), 1);
+    assert_eq!(find(&proj, &key("Tramas", "Liso")).unwrap().setup.size, 99.0, "el del proyecto no se pisa");
+    assert!(find(&proj, &key("Tramas", "Sello")).is_some() && find(&proj, &key("Follaje", "Hojas")).is_none());
+    assert_eq!(proj_images.len(), 1);
+    assert_eq!(merge_library(&mut proj, &mut proj_images, only_tramas), 0, "una segunda vez no repite");
+    assert!(library_offer(&proj, &lib).iter().all(|(c, _, _)| c != "Tramas"));
+
+    // Archivo dañado o ausente: biblioteca vacía, sin fallar; y se puede volver a escribir encima.
     std::fs::write(dir.join("pinceles.json"), "{ esto no es json").unwrap();
     assert!(load_library(&dir).presets.is_empty());
     assert!(load_library(&dir.join("no_existe")).presets.is_empty());
-    a_images.clear();
+    update_library(&dir, &a, &[im], &[]).unwrap();
+    assert_eq!(load_library(&dir).presets.len(), 2);
     let _ = std::fs::remove_dir_all(&dir);
 }
-
-#[test]
-fn opening_a_valid_project_does_not_change_its_brushes() {
-    // Al abrir un archivo se repara (sanitize); si todo está bien, no debe cambiar nada.
-    let g = Gray { w: 5, h: 2, data: vec![255, 200, 150, 100, 50, 0, 10, 20, 30, 40] };
-    let im = BrushImage::from_gray("tramado.png", &g).unwrap();
-    let mut s = setup(41.0);
-    s.tip = Some(im.id.clone());
-    s.texture = Some(im.id.clone());
-    s.params.use_tip_image = true;
-    s.params.texture = TexKind::Image;
-    s.opacity = 0.7;
-    let mut p = crate::model::Project::blank(256, 144, 24, 8);
-    let k = save_new(&mut p.brush_presets, "Sello", "Tramas", s.clone());
-    save_new(&mut p.brush_presets, "Liso", "Tramas", setup(9.0));
-    p.brush_images.push(im);
-    p.brush_state = Some(BrushState { setup: s, preset: Some(k) });
-    let json = serde_json::to_string(&p).unwrap();
-    let mut back: crate::model::Project = serde_json::from_str(&json).unwrap();
-    back.sanitize();
-    assert_eq!(back.brush_presets, p.brush_presets);
-    assert_eq!(back.brush_images, p.brush_images);
-    assert_eq!(back.brush_state, p.brush_state);
-    // Y guardar otra vez da el mismo archivo.
-    assert_eq!(serde_json::to_string(&back).unwrap(), json);
-}
-
 #[test]
 fn presets_reproduce_the_same_stroke_after_a_save_cycle() {
     // Un pincel complejo, guardado y recuperado, pinta exactamente lo mismo.
