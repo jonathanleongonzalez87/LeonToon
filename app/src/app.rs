@@ -251,6 +251,9 @@ pub struct LeonApp {
     brush_live: Option<crate::brush::LiveStroke>,
     /// Última presión leída del lápiz (1 si no hay lápiz).
     pen_pressure: f32,
+    /// Imágenes cargadas para la punta y para la textura del pincel (nombre, máscara).
+    brush_tip_img: Option<(String, std::sync::Arc<crate::brush::Gray>)>,
+    brush_tex_img: Option<(String, std::sync::Arc<crate::brush::Gray>)>,
     brush_tex: Option<egui::TextureHandle>,
     brush_prev: Option<(String, egui::TextureHandle)>,
     view3d: bool,
@@ -376,21 +379,26 @@ impl LeonApp {
             l.kind = LayerKind::Bitmap;
             if std::env::var("LEONTOON_BRUSH").is_ok() {
                 // Tres pinceles del motor: duro, difuso con poco flujo y plano girado (caligráfico).
-                use crate::brush::{BrushParams, BrushSpec, Control, LiveStroke, Pen};
-                let d = BrushParams::default();
+                use crate::brush::{BrushParams as P, BrushSpec as S, Control, LiveStroke, Pen, TexKind};
+                let d = P::default();
                 let specs = [
-                    BrushSpec { size: 26.0, opacity: 1.0, color: [230, 60, 160], params: d, seed: 1 },
-                    BrushSpec { size: 40.0, opacity: 1.0, color: [30, 120, 230], params: BrushParams { hardness: 0.1, flow: 0.25, spacing: 6.0, ..d }, seed: 2 },
-                    BrushSpec { size: 38.0, opacity: 1.0, color: [20, 150, 80], params: BrushParams { roundness: 0.25, angle: 40.0, spacing: 40.0, ..d }, seed: 3 },
-                    // Presión que sube y baja: controla el tamaño (afinado en los extremos) y el flujo.
-                    BrushSpec { size: 46.0, opacity: 1.0, color: [240, 150, 20], params: BrushParams { size_control: Control::Pressure, min_size: 0.08, flow_control: Control::Pressure, spacing: 8.0, ..d }, seed: 4 },
-                    // Variaciones al azar: tamaño, ángulo, redondez y flujo.
-                    BrushSpec { size: 40.0, opacity: 1.0, color: [140, 60, 200], params: BrushParams { size_jitter: 0.6, angle_jitter: 1.0, roundness: 0.5, roundness_jitter: 0.7, min_roundness: 0.15, flow_jitter: 0.5, spacing: 45.0, ..d }, seed: 5 },
+                    // 1 duro, 2 difuso con poco flujo, 3 plano girado, 4 presión (tamaño y flujo), 5 variaciones al azar
+                    S::new(22.0, 1.0, [230, 60, 160], d, 1),
+                    S::new(34.0, 1.0, [30, 120, 230], P { hardness: 0.1, flow: 0.25, spacing: 6.0, ..d }, 2),
+                    S::new(30.0, 1.0, [20, 150, 80], P { roundness: 0.25, angle: 40.0, spacing: 40.0, ..d }, 3),
+                    S::new(38.0, 1.0, [240, 150, 20], P { size_control: Control::Pressure, min_size: 0.08, flow_control: Control::Pressure, spacing: 8.0, ..d }, 4),
+                    S::new(30.0, 1.0, [140, 60, 200], P { size_jitter: 0.6, angle_jitter: 1.0, roundness: 0.5, roundness_jitter: 0.7, min_roundness: 0.15, flow_jitter: 0.5, spacing: 45.0, ..d }, 5),
+                    // Fase 3: dispersión, textura de papel, doble pincel, color, bordes húmedos
+                    S::new(14.0, 1.0, [60, 60, 70], P { scatter: 2.5, scatter_count: 4, count_jitter: 0.4, spacing: 35.0, size_jitter: 0.5, ..d }, 6),
+                    S::new(44.0, 1.0, [80, 50, 30], P { texture: TexKind::Paper, texture_depth: 0.9, spacing: 12.0, hardness: 0.7, ..d }, 7),
+                    S::new(46.0, 1.0, [30, 90, 70], P { dual: true, dual_size: 0.18, dual_count: 18, spacing: 14.0, ..d }, 8),
+                    S::new(34.0, 1.0, [240, 130, 60], P { hue_jitter: 0.6, bri_jitter: 0.3, spacing: 70.0, size_jitter: 0.3, ..d }, 9).with_color2([60, 140, 240]),
+                    S::new(54.0, 0.9, [40, 110, 200], P { wet_edges: 1.0, hardness: 0.35, spacing: 8.0, flow: 0.5, ..d }, 10),
                 ];
                 let mut r = crate::raster::Raster::new(project.width, project.height);
                 for (i, s) in specs.into_iter().enumerate() {
                     let mut ls = LiveStroke::new(project.width, project.height, s);
-                    let y = 150.0 + i as f32 * 100.0;
+                    let y = 70.0 + i as f32 * 58.0;
                     for k in 0..=70 {
                         let t = k as f32 / 70.0;
                         let pressure = (t * std::f32::consts::PI).sin().clamp(0.03, 1.0);
@@ -459,6 +467,8 @@ impl LeonApp {
             brush: Default::default(),
             brush_live: None,
             pen_pressure: 1.0,
+            brush_tip_img: None,
+            brush_tex_img: None,
             brush_tex: None,
             brush_prev: None,
             view3d: false,

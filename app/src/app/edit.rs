@@ -413,7 +413,7 @@ impl LeonApp {
         self.brush_tex = None;
         if self.tool == Tool::Brush && self.layer().kind == LayerKind::Bitmap {
             let seed = (self.now * 1000.0) as u64 ^ self.frame_no.wrapping_mul(2_654_435_761);
-            let spec = crate::brush::BrushSpec { size: self.brush_size, opacity: self.stroke_opacity, color: [color[0], color[1], color[2]], params: self.brush, seed };
+            let spec = self.brush_spec([color[0], color[1], color[2]], self.brush_size, seed);
             let mut ls = crate::brush::LiveStroke::new(self.project.width, self.project.height, spec);
             ls.push_with(p, self.cur_pen());
             self.brush_live = Some(ls);

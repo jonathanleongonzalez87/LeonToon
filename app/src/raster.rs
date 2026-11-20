@@ -65,7 +65,13 @@ impl Raster {
 
     /// Compone `src` (RGBA premultiplicado, mismo tamaño) sobre este mapa con la opacidad dada,
     /// solo dentro de `b = [x0, y0, x1, y1]` (x1 e y1 no incluidos).
+    #[allow(dead_code)]
     pub fn composite_over(&mut self, src: &Raster, b: [u32; 4], opacity: f32) {
+        self.composite_over_wet(src, b, opacity, 0.0);
+    }
+
+    /// Igual que `composite_over`, con el efecto de bordes húmedos (`wet` de 0 a 1) sobre la pintura de `src`.
+    pub fn composite_over_wet(&mut self, src: &Raster, b: [u32; 4], opacity: f32, wet: f32) {
         if src.w != self.w || src.h != self.h || self.data.len() != src.data.len() {
             return;
         }
@@ -78,12 +84,18 @@ impl Raster {
                 if s[3] == 0 {
                     continue;
                 }
-                let sa = s[3] as f32 / 255.0 * op;
+                // Bordes húmedos: cambia el alfa de la pintura y reescala el color en proporción.
+                let a0 = s[3] as f32 / 255.0;
+                let a1 = if wet > 0.0 { crate::brush::wet_alpha(a0, wet) } else { a0 };
+                let k = a1 / a0;
+                let sa = a1 * op;
                 let keep = 1.0 - sa;
-                for k in 0..4 {
-                    let v = s[k] as f32 * op + self.data[i + k] as f32 * keep;
-                    self.data[i + k] = v.round().min(255.0) as u8;
+                for c in 0..3 {
+                    let v = s[c] as f32 * k * op + self.data[i + c] as f32 * keep;
+                    self.data[i + c] = v.round().min(255.0) as u8;
                 }
+                let v = a1 * 255.0 * op + self.data[i + 3] as f32 * keep;
+                self.data[i + 3] = v.round().min(255.0) as u8;
             }
         }
         self.inked = self.inked || self.data.chunks_exact(4).any(|p| p[3] != 0);
