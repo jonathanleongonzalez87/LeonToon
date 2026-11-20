@@ -1,0 +1,74 @@
+name: Release
+
+# Publica una Release con el .exe de Windows cuando se sube una etiqueta vX.Y.Z.
+# También se puede lanzar a mano (Actions → Release → Run workflow) para probar:
+# por defecto solo compila y sube el .zip como archivo de la ejecución, sin publicar.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versión para la prueba (por ejemplo v0.0.0-prueba)'
+        default: 'v0.0.0-prueba'
+      publish:
+        description: 'Publicar la Release (si no, solo compilar y guardar el .zip)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Versión
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_TYPE -eq 'tag') { $v = $env:GITHUB_REF_NAME } else { $v = '${{ inputs.version }}' }
+          "VERSION=$v" >> $env:GITHUB_ENV
+          # En las etiquetas, la versión debe coincidir con la de app/Cargo.toml.
+          $cargo = (Select-String -Path app/Cargo.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $v -ne "v$cargo") {
+            Write-Error "La etiqueta $v no coincide con la versión de app/Cargo.toml ($cargo). Sube la versión con un PR y vuelve a etiquetar."
+            exit 1
+          }
+
+      - name: Rust estable
+        run: rustup toolchain install stable --profile minimal
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app
+
+      - name: Compilar (release)
+        run: cargo build --release --manifest-path app/Cargo.toml
+
+      - name: Empaquetar
+        shell: pwsh
+        run: |
+          $dir = "LeonToon-$env:VERSION-windows-x64"
+          New-Item -ItemType Directory $dir | Out-Null
+          Copy-Item app/target/release/leontoon.exe "$dir/LeonToon.exe"
+          Compress-Archive -Path $dir -DestinationPath "$dir.zip"
+          "ASSET=$dir.zip" >> $env:GITHUB_ENV
+          Get-Item "$dir.zip" | Select-Object Name, Length
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ASSET }}
+          path: ${{ env.ASSET }}
+
+      - name: Publicar la Release
+        if: github.ref_type == 'tag' || inputs.publish
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $notes = "Descarga el .zip, descomprímelo y abre ``LeonToon.exe``. Windows puede mostrar un aviso de SmartScreen porque el programa aún no está firmado: pulsa «Más información» y luego «Ejecutar de todos modos». Para exportar MP4 hace falta ffmpeg."
+          $extra = @()
+          if ($env:VERSION -match '-') { $extra += '--prerelease' }
+          gh release create $env:VERSION $env:ASSET --title "LeonToon $env:VERSION" --notes $notes --generate-notes @extra
