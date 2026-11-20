@@ -270,6 +270,9 @@ pub struct LeonApp {
     /// Curva de la Pluma en curso y nodo elegido al editar una curva.
     /// Texturas de grano de los papeles de estudio (se suben una vez).
     paper_tex: std::collections::HashMap<crate::paper::Grain, egui::TextureHandle>,
+    /// Escala del grano (porcentaje) y semilla de su variante.
+    paper_scale: f32,
+    paper_seed: u32,
     pen_path: Option<penui::PenPath>,
     sel_node: Option<usize>,
     /// Última presión leída del lápiz (1 si no hay lápiz).
@@ -562,6 +565,8 @@ impl LeonApp {
             vui: Default::default(),
             sui: Default::default(),
             paper_tex: Default::default(),
+            paper_scale: crate::paper::SCALE_DEFAULT,
+            paper_seed: std::env::var("LEONTOON_SEMILLA").ok().and_then(|v| v.parse().ok()).unwrap_or(1),
             pen_path: None,
             sel_node: None,
             pen_pressure: 1.0,
@@ -703,6 +708,9 @@ impl LeonApp {
         // Capturas de los papeles de estudio: LEONTOON_PAPEL=<id> elige uno y LEONTOON_LUZ=<0-100> fija la luz de la mesa.
         if let Some(pp) = std::env::var("LEONTOON_PAPEL").ok().and_then(|v| crate::paper::PAPERS.iter().find(|p| p.id == v)) {
             app.project.background = [pp.rgb[0], pp.rgb[1], pp.rgb[2], 255];
+        }
+        if let Some(s) = std::env::var("LEONTOON_ESCALA").ok().and_then(|v| v.parse::<f32>().ok()) {
+            app.paper_scale = s;
         }
         if let Some(l) = std::env::var("LEONTOON_LUZ").ok().and_then(|v| v.parse::<f32>().ok()) {
             app.light_amt = l;
