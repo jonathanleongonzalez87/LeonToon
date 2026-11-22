@@ -411,7 +411,7 @@ impl Editor {
             Editor::Timeline => "Línea de tiempo",
             Editor::Storyboard => "Storyboard",
             Editor::SmStage => "Escenario de Stop Motion",
-            Editor::SmStrip => "Tira de fotos y Frame Browser",
+            Editor::SmStrip => "Tira de fotos",
         }
     }
     /// Identificador estable para guardarlo en el archivo de ajustes (no cambia aunque cambie el nombre).

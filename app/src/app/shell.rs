@@ -18,24 +18,24 @@ pub(super) fn pill(ui: &mut egui::Ui, text: &str, on: bool) -> egui::Response {
 
 /// Cabecera de área (28 px, gris más claro), con título.
 pub(super) fn area_header(ui: &mut egui::Ui, title: &str) -> Rect {
-    let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 28.0), Sense::hover());
+    let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), UiScale::AREA_HEADER), Sense::hover());
     ui.painter().rect_filled(rect, egui::CornerRadius { nw: 6, ne: 6, sw: 0, se: 0 }, BG3);
     ui.painter().hline(rect.x_range(), rect.max.y, stk(1.0, LINE));
-    ui.painter().text(rect.left_center() + Vec2::new(10.0, 0.0), Align2::LEFT_CENTER, title, semi(12.0), TX);
+    ui.painter().text(rect.left_center() + Vec2::new(10.0, 0.0), Align2::LEFT_CENTER, title, semi(11.5), TX);
     rect
 }
 
 /// Cabecera de panel lateral (sección plegable con título en mayúsculas).
 pub(super) fn panel_header(ui: &mut egui::Ui, title: &str) {
-    let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 24.0), Sense::hover());
+    let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 22.0), Sense::hover());
     let c = rect.left_center() + Vec2::new(8.0, 0.0);
     // Triángulo de sección desplegada, como en el prototipo.
     tri(ui.painter(), c + Vec2::new(-3.0, -2.0), c + Vec2::new(3.0, -2.0), c + Vec2::new(0.0, 2.5), INK3);
-    ui.painter().text(rect.left_center() + Vec2::new(18.0, 0.0), Align2::LEFT_CENTER, title, semi(12.0), TX);
+    ui.painter().text(rect.left_center() + Vec2::new(18.0, 0.0), Align2::LEFT_CENTER, title, semi(11.5), TX);
 }
 
 pub(super) fn muted(ui: &mut egui::Ui, text: impl Into<String>) {
-    ui.label(RichText::new(text.into()).size(11.5).color(MU));
+    ui.label(RichText::new(text.into()).size(11.0).color(MU));
 }
 
 /// Pinta el fondo de un área (gris, esquinas de 6 px) y da un Ui dentro.
@@ -55,7 +55,7 @@ pub(super) const GUIDE_NAMES: [&str; 6] = [
     "Cruz de centro",
 ];
 
-const TOOLHEAD_H: f32 = 34.0;
+const TOOLHEAD_H: f32 = UiScale::TOOL_HEAD;
 
 impl LeonApp {
     pub(super) fn shell(&mut self, ctx: &egui::Context) {

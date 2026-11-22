@@ -64,6 +64,23 @@ pub(super) fn draw_hud_icon(kind: u8, p: &egui::Painter, c: Pos2, col: Color32) 
     }
 }
 
+/// Escala de la interfaz (un solo sitio): tamaño del texto de cuerpo y de botones, alto mínimo de los controles y
+/// separaciones. Los tamaños fijos de las cabeceras salen de UiScale.
+pub(super) struct UiScale;
+
+impl UiScale {
+    pub const BODY: f32 = 11.5;
+    pub const SMALL: f32 = 10.0;
+    pub const HEADING: f32 = 14.0;
+    pub const CONTROL_H: f32 = 18.0;
+    /// Alto de la cabecera de cada área (selector de editor, pestañas).
+    pub const AREA_HEADER: f32 = 25.0;
+    /// Alto de la cabecera de herramienta.
+    pub const TOOL_HEAD: f32 = 30.0;
+    /// Alto del selector de editor.
+    pub const SELECTOR_H: f32 = 20.0;
+}
+
 pub(super) fn setup_style(ctx: &egui::Context) {
     setup_fonts(ctx);
     let mut v = egui::Visuals::dark();
@@ -94,11 +111,14 @@ pub(super) fn setup_style(ctx: &egui::Context) {
     ctx.set_theme(egui::ThemePreference::Dark);
     ctx.set_visuals_of(egui::Theme::Dark, v);
     ctx.all_styles_mut(|s| {
-        s.spacing.item_spacing = Vec2::new(6.0, 5.0);
-        s.spacing.button_padding = Vec2::new(8.0, 3.0);
-        s.spacing.interact_size.y = 20.0;
-        s.text_styles.insert(egui::TextStyle::Body, FontId::proportional(12.5));
-        s.text_styles.insert(egui::TextStyle::Button, FontId::proportional(12.5));
+        s.spacing.item_spacing = Vec2::new(5.0, 4.0);
+        s.spacing.button_padding = Vec2::new(6.0, 2.0);
+        s.spacing.interact_size.y = UiScale::CONTROL_H;
+        s.spacing.slider_rail_height = 4.0;
+        s.text_styles.insert(egui::TextStyle::Body, FontId::proportional(UiScale::BODY));
+        s.text_styles.insert(egui::TextStyle::Button, FontId::proportional(UiScale::BODY));
+        s.text_styles.insert(egui::TextStyle::Small, FontId::proportional(UiScale::SMALL));
+        s.text_styles.insert(egui::TextStyle::Heading, FontId::proportional(UiScale::HEADING));
     });
 }
 

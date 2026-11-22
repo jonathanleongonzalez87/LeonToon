@@ -89,7 +89,7 @@ impl LeonApp {
         }
         let open = ctx.data(|d| d.get_temp::<bool>(open_id)).unwrap_or(false);
         // El botón
-        let (rect, resp) = ui.allocate_exact_size(Vec2::new(width, 22.0), Sense::click());
+        let (rect, resp) = ui.allocate_exact_size(Vec2::new(width, UiScale::SELECTOR_H), Sense::click());
         let bg = if open { BG4 } else if resp.hovered() { Color32::from_rgb(0x44, 0x44, 0x44) } else { Color32::from_rgb(0x38, 0x38, 0x38) };
         {
             let p = ui.painter_at(rect);
@@ -164,7 +164,8 @@ impl LeonApp {
         let mut child = ui.new_child(egui::UiBuilder::new().max_rect(hr.shrink2(Vec2::new(4.0, 2.0))).layout(egui::Layout::left_to_right(egui::Align::Center)));
         let slot = self.cur_slot;
         // En cabeceras estrechas (la hoja de exposición al lado del visor) el selector cede sitio a los controles del editor.
-        self.slot_combo(&mut child, slot, (hr.width() * 0.38).clamp(110.0, 170.0));
+        let w = if matches!(self.slot_editor(slot), Editor::Timeline | Editor::SmStrip) { (hr.width() * 0.38).clamp(110.0, 170.0) } else { (hr.width() - 8.0).clamp(110.0, 220.0) };
+        self.slot_combo(&mut child, slot, w);
         let x = (child.min_rect().max.x + 6.0).min(hr.max.x - 6.0);
         Rect::from_min_max(Pos2::new(x, hr.min.y + 2.0), Pos2::new(hr.max.x - 6.0, hr.max.y - 2.0))
     }
