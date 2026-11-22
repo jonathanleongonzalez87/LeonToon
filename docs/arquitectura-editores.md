@@ -156,4 +156,5 @@ Respuestas de la persona a las seis preguntas de la primera versión de este doc
 | Fase | Estado |
 |---|---|
 | A. Registro de editores | Hecha en el Issue #80: catálogo con grupos, menú agrupado, y los paneles Capas, X-Sheet de Stop Motion y Cámara y captura disponibles como editores en el hueco de la columna derecha |
-| B a G | Pendientes |
+| D. Contexto y vacíos explicativos | Hecha en el Issue #83: cada editor declara su requisito (context.rs), explica qué falta y ofrece el botón que lo arregla, y el menú atenúa los que no encajan |
+| B, C, E, F, G | Pendientes |
