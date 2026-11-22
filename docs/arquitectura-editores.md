@@ -140,11 +140,20 @@ Esta es la pieza más grande y la que más cuidado pide; las demás se pueden ha
 
 Orden recomendado: **A → D → C → B → E → F**. A y D se ven poco pero preparan todo; C es donde se nota; F se diseña aparte con calma porque toca el formato del proyecto.
 
-## 5. Decisiones que necesito de ti
+## 5. Decisiones tomadas
 
-1. **Grupos**: ¿te sirven Visores / Tiempo / Datos / Producción / Sistema, o prefieres otros nombres o otro reparto?
-2. **Alcance de la flexibilidad**: ¿empezamos solo con «cambiar el editor de cada área» (más simple, ya se parece a Blender) o quieres desde pronto dividir y unir áreas con el ratón (fase G)?
-3. **Entrar en la capa**: ¿Tab para entrar y salir en cualquier capa que tenga contenido te parece el gesto correcto, o prefieres doble clic y un botón de salir?
-4. **Modo objeto / edición**: hoy es una sola opción global (`Tab`). ¿Debe pasar a ser **por capa** como en Blender (cada capa recuerda su modo)?
-5. **Scripting**: ¿lo contemplas algún día? Si no, el grupo «Sistema» queda más pequeño.
-6. **Primera fase**: ¿empiezo por A (registro de editores) o prefieres que el siguiente paso visible sea otra cosa de Stop Motion y esto espere?
+Respuestas de la persona a las seis preguntas de la primera versión de este documento:
+
+1. **Grupos**: Visores, Tiempo, Datos, Producción y Sistema, aceptados provisionalmente.
+2. **Flexibilidad**: cambiar el editor de cada área **y** dividir y unir áreas con el ratón (la fase G entra en el plan).
+3. **Entrar en la capa**: ambos gestos, Tab y doble clic.
+4. **Modo objeto / edición**: **por capa**, como en Blender (cada capa recuerda su modo).
+5. **Scripting**: sí, algún día (el grupo Sistema lo recibirá).
+6. **Primera fase**: A, registro de editores (Issue #80).
+
+## 6. Estado de las fases
+
+| Fase | Estado |
+|---|---|
+| A. Registro de editores | Hecha en el Issue #80: catálogo con grupos, menú agrupado, y los paneles Capas, X-Sheet de Stop Motion y Cámara y captura disponibles como editores en el hueco de la columna derecha |
+| B a G | Pendientes |
