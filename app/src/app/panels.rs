@@ -50,7 +50,7 @@ impl LeonApp {
                     Some(t) => {
                         let t = *t;
                         let tip = format!("{}  ({})\n{}", t.name(), t.letter(), t.tip());
-                        if tool_button(ui, btn, self.tool == t, t.pending(), &tip, move |p, r, c| draw_tool_icon(t, p, r, c)).clicked() {
+                        if tool_button(ui, btn, self.tool == t, t.pending(), &tip, tool_tint(t), move |p, r, c| draw_tool_icon(t, p, r, c)).clicked() {
                             self.set_tool(t);
                         }
                     }
@@ -84,7 +84,7 @@ impl LeonApp {
             }
             let t = self.tool;
             let (ir, _) = ui.allocate_exact_size(Vec2::splat(16.0), Sense::hover());
-            draw_tool_icon(t, ui.painter(), ir, TX);
+            draw_tool_icon(t, ui.painter(), ir, tool_tint(t));
             ui.label(RichText::new(t.name()).color(TX).strong());
             ui.separator();
             if t.pending() {

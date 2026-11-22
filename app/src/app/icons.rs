@@ -102,15 +102,15 @@ pub(super) fn setup_style(ctx: &egui::Context) {
     });
 }
 
-/// Botón de la columna de herramientas (30×28, naranja cuando está elegida).
-/// Botón de la barra de herramientas (34×32, naranja con icono oscuro cuando está elegida;
-/// apagado si la herramienta está pendiente).
+/// Botón de la barra de herramientas: el icono lleva el color de su herramienta (de la paleta), el elegido se pone sobre
+/// fondo naranja con el icono oscuro, y el que está pendiente se apaga.
 pub(super) fn tool_button(
     ui: &mut egui::Ui,
     size: Vec2,
     selected: bool,
     pending: bool,
     tip: &str,
+    tint: Color32,
     draw: impl FnOnce(&egui::Painter, Rect, Color32),
 ) -> egui::Response {
     let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
@@ -119,21 +119,47 @@ pub(super) fn tool_button(
         p.rect_filled(rect, 6.0, ACCENT);
     } else if resp.hovered() {
         p.rect_filled(rect, 6.0, BG4);
+        p.rect_stroke(rect, 6.0, stk(1.0, with_alpha(tint, 0.55)), EStrokeKind::Inside);
     }
     let fg = if selected {
         ACCENT_INK
     } else if pending {
-        with_alpha(MU, 0.45)
+        with_alpha(tint, 0.35)
     } else if resp.hovered() {
-        TX
+        lighten(tint, 0.25)
     } else {
-        MU
+        tint
     };
     // El icono crece con el botón (barra de herramientas más ancha).
-    draw(p, Rect::from_center_size(rect.center(), Vec2::splat((size.y * 0.5).max(16.0))), fg);
+    draw(p, Rect::from_center_size(rect.center(), Vec2::splat((size.y * 0.58).max(18.0))), fg);
     resp.on_hover_text(tip)
 }
 
+/// Aclara un color mezclándolo con blanco.
+pub(super) fn lighten(c: Color32, k: f32) -> Color32 {
+    let m = |a: u8| (a as f32 + (255.0 - a as f32) * k).round() as u8;
+    Color32::from_rgb(m(c.r()), m(c.g()), m(c.b()))
+}
+
+/// Color de cada herramienta, tomado de la paleta de LeonToon: naranja para pintar, dorado para rellenar y la pluma,
+/// azul para ver y escribir, verde para formas y el cuentagotas, lila para mover y la cámara, salmón para borrar.
+pub(super) fn tool_tint(t: Tool) -> Color32 {
+    const ORANGE: Color32 = Color32::from_rgb(0xfd, 0x67, 0x24);
+    const GOLD: Color32 = Color32::from_rgb(0xf2, 0xd2, 0x7a);
+    const SKY: Color32 = Color32::from_rgb(0x8f, 0xb3, 0xcf);
+    const GREEN: Color32 = Color32::from_rgb(0xa8, 0xcf, 0x8f);
+    const LILAC: Color32 = Color32::from_rgb(0xb7, 0xa2, 0xe6);
+    const SALMON: Color32 = Color32::from_rgb(0xe9, 0xa0, 0x7a);
+    match t {
+        Tool::Select => Color32::from_rgb(0xee, 0xee, 0xee),
+        Tool::RotateObj | Tool::RotateView | Tool::Anchor | Tool::Camera => LILAC,
+        Tool::Brush | Tool::Vector => ORANGE,
+        Tool::Pen | Tool::Fill => GOLD,
+        Tool::Text | Tool::Hand | Tool::Zoom => SKY,
+        Tool::Shape | Tool::Picker => GREEN,
+        Tool::Eraser => SALMON,
+    }
+}
 pub(super) fn checker(p: &egui::Painter, r: Rect) {
     p.rect_filled(r, 3.0, Color32::from_gray(200));
     let s = (r.width().min(r.height()) / 4.0).max(2.0);
@@ -271,11 +297,20 @@ pub(super) fn draw_lock(p: &egui::Painter, r: Rect, on: bool, hover: bool) {
 
 pub(super) fn draw_tool_icon(t: Tool, p: &egui::Painter, r: Rect, c: Color32) {
     let s = |x: f32, y: f32| Pos2::new(r.min.x + x * r.width(), r.min.y + y * r.height());
-    let st = stk(1.5, c);
-    let poly = |pts: Vec<Pos2>| p.add(Shape::closed_line(pts, st));
+    let st = stk(1.8, c);
+    // Los cuerpos llevan un relleno suave del mismo color para que el icono tenga presencia (solo en formas convexas).
+    let soft = c.gamma_multiply(0.30);
+    let poly = |pts: Vec<Pos2>| {
+        p.add(Shape::convex_polygon(pts.clone(), soft, EStroke::NONE));
+        p.add(Shape::closed_line(pts, st));
+    };
     match t {
         Tool::Select => {
-            poly(vec![s(0.2, 0.1), s(0.78, 0.42), s(0.52, 0.52), s(0.42, 0.78)]);
+            // La flecha es cóncava: se rellena como dos triángulos.
+            let (a, b, m, d) = (s(0.2, 0.1), s(0.78, 0.42), s(0.52, 0.52), s(0.42, 0.78));
+            p.add(Shape::convex_polygon(vec![a, b, m], soft, EStroke::NONE));
+            p.add(Shape::convex_polygon(vec![a, m, d], soft, EStroke::NONE));
+            p.add(Shape::closed_line(vec![a, b, m, d], st));
         }
         Tool::RotateObj | Tool::RotateView => {
             let ctr = r.center();
@@ -284,10 +319,11 @@ pub(super) fn draw_tool_icon(t: Tool, p: &egui::Painter, r: Rect, c: Color32) {
             p.add(Shape::line(pts, st));
             tri(p, end + Vec2::new(-1.0, -5.0), end + Vec2::new(5.0, 0.0), end + Vec2::new(-1.0, 4.0), c);
             if t == Tool::RotateObj {
-                p.circle_filled(ctr, 1.8, c);
+                p.circle_filled(ctr, 2.2, c);
             }
         }
         Tool::Anchor => {
+            p.circle_filled(r.center(), r.width() * 0.2, soft);
             p.circle_stroke(r.center(), r.width() * 0.2, st);
             p.line_segment([s(0.5, 0.05), s(0.5, 0.32)], st);
             p.line_segment([s(0.5, 0.68), s(0.5, 0.95)], st);
@@ -295,7 +331,9 @@ pub(super) fn draw_tool_icon(t: Tool, p: &egui::Painter, r: Rect, c: Color32) {
             p.line_segment([s(0.68, 0.5), s(0.95, 0.5)], st);
         }
         Tool::Camera => {
-            p.rect_stroke(Rect::from_min_max(s(0.05, 0.28), s(0.65, 0.72)), 2.0, st, EStrokeKind::Middle);
+            let body = Rect::from_min_max(s(0.05, 0.28), s(0.65, 0.72));
+            p.rect_filled(body, 2.0, soft);
+            p.rect_stroke(body, 2.0, st, EStrokeKind::Middle);
             poly(vec![s(0.65, 0.45), s(0.95, 0.28), s(0.95, 0.72), s(0.65, 0.55)]);
         }
         Tool::Brush => {
@@ -309,15 +347,18 @@ pub(super) fn draw_tool_icon(t: Tool, p: &egui::Painter, r: Rect, c: Color32) {
         Tool::Pen => {
             poly(vec![s(0.5, 0.08), s(0.28, 0.5), s(0.5, 0.92), s(0.72, 0.5)]);
             p.line_segment([s(0.5, 0.08), s(0.5, 0.45)], st);
-            p.circle_stroke(s(0.5, 0.52), 1.6, st);
+            p.circle_filled(s(0.5, 0.52), 2.0, c);
         }
         Tool::Text => {
-            p.line_segment([s(0.2, 0.15), s(0.8, 0.15)], st);
-            p.line_segment([s(0.5, 0.15), s(0.5, 0.88)], st);
-            p.line_segment([s(0.36, 0.88), s(0.64, 0.88)], st);
+            p.line_segment([s(0.2, 0.15), s(0.8, 0.15)], stk(2.2, c));
+            p.line_segment([s(0.5, 0.15), s(0.5, 0.88)], stk(2.2, c));
+            p.line_segment([s(0.36, 0.88), s(0.64, 0.88)], stk(2.2, c));
         }
         Tool::Shape => {
-            p.rect_stroke(Rect::from_min_max(s(0.08, 0.42), s(0.5, 0.88)), 1.0, st, EStrokeKind::Middle);
+            let sq = Rect::from_min_max(s(0.08, 0.42), s(0.5, 0.88));
+            p.rect_filled(sq, 1.0, soft);
+            p.rect_stroke(sq, 1.0, st, EStrokeKind::Middle);
+            p.circle_filled(s(0.65, 0.35), r.width() * 0.22, soft);
             p.circle_stroke(s(0.65, 0.35), r.width() * 0.22, st);
         }
         Tool::Eraser => {
@@ -327,10 +368,11 @@ pub(super) fn draw_tool_icon(t: Tool, p: &egui::Painter, r: Rect, c: Color32) {
         Tool::Fill => {
             poly(vec![s(0.25, 0.45), s(0.5, 0.2), s(0.8, 0.5), s(0.55, 0.75)]);
             p.line_segment([s(0.1, 0.92), s(0.9, 0.92)], st);
-            p.circle_filled(s(0.85, 0.72), r.width() * 0.07, c);
+            p.circle_filled(s(0.85, 0.72), r.width() * 0.09, c);
         }
         Tool::Picker => {
-            p.line_segment([s(0.15, 0.85), s(0.62, 0.38)], stk(1.8, c));
+            p.line_segment([s(0.15, 0.85), s(0.62, 0.38)], stk(2.2, c));
+            p.circle_filled(s(0.75, 0.25), r.width() * 0.13, soft);
             p.circle_stroke(s(0.75, 0.25), r.width() * 0.13, st);
             p.line_segment([s(0.55, 0.28), s(0.72, 0.45)], st);
         }
@@ -342,8 +384,9 @@ pub(super) fn draw_tool_icon(t: Tool, p: &egui::Painter, r: Rect, c: Color32) {
             p.add(Shape::line(vec![s(0.26, 0.6), s(0.12, 0.5), s(0.22, 0.75), s(0.42, 0.92), s(0.65, 0.92), s(0.74, 0.7), s(0.72, 0.4)], st));
         }
         Tool::Zoom => {
+            p.circle_filled(s(0.42, 0.42), r.width() * 0.28, soft);
             p.circle_stroke(s(0.42, 0.42), r.width() * 0.28, st);
-            p.line_segment([s(0.63, 0.63), s(0.92, 0.92)], stk(2.0, c));
+            p.line_segment([s(0.63, 0.63), s(0.92, 0.92)], stk(2.4, c));
             p.line_segment([s(0.3, 0.42), s(0.54, 0.42)], st);
             p.line_segment([s(0.42, 0.3), s(0.42, 0.54)], st);
         }
