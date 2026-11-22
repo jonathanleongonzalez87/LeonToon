@@ -120,3 +120,25 @@ fn un_proveedor_que_falla_no_impide_listar_los_demas() {
     assert_eq!(devices.len(), 1);
     assert_eq!(errors, vec!["roto: sin permiso".to_string()]);
 }
+
+#[test]
+fn el_enfoque_asistido_marca_los_bordes_nitidos_y_deja_lo_liso() {
+    // Mitad izquierda negra y mitad derecha blanca: hay un borde muy nítido en el centro.
+    let (w, h) = (8usize, 5usize);
+    let mut px = Vec::new();
+    for _ in 0..h {
+        for x in 0..w {
+            let v = if x < w / 2 { 0 } else { 255 };
+            px.extend_from_slice(&[v, v, v, 255]);
+        }
+    }
+    let mut flat = vec![120u8; w * h * 4];
+    let flat_copy = flat.clone();
+    peaking(&mut px, w, h);
+    peaking(&mut flat, w, h);
+    let at = |x: usize, y: usize| &px[(y * w + x) * 4..(y * w + x) * 4 + 3];
+    assert_eq!(at(3, 2), &[255, 0, 200], "el borde se marca");
+    assert_eq!(at(4, 2), &[255, 0, 200], "el borde se marca");
+    assert_eq!(at(1, 2), &[0, 0, 0], "lo liso no cambia");
+    assert_eq!(flat, flat_copy, "una imagen lisa no se toca");
+}

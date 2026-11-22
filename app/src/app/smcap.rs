@@ -56,6 +56,16 @@ pub(super) struct CapState {
     shots: u32,
     /// Conectar la cámara elegida al abrir el Live View (solo para capturas de pantalla).
     auto: bool,
+    /// Herramientas del Live View: aumento (1 = el cuadro entero), desplazamiento en el cuadro, cuadrículas, enfoque
+    /// asistido y «ver la foto anterior» en lugar de la cámara.
+    zoom: f32,
+    pan: (f32, f32),
+    thirds: bool,
+    cross: bool,
+    peaking: bool,
+    flip: bool,
+    /// Cuántas fotos reproducir con «Últimas».
+    pub(super) last_n: u32,
 }
 
 impl Default for CapState {
@@ -84,6 +94,13 @@ impl Default for CapState {
             onion_tex: None,
             shots: 0,
             auto: false,
+            zoom: 1.0,
+            pan: (0.0, 0.0),
+            thirds: false,
+            cross: false,
+            peaking: false,
+            flip: false,
+            last_n: 12,
         }
     }
 }
@@ -94,6 +111,15 @@ impl CapState {
         let live = std::env::var("LEONTOON_LIVE").is_ok();
         CapState { live, auto: live, ..Default::default() }
     }
+}
+
+/// Texto pequeño sobre fondo oscuro para rotular el escenario. `pos` es la esquina de arriba a la izquierda, o la de
+/// abajo a la izquierda si `from_bottom`.
+fn badge(p: &egui::Painter, pos: Pos2, from_bottom: bool, text: String, color: Color32) {
+    let galley = p.layout_no_wrap(text, FontId::proportional(12.0), color);
+    let top = if from_bottom { Pos2::new(pos.x, pos.y - galley.size().y) } else { pos };
+    p.rect_filled(Rect::from_min_size(top, galley.size()).expand2(Vec2::new(5.0, 2.0)), 4.0, Color32::from_black_alpha(170));
+    p.galley(top, galley, color);
 }
 
 fn kb(n: usize) -> String {
@@ -164,7 +190,10 @@ impl LeonApp {
                     Event::Warning(w) => c.problem = Some(w),
                 }
             }
-            if let Some(l) = s.take_live() {
+            if let Some(mut l) = s.take_live() {
+                if c.peaking {
+                    capture::peaking(&mut l.rgba, l.width as usize, l.height as usize);
+                }
                 let img = egui::ColorImage::from_rgba_unmultiplied([l.width as usize, l.height as usize], &l.rgba);
                 match c.tex.as_mut() {
                     Some(t) => t.set(img, egui::TextureOptions::LINEAR),
@@ -276,6 +305,11 @@ impl LeonApp {
         }
         use egui::{Key, Modifiers};
         let none = Modifiers::NONE;
+        // L: ver la foto anterior en lugar de la cámara (y volver), como el botón del panel de la derecha.
+        if !ctx.wants_keyboard_input() && ctx.input_mut(|i| i.consume_key(none, Key::L)) {
+            self.sm_ui.cap.flip = !self.sm_ui.cap.flip;
+            return true;
+        }
         let go = ctx.input_mut(|i| i.consume_key(none, Key::F5) || i.consume_key(none, Key::Enter));
         if go {
             if self.sm_ui.cap.held.is_some() {
@@ -329,7 +363,9 @@ impl LeonApp {
         }
     }
 
-    /// El visor de la sala mientras el Live View está abierto.
+    /// El Live View: ocupa todo el escenario de la sala. Muestra lo que ve la cámara con la foto anterior encima, las
+    /// cuadrículas y las ayudas de enfoque que se hayan activado, y la foto pendiente de revisar. La rueda del ratón
+    /// acerca, arrastrar desplaza y doble clic vuelve al cuadro entero.
     pub(super) fn sm_live_view(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         if std::mem::take(&mut self.sm_ui.cap.auto) {
@@ -340,65 +376,113 @@ impl LeonApp {
         ui.painter().rect_filled(rect, 6.0, Color32::from_rgb(0x10, 0x10, 0x12));
         let seq_ref = self.sm_room_layer().and_then(|li| self.project.layers[li].stopmotion.clone());
         let ready = seq_ref.as_ref().map_or(false, |r| self.sm.contains_key(&r.id));
-        let bar_h = 40.0;
-        let stage = Rect::from_min_max(rect.min + Vec2::new(8.0, 30.0), rect.max - Vec2::new(8.0, bar_h + 8.0));
-        // Cabecera: estado de la cámara, opciones y salida.
-        let head = Rect::from_min_size(rect.min + Vec2::new(8.0, 4.0), Vec2::new(rect.width() - 16.0, 24.0));
-        let mut hui = ui.new_child(egui::UiBuilder::new().max_rect(head).layout(egui::Layout::left_to_right(egui::Align::Center)));
-        hui.spacing_mut().item_spacing.x = 8.0;
-        let mut exit = false;
-        let status = {
-            let c = &self.sm_ui.cap;
-            match (&c.session, c.full) {
-                (Some(s), Some((w, h))) => format!("● {} · foto {w}×{h} · {:.0} cuadros/s", s.device.name, c.fps),
-                (Some(s), None) => format!("Abriendo {}…", s.device.name),
-                _ => "Sin cámara conectada".into(),
-            }
-        };
-        hui.label(RichText::new(status).size(12.0).color(TX));
-        hui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui.small_button("Salir del Live View").clicked() {
-                exit = true;
-            }
-            let c = &mut self.sm_ui.cap;
-            ui.add(egui::Slider::new(&mut c.onion_alpha, 0.1..=0.9).show_value(false)).on_hover_text("Opacidad de la foto anterior sobre el Live View");
-            ui.checkbox(&mut c.onion, "Foto anterior").on_hover_text("Onion skin en vivo: la última foto de la secuencia sobre lo que ve la cámara");
-            ui.checkbox(&mut c.direct, "Animación directa").on_hover_text("Intro y F5 capturan y avanzan sin pedir revisión. Si lo quitas, la foto queda pendiente para incorporarla, repetirla o descartarla");
-        });
-        // Escenario: foto pendiente, o Live View con la foto anterior encima.
+        let stage = rect.shrink(8.0);
         let ar_of = |w: u32, h: u32| w.max(1) as f32 / h.max(1) as f32;
         let fit = |ar: f32| -> Rect {
             let size = if stage.width() / stage.height().max(1.0) > ar { Vec2::new(stage.height() * ar, stage.height()) } else { Vec2::new(stage.width(), stage.width() / ar) };
             Rect::from_center_size(stage.center(), size)
         };
-        let uv = Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0));
         let mut onion_tex = None;
-        if self.sm_ui.cap.onion && self.sm_ui.cap.held.is_none() {
+        if (self.sm_ui.cap.onion || self.sm_ui.cap.flip) && self.sm_ui.cap.held.is_none() {
             if let Some(r) = seq_ref.as_ref().filter(|_| ready) {
                 onion_tex = self.cap_onion(&ctx, r);
             }
         }
+        let full_uv = Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0));
+        let mut zoom_pan: Option<(f32, (f32, f32))> = None;
         let c = &self.sm_ui.cap;
-        if let Some(h) = &c.held {
-            let r = fit(ar_of(h.photo.width, h.photo.height));
-            ui.painter().image(h.tex.id(), r, uv, Color32::WHITE);
-            ui.painter().text(stage.left_top() + Vec2::new(8.0, 8.0), Align2::LEFT_TOP, format!("Foto pendiente · {}×{} · {}", h.photo.width, h.photo.height, kb(h.photo.bytes.len())), FontId::proportional(12.0), ACCENT);
-        } else if let Some(t) = &c.tex {
-            let sz = t.size_vec2();
-            let r = fit(ar_of(sz.x as u32, sz.y as u32));
-            ui.painter().image(t.id(), r, uv, Color32::WHITE);
-            if let Some(o) = onion_tex {
-                ui.painter().image(o, r, uv, Color32::WHITE.gamma_multiply(c.onion_alpha));
+        let img = if let Some(h) = &c.held {
+            Some((h.tex.id(), h.photo.width, h.photo.height, true))
+        } else {
+            c.tex.as_ref().map(|t| (t.id(), t.size_vec2().x as u32, t.size_vec2().y as u32, false))
+        };
+        let mut status_extra = String::new();
+        if let Some((tid, w, h, is_held)) = img {
+            let r = fit(ar_of(w, h));
+            let p = ui.painter();
+            if is_held {
+                p.image(tid, r, full_uv, Color32::WHITE);
+                badge(p, stage.left_top() + Vec2::new(4.0, 4.0), false, format!("Foto pendiente · {}×{} · {}", c.held.as_ref().map_or(0, |h| h.photo.width), c.held.as_ref().map_or(0, |h| h.photo.height), c.held.as_ref().map_or(String::new(), |h| kb(h.photo.bytes.len()))), ACCENT);
+            } else {
+                let zoom = c.zoom.clamp(1.0, 8.0);
+                let half = 0.5 / zoom;
+                let lim = 0.5 - half;
+                let (px, py) = (c.pan.0.clamp(-lim, lim), c.pan.1.clamp(-lim, lim));
+                let uv = Rect::from_min_max(Pos2::new(0.5 + px - half, 0.5 + py - half), Pos2::new(0.5 + px + half, 0.5 + py + half));
+                p.image(tid, r, uv, Color32::WHITE);
+                if let Some(o) = onion_tex {
+                    p.image(o, r, uv, Color32::WHITE.gamma_multiply(if c.flip { 1.0 } else if c.onion { c.onion_alpha } else { 0.0 }));
+                }
+                if c.flip {
+                    badge(p, stage.left_top() + Vec2::new(4.0, 26.0), false, "Foto anterior (L para volver a la cámara)".into(), ACCENT);
+                }
+                let line = Color32::from_white_alpha(120);
+                if c.thirds {
+                    for k in 1..=2 {
+                        let f = k as f32 / 3.0;
+                        p.vline(r.min.x + r.width() * f, r.y_range(), stk(1.0, line));
+                        p.hline(r.x_range(), r.min.y + r.height() * f, stk(1.0, line));
+                    }
+                }
+                if c.cross {
+                    let m = r.center();
+                    p.vline(m.x, r.y_range(), stk(1.0, line));
+                    p.hline(r.x_range(), m.y, stk(1.0, line));
+                    p.circle_stroke(m, 18.0, stk(1.0, line));
+                }
+                if zoom > 1.0 {
+                    status_extra = format!(" · aumento {zoom:.1}×");
+                }
+                let resp = ui.interact(r, egui::Id::new("cap_stage"), Sense::click_and_drag());
+                let (mut nz, mut npan) = (zoom, (px, py));
+                if resp.hovered() {
+                    let scroll = ui.input(|i| i.smooth_scroll_delta.y);
+                    if scroll != 0.0 {
+                        nz = (zoom * (1.0 + scroll * 0.002)).clamp(1.0, 8.0);
+                    }
+                }
+                if zoom > 1.0 && resp.dragged() {
+                    let d = resp.drag_delta();
+                    npan.0 -= d.x / (r.width() * zoom);
+                    npan.1 -= d.y / (r.height() * zoom);
+                }
+                if resp.double_clicked() {
+                    nz = 1.0;
+                }
+                if nz <= 1.001 {
+                    nz = 1.0;
+                    npan = (0.0, 0.0);
+                } else {
+                    let l = 0.5 - 0.5 / nz;
+                    npan = (npan.0.clamp(-l, l), npan.1.clamp(-l, l));
+                }
+                if (nz - c.zoom).abs() > f32::EPSILON || npan != c.pan {
+                    zoom_pan = Some((nz, npan));
+                }
             }
         } else if c.session.is_some() {
             ui.painter().text(stage.center(), Align2::CENTER_CENTER, "Esperando la imagen de la cámara…", FontId::proportional(13.0), INK3);
         }
+        // Estado de la cámara (arriba a la izquierda) y último aviso (abajo a la izquierda).
+        let status = match (&c.session, c.full) {
+            (Some(s), Some((w, h))) => format!("● {} · foto {w}×{h} · {:.0} cuadros/s{status_extra}", s.device.name, c.fps),
+            (Some(s), None) => format!("Abriendo {}…", s.device.name),
+            _ => "Sin cámara conectada".into(),
+        };
+        if c.held.is_none() {
+            badge(ui.painter(), stage.left_top() + Vec2::new(4.0, 4.0), false, status, TX);
+        }
+        let line = c.problem.as_ref().map(|p| (format!("⚠ {p}"), ACCENT2)).or_else(|| (!c.info.is_empty()).then(|| (c.info.clone(), MU)));
+        if let Some((t, col)) = line {
+            badge(ui.painter(), stage.left_bottom() + Vec2::new(4.0, -4.0), true, t, col);
+        }
+        if let Some((z, p)) = zoom_pan {
+            self.sm_ui.cap.zoom = z;
+            self.sm_ui.cap.pan = p;
+        }
         // Sin cámara: elegir y conectar.
         if self.sm_ui.cap.session.is_none() && self.sm_ui.cap.held.is_none() {
             let mut cui = ui.new_child(egui::UiBuilder::new().max_rect(Rect::from_center_size(stage.center(), Vec2::new(stage.width().min(420.0), 140.0))).layout(egui::Layout::top_down(egui::Align::Center)));
-            if let Some(p) = &self.sm_ui.cap.problem {
-                cui.label(RichText::new(format!("⚠ {p}")).size(12.0).color(ACCENT2));
-            }
             if !ready {
                 muted(&mut cui, "La capa Stop Motion necesita una secuencia (carpeta) para guardar las fotos.");
             }
@@ -409,43 +493,112 @@ impl LeonApp {
                 }
             });
         }
-        // Barra de captura.
-        let bar = Rect::from_min_size(Pos2::new(rect.min.x + 8.0, rect.max.y - bar_h - 4.0), Vec2::new(rect.width() - 16.0, bar_h));
-        let mut bui = ui.new_child(egui::UiBuilder::new().max_rect(bar).layout(egui::Layout::left_to_right(egui::Align::Center)));
-        bui.spacing_mut().item_spacing.x = 6.0;
+    }
+
+    /// Barra bajo el escenario: transporte y reproducción arriba; captura abajo.
+    pub(super) fn sm_capture_bar(&mut self, ui: &mut egui::Ui) {
+        use super::icons::{draw_first, draw_last, draw_loop, draw_next, draw_pause, draw_play, draw_prev, icon_button};
+        let rect = ui.max_rect();
+        let Some(r) = self.sm_room_layer().and_then(|li| self.project.layers[li].stopmotion.clone()) else { return };
+        let ready = self.sm.contains_key(&r.id);
+        let n = self.project.length;
+        let row1 = Rect::from_min_size(rect.min + Vec2::new(8.0, 4.0), Vec2::new(rect.width() - 16.0, 28.0));
+        let row2 = Rect::from_min_size(rect.min + Vec2::new(8.0, 38.0), Vec2::new(rect.width() - 16.0, 28.0));
+        let mut r1 = ui.new_child(egui::UiBuilder::new().max_rect(row1).layout(egui::Layout::left_to_right(egui::Align::Center)));
+        r1.spacing_mut().item_spacing.x = 4.0;
+        {
+            let ui = &mut r1;
+            if icon_button(ui, 24.0, false, "Primer cuadro (Inicio)", draw_first).clicked() {
+                self.playing = false;
+                self.frame = self.project.range.map_or(0, |r| r.0);
+            }
+            if icon_button(ui, 24.0, false, "Cuadro anterior ( , )", draw_prev).clicked() {
+                self.step(-1);
+            }
+            let playing = self.playing;
+            let play = icon_button(ui, 24.0, playing, "Reproducir / pausa (Espacio). Con el Live View abierto, reproduce lo capturado y vuelve a la cámara al parar", move |p, r, c| {
+                if playing {
+                    draw_pause(p, r, c)
+                } else {
+                    draw_play(p, r, c)
+                }
+            });
+            if play.clicked() {
+                self.sm_play_range = None;
+                self.toggle_play();
+            }
+            if icon_button(ui, 24.0, false, "Cuadro siguiente ( . )", draw_next).clicked() {
+                self.step(1);
+            }
+            if icon_button(ui, 24.0, false, "Último cuadro (Fin)", draw_last).clicked() {
+                self.playing = false;
+                self.frame = self.project.range.map_or(n - 1, |r| r.1);
+            }
+            if icon_button(ui, 24.0, self.loop_play, "Bucle", draw_loop).clicked() {
+                self.loop_play = !self.loop_play;
+            }
+            ui.add_space(6.0);
+            ui.label(RichText::new(format!("{} / {}", self.frame + 1, n)).size(12.5).color(TX).strong());
+            ui.add(egui::DragValue::new(&mut self.project.fps).range(1..=120).suffix(" fps"));
+            ui.add_space(6.0);
+            let mut last_n = self.sm_ui.cap.last_n;
+            ui.add(egui::DragValue::new(&mut last_n).range(2..=500).prefix("últimas ")).on_hover_text("Cuántas fotos reproduce el botón «▶ Últimas»");
+            self.sm_ui.cap.last_n = last_n;
+            if ui.button(format!("▶ Últimas {last_n}")).on_hover_text("Reproduce solo las últimas fotos de la secuencia, para revisar el movimiento que acabas de hacer").clicked() {
+                let pfps = self.project.fps;
+                let range = self.sm.get(&r.id).and_then(|v| {
+                    let s = &v.folder.seq;
+                    let items = s.items.len();
+                    (items > 0).then(|| {
+                        let a = super::smroom::project_frame_of(s, &r, pfps, items.saturating_sub(last_n as usize));
+                        let b = super::smroom::project_frame_of(s, &r, pfps, items).saturating_sub(1).max(a);
+                        (a, b.min(n.saturating_sub(1)))
+                    })
+                });
+                if range.is_some() {
+                    self.sm_play_range = range;
+                    self.playing = false;
+                    self.toggle_play();
+                }
+            }
+        }
+        let mut r2 = ui.new_child(egui::UiBuilder::new().max_rect(row2).layout(egui::Layout::left_to_right(egui::Align::Center)));
+        r2.spacing_mut().item_spacing.x = 6.0;
+        let ui = &mut r2;
         let connected = self.sm_ui.cap.session.is_some();
-        let busy = self.sm_ui.cap.want.is_some();
+        let busy = self.sm_ui.cap.want.is_some() || self.playing;
+        let live = self.sm_ui.cap.live;
+        if ui.add(egui::SelectableLabel::new(live, "● Live View")).on_hover_text("Muestra lo que ve la cámara en el escenario y permite capturar").clicked() {
+            self.sm_ui.cap.live = !live;
+            if !live && !connected {
+                self.sm_cap_connect();
+            }
+        }
         if self.sm_ui.cap.held.is_some() {
-            if bui.add(egui::Button::new(RichText::new("✔ Incorporar (Intro)").strong())).clicked() {
+            if ui.add(egui::Button::new(RichText::new("✔ Incorporar (Intro)").strong())).clicked() {
                 self.cap_accept();
             }
-            if bui.button("↻ Repetir").on_hover_text("Descarta esta foto y captura otra").clicked() {
+            if ui.button("↻ Repetir").on_hover_text("Descarta esta foto y captura otra").clicked() {
                 self.sm_ui.cap.held = None;
                 self.cap_request(Want::Review);
             }
-            if bui.button("✕ Descartar (Esc)").clicked() {
+            if ui.button("✕ Descartar (Esc)").clicked() {
                 self.sm_ui.cap.held = None;
             }
         } else {
-            bui.add_enabled_ui(connected && ready && !busy, |ui| {
-                if ui.add(egui::Button::new(RichText::new("● Capturar y avanzar (Intro / F5)").strong())).on_hover_text("Guarda la foto al final de la secuencia y lleva el cabezal a ella").clicked() {
+            ui.add_enabled_ui(connected && ready && !busy, |ui| {
+                let shoot = egui::Button::new(RichText::new("● Capturar y avanzar (Intro / F5)").strong().color(Color32::WHITE)).fill(Color32::from_rgb(0xa8, 0x2a, 0x2a)).min_size(Vec2::new(210.0, 26.0));
+                if ui.add(shoot).on_hover_text("Guarda la foto al final de la secuencia y lleva el cabezal a ella").clicked() {
                     self.cap_request(Want::Add);
                 }
                 if ui.button("Capturar y revisar").on_hover_text("Deja la foto pendiente para incorporarla, repetirla o descartarla").clicked() {
                     self.cap_request(Want::Review);
                 }
             });
-            if connected && bui.button("Desconectar").clicked() {
-                self.sm_cap_close();
-            }
         }
         let c = &self.sm_ui.cap;
-        let line = c.problem.as_ref().map(|p| (format!("⚠ {p}"), ACCENT2)).or_else(|| (!c.info.is_empty()).then(|| (c.info.clone(), MU)));
-        if let Some((t, col)) = line {
-            bui.label(RichText::new(t).size(11.5).color(col));
-        }
-        if exit {
-            self.sm_ui.cap.live = false;
+        if let Some(t) = c.problem.as_ref().map(|p| (format!("⚠ {p}"), ACCENT2)).or_else(|| (!c.info.is_empty()).then(|| (c.info.clone(), MU))) {
+            ui.add(egui::Label::new(RichText::new(t.0).size(11.5).color(t.1)).truncate());
         }
     }
 
@@ -455,7 +608,7 @@ impl LeonApp {
         }
         let c = &mut self.sm_ui.cap;
         let label = c.chosen.as_ref().and_then(|id| c.devices.iter().find(|d| &d.id == id)).map_or("(ninguna)".to_string(), |d| d.name.clone());
-        egui::ComboBox::from_id_salt("cap_dev").selected_text(label).width(210.0).show_ui(ui, |ui| {
+        egui::ComboBox::from_id_salt("cap_dev").selected_text(label).width(150.0).show_ui(ui, |ui| {
             for d in c.devices.clone() {
                 let sel = c.chosen.as_ref() == Some(&d.id);
                 if ui.selectable_label(sel, format!("{} ({})", d.name, d.provider)).clicked() {
@@ -468,85 +621,97 @@ impl LeonApp {
         }
     }
 
-    /// Pestaña «Captura» del panel inferior: dispositivos de captura, prueba de captura, controles y errores.
-    pub(super) fn sm_cap_panel(&mut self, ui: &mut egui::Ui) {
+    /// Columna derecha de la sala: la cámara, sus controles, el papel cebolla y las herramientas del Live View.
+    pub(super) fn sm_cam_panel(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         self.sm_cap_poll(&ctx);
-        panel_header(ui, "Dispositivos de captura");
-        ui.horizontal_wrapped(|ui| {
-            self.cap_device_combo(ui);
-            let connected = self.sm_ui.cap.session.is_some();
-            if connected {
-                if ui.button("Desconectar").clicked() {
-                    self.sm_cap_close();
-                }
-                if ui.button("Probar captura").on_hover_text("Saca una foto para comprobar que funciona; no se guarda").clicked() {
-                    self.cap_request(Want::Test);
-                }
-            } else if ui.button("Conectar").clicked() {
-                self.sm_cap_connect();
-            }
-            let live = self.sm_ui.cap.live;
-            if ui.selectable_label(live, "● Live View").on_hover_text("Muestra lo que ve la cámara en el visor y permite capturar").clicked() {
-                self.sm_ui.cap.live = !live;
-                if !live && self.sm_ui.cap.session.is_none() {
+        egui::ScrollArea::vertical().auto_shrink([false, false]).id_salt("sm_cam").show(ui, |ui| {
+            panel_header(ui, "Cámara");
+            ui.horizontal_wrapped(|ui| {
+                self.cap_device_combo(ui);
+            });
+            ui.horizontal_wrapped(|ui| {
+                let connected = self.sm_ui.cap.session.is_some();
+                if connected {
+                    if ui.button("Desconectar").clicked() {
+                        self.sm_cap_close();
+                    }
+                    if ui.button("Probar captura").on_hover_text("Saca una foto para comprobar que funciona; no se guarda").clicked() {
+                        self.cap_request(Want::Test);
+                    }
+                } else if ui.button("Conectar").clicked() {
                     self.sm_cap_connect();
                 }
+            });
+            let c = &self.sm_ui.cap;
+            if c.devices.is_empty() && c.listed {
+                muted(ui, "No se encontró ninguna cámara. Comprueba que está enchufada y que Windows le da permiso a las aplicaciones de escritorio.");
             }
-        });
-        let c = &self.sm_ui.cap;
-        if c.devices.is_empty() && c.listed {
-            muted(ui, "No se encontró ninguna cámara. Comprueba que está enchufada y que Windows le da permiso a las aplicaciones de escritorio.");
-        }
-        for e in &c.list_errors {
-            ui.label(RichText::new(format!("⚠ {e}")).size(11.5).color(ACCENT2));
-        }
-        if let Some(p) = &c.problem {
-            ui.label(RichText::new(format!("⚠ {p}")).size(11.5).color(ACCENT2));
-        }
-        if !c.info.is_empty() {
-            muted(ui, c.info.clone());
-        }
-        if let (Some(s), Some((w, h))) = (&c.session, c.full) {
-            muted(ui, format!("{} · la foto sale a {w}×{h}; el Live View solo es una vista reducida", s.device.name));
-        }
-        // Controles: solo los que la cámara declara.
-        let controls = c.controls.clone();
-        if !controls.is_empty() {
-            ui.add_space(4.0);
-            panel_header(ui, "Controles de la cámara");
-            let mut changed: Option<(String, i64)> = None;
-            egui::ScrollArea::vertical().show(ui, |ui| {
+            for e in &c.list_errors {
+                ui.label(RichText::new(format!("⚠ {e}")).size(11.5).color(ACCENT2));
+            }
+            if let Some(p) = &c.problem {
+                ui.label(RichText::new(format!("⚠ {p}")).size(11.5).color(ACCENT2));
+            }
+            if !c.info.is_empty() {
+                muted(ui, c.info.clone());
+            }
+            if let (Some(s), Some((w, h))) = (&c.session, c.full) {
+                muted(ui, format!("La foto sale a {w}×{h} ({}); el Live View es una vista reducida", s.device.name));
+            }
+            // Controles: solo los que la cámara declara.
+            let controls = c.controls.clone();
+            if !controls.is_empty() {
+                ui.add_space(4.0);
+                panel_header(ui, "Controles de la cámara");
+                let mut changed: Option<(String, i64)> = None;
+                ui.spacing_mut().slider_width = (ui.available_width() - 70.0).max(80.0);
                 for ctl in &controls {
-                    ui.horizontal(|ui| {
-                        ui.label(RichText::new(&ctl.label).size(11.5).color(MU));
-                        let mut v = self.sm_ui.cap.control_value(&ctl.key, ctl.value);
-                        if ctl.boolean {
-                            let mut b = v != 0;
-                            if ui.checkbox(&mut b, "").changed() {
-                                v = b as i64;
-                                changed = Some((ctl.key.clone(), v));
-                            }
-                        } else if ui.add(egui::Slider::new(&mut v, ctl.min..=ctl.max).step_by(ctl.step as f64)).changed() {
+                    ui.label(RichText::new(&ctl.label).size(11.5).color(MU));
+                    let mut v = self.sm_ui.cap.control_value(&ctl.key, ctl.value);
+                    if ctl.boolean {
+                        let mut b = v != 0;
+                        if ui.checkbox(&mut b, "Activado").changed() {
+                            v = b as i64;
                             changed = Some((ctl.key.clone(), v));
                         }
-                    });
+                    } else if ui.add(egui::Slider::new(&mut v, ctl.min..=ctl.max).step_by(ctl.step as f64)).changed() {
+                        changed = Some((ctl.key.clone(), v));
+                    }
+                }
+                if let Some((k, v)) = changed {
+                    self.sm_ui.cap.set_control(&k, v);
+                }
+            } else if self.sm_ui.cap.session.is_some() && self.sm_ui.cap.full.is_some() {
+                muted(ui, "Esta cámara no declara controles que se puedan cambiar.");
+            }
+            ui.add_space(4.0);
+            panel_header(ui, "Captura y papel cebolla");
+            let c = &mut self.sm_ui.cap;
+            ui.checkbox(&mut c.direct, "Animación directa").on_hover_text("Intro y F5 capturan y avanzan sin pedir revisión. Si lo quitas, la foto queda pendiente para incorporarla, repetirla o descartarla");
+            ui.checkbox(&mut c.onion, "Foto anterior encima").on_hover_text("Onion skin en vivo: la última foto de la secuencia sobre lo que ve la cámara");
+            ui.spacing_mut().slider_width = (ui.available_width() - 20.0).max(80.0);
+            ui.add_enabled(c.onion, egui::Slider::new(&mut c.onion_alpha, 0.1..=0.9).show_value(false)).on_hover_text("Opacidad de la foto anterior sobre el Live View");
+            ui.add_space(4.0);
+            panel_header(ui, "Herramientas del Live View");
+            ui.horizontal(|ui| {
+                for (t, z) in [("Ajustar", 1.0f32), ("2×", 2.0), ("4×", 4.0)] {
+                    if ui.selectable_label((c.zoom - z).abs() < 0.01, t).clicked() {
+                        c.zoom = z;
+                        c.pan = (0.0, 0.0);
+                    }
                 }
             });
-            if let Some((k, v)) = changed {
-                self.sm_ui.cap.set_control(&k, v);
-            }
-        } else if self.sm_ui.cap.session.is_some() && self.sm_ui.cap.full.is_some() {
-            muted(ui, "Esta cámara no declara controles que se puedan cambiar.");
-        }
+            muted(ui, "Rueda para acercar, arrastrar para mover y doble clic para ajustar.");
+            ui.checkbox(&mut c.thirds, "Cuadrícula de tercios");
+            ui.checkbox(&mut c.cross, "Cruz de centro");
+            ui.checkbox(&mut c.peaking, "Enfoque asistido").on_hover_text("Marca en magenta los bordes nítidos para ver qué está enfocado. Solo afecta a la vista, no a la foto");
+            ui.checkbox(&mut c.flip, "Ver la foto anterior (L)").on_hover_text("Cambia entre la cámara y la última foto sin tocar nada más");
+        });
     }
 }
 
 impl CapState {
-    pub(super) fn session_is_none(&self) -> bool {
-        self.session.is_none()
-    }
-
     fn control_value(&self, key: &str, fallback: i64) -> i64 {
         self.controls.iter().find(|c| c.key == key).map_or(fallback, |c| c.value)
     }

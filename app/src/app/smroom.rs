@@ -31,6 +31,8 @@ pub(super) struct SmUi {
     last_cur: Option<usize>,
     /// Captura con cámara (Issue #62).
     pub(super) cap: super::smcap::CapState,
+    /// Tamaños de los paneles de la disposición tipo Dragonframe (0 = el de por defecto).
+    pub(super) dw: super::smdragon::DragonSizes,
 }
 
 impl SmUi {
@@ -42,12 +44,12 @@ impl SmUi {
 
     /// Para capturas: LEONTOON_SMTAB=0|1|2 abre esa pestaña del panel de la sala.
     pub(super) fn from_env() -> SmUi {
-        SmUi { tab: std::env::var("LEONTOON_SMTAB").ok().and_then(|v| v.parse().ok()).unwrap_or(0), cap: super::smcap::CapState::from_env(), ..Default::default() }
+        SmUi { tab: std::env::var("LEONTOON_SMTAB").ok().and_then(|v| v.parse::<u8>().ok()).unwrap_or(0).min(1), cap: super::smcap::CapState::from_env(), ..Default::default() }
     }
 }
 
 /// Lo que piden los controles; se aplica al terminar de dibujar, cuando ya no se está leyendo la secuencia.
-enum Act {
+pub(super) enum Act {
     Goto(usize),
     Move(Vec<String>, usize),
     Duplicate,
@@ -68,7 +70,7 @@ enum Act {
 }
 
 #[derive(Clone, Copy, PartialEq)]
-enum AddWhere {
+pub(super) enum AddWhere {
     End,
     AfterSelection,
     Replace,
@@ -178,21 +180,11 @@ impl LeonApp {
         let hr = area_header(ui, "");
         let mut h = ui.new_child(egui::UiBuilder::new().max_rect(hr.shrink2(Vec2::new(6.0, 2.0))).layout(egui::Layout::left_to_right(egui::Align::Center)));
         h.spacing_mut().item_spacing.x = 3.0;
-        for (i, name) in ["Secuencia", "Frame Browser", "X-Sheet", "Captura"].into_iter().enumerate() {
+        // La X-Sheet va en la columna izquierda de la sala y la cámara en la derecha: aquí solo la tira y el Frame Browser.
+        for (i, name) in ["Secuencia", "Frame Browser"].into_iter().enumerate() {
             if pill(&mut h, name, self.sm_ui.tab as usize == i).clicked() {
                 self.sm_ui.tab = i as u8;
             }
-        }
-        let live = self.sm_ui.cap.live;
-        if pill(&mut h, "● Live View", live).on_hover_text("Muestra la cámara en el visor para capturar fotos").clicked() {
-            self.sm_ui.cap.live = !live;
-            if !live && self.sm_ui.cap.session_is_none() {
-                self.sm_cap_connect();
-            }
-        }
-        if self.sm_ui.tab == 3 {
-            self.sm_cap_panel(ui);
-            return;
         }
         let Some(li) = self.sm_room_layer() else {
             ui.add_space(10.0);
@@ -237,15 +229,14 @@ impl LeonApp {
         self.sm_toolbar(ui, &id, &mut acts);
         match self.sm_ui.tab {
             0 => self.sm_strip(ui, &id, &r, &mut acts),
-            1 => self.sm_browser(ui, &id, &mut acts),
-            _ => self.sm_xsheet(ui, &id, &r, &mut acts),
+            _ => self.sm_browser(ui, &id, &mut acts),
         }
         for a in acts {
             self.sm_act(&id, &r, a);
         }
     }
 
-    fn sm_toolbar(&mut self, ui: &mut egui::Ui, id: &str, acts: &mut Vec<Act>) {
+    pub(super) fn sm_toolbar(&mut self, ui: &mut egui::Ui, id: &str, acts: &mut Vec<Act>) {
         let (can_undo, can_redo, n_sel) = {
             let v = &self.sm[id];
             (v.hist.can_undo(), v.hist.can_redo(), self.sm_ui.sel.len())
@@ -317,7 +308,7 @@ impl LeonApp {
     }
 
     /// Franja de la secuencia: una celda por posición, más ancha cuanto más dura. Se arrastra para reordenar.
-    fn sm_strip(&mut self, ui: &mut egui::Ui, id: &str, r: &SmRef, acts: &mut Vec<Act>) {
+    pub(super) fn sm_strip(&mut self, ui: &mut egui::Ui, id: &str, r: &SmRef, acts: &mut Vec<Act>) {
         let avail = ui.available_size();
         let th = (avail.y - 40.0).clamp(36.0, 110.0);
         let tw = th * 16.0 / 9.0;
@@ -448,7 +439,7 @@ impl LeonApp {
     }
 
     /// Frame Browser: todas las fotos de la secuencia con su miniatura (solo se cargan las que se ven).
-    fn sm_browser(&mut self, ui: &mut egui::Ui, id: &str, acts: &mut Vec<Act>) {
+    pub(super) fn sm_browser(&mut self, ui: &mut egui::Ui, id: &str, acts: &mut Vec<Act>) {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 4.0;
             ui.add(egui::TextEdit::singleline(&mut self.sm_ui.search).hint_text("Buscar por número o archivo").desired_width(170.0));
@@ -534,7 +525,7 @@ impl LeonApp {
     }
 
     /// X-Sheet: una fila por posición con sus cuadros, su foto, su exposición y su nota.
-    fn sm_xsheet(&mut self, ui: &mut egui::Ui, id: &str, r: &SmRef, acts: &mut Vec<Act>) {
+    pub(super) fn sm_xsheet(&mut self, ui: &mut egui::Ui, id: &str, r: &SmRef, acts: &mut Vec<Act>, compact: bool) {
         let (pfps, frame) = (self.project.fps, self.frame);
         let v = &self.sm[id];
         let seq = &v.folder.seq;
@@ -546,13 +537,17 @@ impl LeonApp {
         let mut exp_edit: Option<(String, u32)> = None;
         let mut note_edit: Option<(String, String)> = None;
         let row_h = 22.0;
-        let widths = [46.0, 96.0, 90.0, 80.0, 40.0];
+        // En la disposición compacta (columna izquierda de la sala) solo van posición, cuadros, foto y exposición.
+        let widths = if compact { [32.0, 62.0, 34.0, 58.0, 40.0] } else { [46.0, 96.0, 90.0, 80.0, 40.0] };
+        let ncols = if compact { 4 } else { 5 };
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 4.0;
-            for (w, t) in widths.iter().zip(["Pos.", "Cuadros", "Foto", "Exposición", "Vis."]) {
+            for (w, t) in widths.iter().zip(["Pos.", "Cuadros", "Foto", "Exp.", "Vis."]).take(ncols) {
                 ui.add_sized([*w, 16.0], egui::Label::new(RichText::new(t).size(11.0).color(MU)));
             }
-            ui.label(RichText::new("Nota").size(11.0).color(MU));
+            if !compact {
+                ui.label(RichText::new("Nota").size(11.0).color(MU));
+            }
         });
         egui::ScrollArea::vertical().auto_shrink([false, false]).id_salt("sm_xsheet").show_rows(ui, row_h, seq.items.len(), |ui, range| {
             for idx in range {
@@ -572,13 +567,19 @@ impl LeonApp {
                 if rr.changed() && e != it.exposure {
                     exp_edit = Some((it.id.clone(), e));
                 }
-                child.add_sized([widths[4], row_h - 2.0], egui::Label::new(RichText::new(if it.visible { "✔" } else { "–" }).size(11.5).color(MU)));
-                let mut note = it.note.clone().unwrap_or_default();
-                let nr = child.add(egui::TextEdit::singleline(&mut note).desired_width(160.0).font(FontId::proportional(11.5)));
-                if nr.changed() {
-                    note_edit = Some((it.id.clone(), note));
+                let mut over_note = false;
+                if !compact {
+                    child.add_sized([widths[4], row_h - 2.0], egui::Label::new(RichText::new(if it.visible { "✔" } else { "–" }).size(11.5).color(MU)));
+                    let mut note = it.note.clone().unwrap_or_default();
+                    let nr = child.add(egui::TextEdit::singleline(&mut note).desired_width(160.0).font(FontId::proportional(11.5)));
+                    over_note = nr.hovered();
+                    if nr.changed() {
+                        note_edit = Some((it.id.clone(), note));
+                    }
+                } else if !it.visible {
+                    child.label(RichText::new("oculta").size(10.5).color(MU));
                 }
-                if resp.clicked() && !rr.hovered() && !nr.hovered() {
+                if resp.clicked() && !rr.hovered() && !over_note {
                     let (ctrl, shift) = ui.input(|i| (i.modifiers.command, i.modifiers.shift));
                     let order: Vec<String> = seq.items.iter().map(|i| i.id.clone()).collect();
                     click_select(&mut self.sm_ui.sel, &mut self.sm_ui.anchor, &order, &it.id, ctrl, shift);
@@ -664,7 +665,7 @@ impl LeonApp {
         true
     }
 
-    fn sm_act(&mut self, id: &str, r: &SmRef, a: Act) {
+    pub(super) fn sm_act(&mut self, id: &str, r: &SmRef, a: Act) {
         let sel = self.sm_ui.sel.clone();
         let hold = if self.sm_ui.hold == 0 { HOLD_DEFAULT } else { self.sm_ui.hold };
         let pfps = self.project.fps;

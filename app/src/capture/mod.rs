@@ -201,6 +201,27 @@ fn live_from(rgb: &image::RgbImage, seq: u64) -> LiveFrame {
     LiveFrame { seq, width: nw, height: nh, rgba, full: (w, h) }
 }
 
+/// Cuánto debe cambiar el brillo entre vecinos para marcar un borde como nítido.
+pub const PEAKING_THRESHOLD: i32 = 60;
+
+/// Enfoque asistido: pinta de magenta los bordes nítidos del Live View (donde el brillo cambia de golpe), para ver qué
+/// está enfocado. Solo cambia la vista; la foto que se captura no se toca.
+pub fn peaking(rgba: &mut [u8], width: usize, height: usize) {
+    if width < 3 || height < 3 || rgba.len() < width * height * 4 {
+        return;
+    }
+    let lum: Vec<i32> = rgba.chunks_exact(4).take(width * height).map(|p| (p[0] as i32 * 299 + p[1] as i32 * 587 + p[2] as i32 * 114) / 1000).collect();
+    for y in 1..height - 1 {
+        for x in 1..width - 1 {
+            let i = y * width + x;
+            let (gx, gy) = (lum[i + 1] - lum[i - 1], lum[i + width] - lum[i - width]);
+            if gx.abs() + gy.abs() > PEAKING_THRESHOLD {
+                rgba[i * 4..i * 4 + 3].copy_from_slice(&[255, 0, 200]);
+            }
+        }
+    }
+}
+
 fn photo_from(f: RawFrame) -> Result<CapturedPhoto, String> {
     if f.jpeg {
         // El JPEG original de la cámara, sin volver a comprimir.

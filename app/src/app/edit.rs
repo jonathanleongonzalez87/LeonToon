@@ -277,7 +277,7 @@ impl LeonApp {
 
     fn play_bounds(&self) -> (u32, u32) {
         let last = self.project.length - 1;
-        match self.project.range {
+        match self.sm_play_range.or(self.project.range) {
             Some((a, b)) => (a.min(last), b.min(last)),
             None => (0, last),
         }

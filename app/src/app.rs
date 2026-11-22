@@ -23,6 +23,7 @@ mod flow_tests;
 mod papers;
 mod panelsize;
 mod smcap;
+mod smdragon;
 mod smroom;
 mod smui;
 mod smview;
@@ -344,6 +345,8 @@ pub struct LeonApp {
     playing: bool,
     play_accum: f64,
     loop_play: bool,
+    /// Sala Stop Motion: reproducir solo un tramo (por ejemplo, las últimas fotos). Se borra al parar.
+    sm_play_range: Option<(u32, u32)>,
     /// Selección de celdas en el Xsheet: (capa, desde, hasta).
     sel: Option<(usize, u32, u32)>,
     xs_horizontal: bool,
@@ -673,6 +676,7 @@ impl LeonApp {
             playing: false,
             play_accum: 0.0,
             loop_play: false,
+            sm_play_range: None,
             sel: None,
             xs_horizontal: false,
             onion: true,

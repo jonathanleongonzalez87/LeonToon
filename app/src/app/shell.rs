@@ -126,23 +126,14 @@ impl LeonApp {
                 0
             };
         }
-        if self.room_kind() == RoomKind::StopMotion && self.sm_ui.cap.live {
-            in_area(ui, view, |ui| self.sm_live_view(ui));
+        let sm_room = self.room_kind() == RoomKind::StopMotion;
+        if sm_room {
+            // Sala Stop Motion: disposición tipo Dragonframe en todo el centro (X-Sheet, escenario, cámara y tira de fotos).
+            self.sm_dragon(ui, center);
         } else {
             in_area(ui, view, |ui| self.viewer(ui));
-        }
-        if self.room_kind() != RoomKind::StopMotion {
             // Al salir de la sala se cierra la cámara: la luz de la webcam no debe quedar encendida.
             self.sm_cap_leave();
-        }
-        if self.room_kind() == RoomKind::StopMotion && self.xs_horizontal {
-            // Sala Stop Motion: transporte y línea de tiempo arriba, y debajo secuencia, Frame Browser y X-Sheet.
-            let top_h = 150.0f32.min(tl.height() * 0.45);
-            let top = Rect::from_min_size(tl.min, Vec2::new(tl.width(), top_h));
-            let bottom = Rect::from_min_max(Pos2::new(tl.min.x, tl.min.y + top_h + gap), tl.max);
-            in_area(ui, top, |ui| self.timeline_area(ui));
-            in_area(ui, bottom, |ui| self.sm_bottom(ui));
-        } else {
             in_area(ui, tl, |ui| self.timeline_area(ui));
         }
 
@@ -161,7 +152,9 @@ impl LeonApp {
                 Resize::None => {}
             }
         }
-        if self.xs_horizontal {
+        if sm_room {
+            // La sala Stop Motion trae sus propios bordes arrastrables.
+        } else if self.xs_horizontal {
             let bar = Rect::from_center_size(Pos2::new(tl.center().x, tl.min.y - gap * 0.5), Vec2::new(tl.width(), 8.0));
             match resize_handle(ui, "timeline", bar, false) {
                 Resize::Drag(p) => self.sizes.timeline = center.max.y - p.y - gap * 0.5,
