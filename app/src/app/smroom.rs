@@ -186,44 +186,12 @@ impl LeonApp {
                 self.sm_ui.tab = i as u8;
             }
         }
-        let Some(li) = self.sm_room_layer() else {
-            ui.add_space(10.0);
-            ui.vertical_centered(|ui| {
-                muted(ui, "Esta sala trabaja con una capa Stop Motion y el proyecto todavía no tiene ninguna.");
-                if ui.button("Agregar una capa Stop Motion").clicked() {
-                    self.add_layer_kind(LayerKind::StopMotion);
-                }
-            });
-            return;
-        };
-        let Some(r) = self.project.layers[li].stopmotion.clone() else {
-            ui.add_space(10.0);
-            ui.vertical_centered(|ui| {
-                muted(ui, "La capa Stop Motion todavía no tiene secuencia. Elige la carpeta donde se guardarán las fotos.");
-                ui.horizontal(|ui| {
-                    if ui.button("Crear una secuencia nueva…").clicked() {
-                        self.cl = li;
-                        self.sm_create();
-                    }
-                    if ui.button("Usar una secuencia que ya existe…").clicked() {
-                        self.cl = li;
-                        self.sm_open_existing();
-                    }
-                });
-            });
-            return;
-        };
-        if let SmState::Missing(msg) = self.sm_state(&r) {
-            ui.add_space(10.0);
-            ui.vertical_centered(|ui| {
-                ui.label(RichText::new(format!("⚠ {msg}")).size(12.0).color(ACCENT2));
-                if ui.button("Buscar la carpeta…").clicked() {
-                    self.cl = li;
-                    self.sm_relocate(&r);
-                }
-            });
+        // Sin capa Stop Motion, sin secuencia o con la carpeta perdida: aviso con el botón que lo arregla (ver context.rs).
+        if let Some(gap) = self.context_gap(super::context::Need::StopMotionSequence) {
+            self.gap_ui(ui, gap);
             return;
         }
+        let Some(r) = self.sm_room_layer().and_then(|li| self.project.layers[li].stopmotion.clone()) else { return };
         let id = r.id.clone();
         let mut acts: Vec<Act> = Vec::new();
         self.sm_toolbar(ui, &id, &mut acts);

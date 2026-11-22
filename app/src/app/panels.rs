@@ -316,7 +316,13 @@ impl LeonApp {
                     ui.label(RichText::new(g.name().to_uppercase()).size(10.0).color(INK3));
                     for e in list {
                         let n = if e == Editor::RoomProps { format!("Propiedades de la sala ({})", def.right.title()) } else { e.name().to_string() };
-                        ui.selectable_value(&mut chosen, e, n);
+                        // Un editor al que le falta contexto se atenúa y dice qué falta (el que ya está elegido sigue activo).
+                        let reason = self.context_gap(e.needs()).map(|g| g.msg);
+                        let r = ui.add_enabled(reason.is_none() || e == ed, egui::SelectableLabel::new(chosen == e, n));
+                        let r = match &reason { Some(m) => r.on_hover_text(m.clone()).on_disabled_hover_text(m.clone()), None => r };
+                        if r.clicked() {
+                            chosen = e;
+                        }
                     }
                 }
             });
@@ -339,6 +345,11 @@ impl LeonApp {
 
     /// Dibuja un editor dentro de un área. Es el único sitio que sabe qué función dibuja cada editor.
     pub(super) fn draw_editor(&mut self, ui: &mut egui::Ui, ed: Editor, room_right: RightKind) {
+        // Si al contexto le falta algo que el editor necesita, se explica y se ofrece arreglarlo.
+        if let Some(gap) = self.context_gap(ed.needs()) {
+            self.gap_ui(ui, gap);
+            return;
+        }
         match ed {
             Editor::RoomProps => self.room_props(ui, room_right),
             Editor::Palettes => self.palette_panel(ui),
