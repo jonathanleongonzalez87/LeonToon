@@ -3,6 +3,10 @@
 Programas pequeños, **fuera de LeonToon**, que sirvieron para el estudio técnico de [`docs/stop-motion-estudio.md`](../../docs/stop-motion-estudio.md).
 Tienen su propio `Cargo.toml` y su propia carpeta `target`; no se compilan con el programa principal.
 
+**Lo más fácil:** haz doble clic en **`EJECUTAR_PRUEBA.bat`** (en esta carpeta). Compila la primera vez, ejecuta la prueba con la cámara número 1 y abre la carpeta con la foto. Si tu cámara es otra, edita el número del final de la línea `prueba-webcam.exe 1 salida`.
+
+O desde una terminal:
+
 ```powershell
 cd tools/prueba-webcam
 cargo build --release
