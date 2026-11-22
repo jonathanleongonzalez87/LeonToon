@@ -1,0 +1,13 @@
+[package]
+name = "prueba-webcam"
+version = "0.1.0"
+edition = "2021"
+description = "Prueba aislada de la Fase 0 de Stop Motion (#58): lista las cámaras, mide el live view y guarda una foto."
+publish = false
+
+[dependencies]
+nokhwa = { version = "0.10", default-features = false, features = ["input-native"] }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+
+[profile.dev]
+opt-level = 2

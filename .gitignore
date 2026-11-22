@@ -19,3 +19,7 @@ app/shots/abr_*.png
 # Capturas de prueba (las del README viven en docs/img) y registros de la herramienta
 app/shots/
 questions.json
+
+# Herramientas de prueba aisladas (tools/): su compilacion y sus resultados
+tools/*/target/
+tools/*/salida/
