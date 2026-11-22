@@ -73,40 +73,90 @@ impl LeonApp {
         !room.def().story && (room == RoomKind::StopMotion || self.slot_editor(Slot::Main) == Editor::Viewer)
     }
 
-    /// El selector de tipo de editor de un hueco: menú agrupado; los editores a los que les falta contexto salen
-    /// atenuados y dicen por qué al pasar el cursor.
+    /// El selector de tipo de editor de un hueco, como el de Blender: un botón con el icono y el nombre del editor actual
+    /// que abre un menú con una columna por grupo (icono y nombre de cada editor). Los editores a los que les falta
+    /// contexto salen atenuados y dicen por qué al pasar el cursor; el que ya está elegido sigue activo.
     pub(super) fn slot_combo(&mut self, ui: &mut egui::Ui, slot: Slot, width: f32) {
         let room = self.room_kind();
         let cur = self.slot_editor(slot);
         let title = if cur == Editor::RoomProps { room.def().right.title() } else { cur.name() };
+        let ctx = ui.ctx().clone();
+        let open_id = egui::Id::new(("slot_menu", slot.id()));
+        // Para capturas de pantalla: LEONTOON_SELECTOR=<hueco> abre el menú de ese hueco al arrancar (una sola vez).
+        static SHOT_OPENED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+        if std::env::var("LEONTOON_SELECTOR").ok().as_deref() == Some(slot.id()) && !SHOT_OPENED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+            ctx.data_mut(|d| d.insert_temp(open_id, true));
+        }
+        let open = ctx.data(|d| d.get_temp::<bool>(open_id)).unwrap_or(false);
+        // El botón
+        let (rect, resp) = ui.allocate_exact_size(Vec2::new(width, 22.0), Sense::click());
+        let bg = if open { BG4 } else if resp.hovered() { Color32::from_rgb(0x44, 0x44, 0x44) } else { Color32::from_rgb(0x38, 0x38, 0x38) };
+        {
+            let p = ui.painter_at(rect);
+            p.rect_filled(rect, 4.0, bg);
+            draw_editor_icon(cur, &p, Rect::from_center_size(Pos2::new(rect.min.x + 14.0, rect.center().y), Vec2::splat(15.0)), group_tint(cur.group()));
+            let galley = p.layout_no_wrap(title.to_string(), FontId::proportional(11.5), TX);
+            let clip = Rect::from_min_max(Pos2::new(rect.min.x + 26.0, rect.min.y), Pos2::new(rect.max.x - 16.0, rect.max.y));
+            p.with_clip_rect(clip).galley(Pos2::new(clip.min.x, rect.center().y - galley.size().y / 2.0), galley, TX);
+            draw_chevron(&p, Pos2::new(rect.max.x - 9.0, rect.center().y), INK3);
+        }
+        let resp = resp.on_hover_text("Tipo de editor de este hueco");
+        if resp.clicked() {
+            ctx.data_mut(|d| d.insert_temp(open_id, !open));
+        }
+        if !open {
+            return;
+        }
+        // El menú: una columna por grupo.
         let mut chosen = cur;
-        egui::ComboBox::from_id_salt(("slot_editor", slot.id())).selected_text(RichText::new(title).color(TX)).width(width).show_ui(ui, |ui| {
-            for g in EditorGroup::ALL {
-                let list: Vec<Editor> = Editor::ALL.into_iter().filter(|e| e.group() == g).collect();
-                if list.is_empty() {
-                    continue;
-                }
-                ui.label(RichText::new(g.name().to_uppercase()).size(10.0).color(INK3));
-                for e in list {
-                    let n = if e == Editor::RoomProps { format!("Propiedades de la sala ({})", room.def().right.title()) } else { e.name().to_string() };
-                    // El que ya está elegido sigue activo aunque falte contexto: así siempre se puede salir de él.
-                    let reason = self.context_gap(e.needs()).map(|g| g.msg);
-                    let r = ui.add_enabled(reason.is_none() || e == cur, egui::SelectableLabel::new(chosen == e, n));
-                    let r = match &reason {
-                        Some(m) => r.on_hover_text(m.clone()).on_disabled_hover_text(m.clone()),
-                        None => r,
-                    };
-                    if r.clicked() {
-                        chosen = e;
+        let area = egui::Area::new(open_id.with("area")).order(egui::Order::Foreground).fixed_pos(rect.left_bottom() + Vec2::new(0.0, 3.0)).constrain(true).show(&ctx, |ui| {
+            egui::Frame::popup(ui.style()).inner_margin(egui::Margin::symmetric(6, 6)).show(ui, |ui| {
+                ui.spacing_mut().item_spacing = Vec2::new(8.0, 2.0);
+                ui.horizontal_top(|ui| {
+                    for g in EditorGroup::ALL {
+                        let list: Vec<Editor> = Editor::ALL.into_iter().filter(|e| e.group() == g).collect();
+                        if list.is_empty() {
+                            continue;
+                        }
+                        ui.vertical(|ui| {
+                            ui.set_width(196.0);
+                            ui.label(RichText::new(g.name()).size(11.0).color(MU));
+                            let (hl, _) = ui.allocate_exact_size(Vec2::new(188.0, 1.0), Sense::hover());
+                            ui.painter().rect_filled(hl, 0.0, LINE_STRONG);
+                            for e in list {
+                                let name = e.name().to_string();
+                                // El que ya está elegido sigue activo aunque falte contexto: así siempre se puede salir de él.
+                                let reason = self.context_gap(e.needs()).map(|g| g.msg);
+                                let enabled = reason.is_none() || e == cur;
+                                let (row, r) = ui.allocate_exact_size(Vec2::new(188.0, 22.0), if enabled { Sense::click() } else { Sense::hover() });
+                                if e == chosen {
+                                    ui.painter().rect_filled(row, 4.0, ACCENT);
+                                } else if r.hovered() && enabled {
+                                    ui.painter().rect_filled(row, 4.0, BG4);
+                                }
+                                let (tint, ink) = if e == chosen { (ACCENT_INK, ACCENT_INK) } else if enabled { (group_tint(g), TX) } else { (with_alpha(group_tint(g), 0.35), INK3) };
+                                draw_editor_icon(e, ui.painter(), Rect::from_center_size(Pos2::new(row.min.x + 14.0, row.center().y), Vec2::splat(15.0)), tint);
+                                ui.painter().with_clip_rect(row).text(Pos2::new(row.min.x + 28.0, row.center().y), Align2::LEFT_CENTER, &name, FontId::proportional(11.5), ink);
+                                if let Some(m) = &reason {
+                                    r.on_hover_text(m.clone());
+                                } else if r.clicked() {
+                                    chosen = e;
+                                }
+                            }
+                        });
                     }
-                }
-            }
+                });
+            });
         });
+        // Se cierra al elegir, con Esc o con un clic fuera del menú y del botón.
+        let outside = ctx.input(|i| i.pointer.any_pressed() && i.pointer.interact_pos().map_or(false, |p| !area.response.rect.contains(p) && !rect.contains(p)));
+        if chosen != cur || outside || ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+            ctx.data_mut(|d| d.insert_temp(open_id, false));
+        }
         if chosen != cur {
             self.set_slot_editor(slot, chosen);
         }
     }
-
     /// Cabecera de un hueco: el fondo, el selector de editor a la izquierda y, a su derecha, el espacio que le queda al
     /// editor para sus propios controles (se devuelve ese rectángulo).
     pub(super) fn slot_head(&mut self, ui: &mut egui::Ui) -> Rect {
@@ -222,5 +272,17 @@ mod tests {
         // Solo vale la primera: el hueco sm_left no existe en Layout y time con timeline es el valor por defecto.
         assert_eq!(m.len(), 1);
         assert_eq!(m[&(RoomKind::StopMotion, Slot::SmRight)], Editor::Preview);
+    }
+
+    #[test]
+    fn todos_los_iconos_de_editor_se_dibujan_sin_fallar() {
+        let ctx = egui::Context::default();
+        let p = ctx.layer_painter(egui::LayerId::background());
+        for e in Editor::ALL {
+            draw_editor_icon(e, &p, Rect::from_min_size(Pos2::ZERO, Vec2::splat(16.0)), group_tint(e.group()));
+        }
+        for g in EditorGroup::ALL {
+            let _ = group_tint(g);
+        }
     }
 }

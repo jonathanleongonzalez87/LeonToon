@@ -392,3 +392,125 @@ pub(super) fn draw_tool_icon(t: Tool, p: &egui::Painter, r: Rect, c: Color32) {
         }
     }
 }
+
+/// Color de cada grupo de editores (de la paleta): azul los visores, dorado el tiempo, verde los datos, lila la
+/// producción y salmón el sistema.
+pub(super) fn group_tint(g: EditorGroup) -> Color32 {
+    match g {
+        EditorGroup::Visores => Color32::from_rgb(0x8f, 0xb3, 0xcf),
+        EditorGroup::Tiempo => Color32::from_rgb(0xf2, 0xd2, 0x7a),
+        EditorGroup::Datos => Color32::from_rgb(0xa8, 0xcf, 0x8f),
+        EditorGroup::Produccion => Color32::from_rgb(0xb7, 0xa2, 0xe6),
+        EditorGroup::Sistema => Color32::from_rgb(0xe9, 0xa0, 0x7a),
+    }
+}
+
+/// Icono de un editor, dibujado en el estilo de los de la barra de herramientas (trazo del color del grupo con un
+/// relleno suave). `r` es un cuadrado.
+pub(super) fn draw_editor_icon(e: Editor, p: &egui::Painter, r: Rect, c: Color32) {
+    let s = |x: f32, y: f32| Pos2::new(r.min.x + x * r.width(), r.min.y + y * r.height());
+    let st = stk(1.5, c);
+    let soft = c.gamma_multiply(0.30);
+    let boxr = |a: Pos2, b: Pos2| {
+        let rc = Rect::from_min_max(a, b);
+        p.rect_filled(rc, 1.5, soft);
+        p.rect_stroke(rc, 1.5, st, EStrokeKind::Middle);
+    };
+    match e {
+        Editor::Viewer => {
+            boxr(s(0.08, 0.16), s(0.92, 0.7));
+            p.line_segment([s(0.5, 0.7), s(0.5, 0.88)], st);
+            p.line_segment([s(0.3, 0.88), s(0.7, 0.88)], st);
+        }
+        Editor::SmStage => {
+            boxr(s(0.08, 0.16), s(0.92, 0.7));
+            p.circle_filled(s(0.28, 0.43), r.width() * 0.09, Color32::from_rgb(0xe0, 0x40, 0x30));
+            p.line_segment([s(0.5, 0.7), s(0.5, 0.88)], st);
+            p.line_segment([s(0.3, 0.88), s(0.7, 0.88)], st);
+        }
+        Editor::Preview => {
+            let pts: Vec<Pos2> = (0..=16).map(|i| { let x = i as f32 / 16.0; s(0.06 + x * 0.88, 0.5 - (std::f32::consts::PI * x).sin() * 0.3) }).collect();
+            let low: Vec<Pos2> = (0..=16).map(|i| { let x = i as f32 / 16.0; s(0.06 + x * 0.88, 0.5 + (std::f32::consts::PI * x).sin() * 0.3) }).collect();
+            p.add(Shape::line(pts, st));
+            p.add(Shape::line(low, st));
+            p.circle_filled(s(0.5, 0.5), r.width() * 0.13, c);
+        }
+        Editor::Timeline => {
+            p.line_segment([s(0.06, 0.62), s(0.94, 0.62)], st);
+            for i in 0..5 {
+                let x = 0.12 + i as f32 * 0.19;
+                p.line_segment([s(x, 0.5), s(x, 0.62)], st);
+            }
+            boxr(s(0.3, 0.22), s(0.46, 0.42));
+            p.line_segment([s(0.62, 0.15), s(0.62, 0.85)], stk(1.8, Color32::from_rgb(0xfd, 0x67, 0x24)));
+        }
+        Editor::SmStrip => {
+            for i in 0..3 {
+                let x = 0.04 + i as f32 * 0.32;
+                boxr(s(x, 0.3), s(x + 0.26, 0.7));
+            }
+        }
+        Editor::SmXSheet => {
+            boxr(s(0.14, 0.1), s(0.86, 0.9));
+            p.line_segment([s(0.14, 0.37), s(0.86, 0.37)], st);
+            p.line_segment([s(0.14, 0.63), s(0.86, 0.63)], st);
+            p.line_segment([s(0.4, 0.1), s(0.4, 0.9)], st);
+        }
+        Editor::Curves => {
+            let pts: Vec<Pos2> = (0..=18).map(|i| { let x = i as f32 / 18.0; s(0.1 + x * 0.8, 0.82 - (x * x * (3.0 - 2.0 * x)) * 0.64) }).collect();
+            p.add(Shape::line(pts, stk(1.8, c)));
+            p.circle_filled(s(0.1, 0.82), 2.4, c);
+            p.circle_filled(s(0.9, 0.18), 2.4, c);
+        }
+        Editor::Layers => {
+            for (i, y) in [0.62f32, 0.42, 0.22].iter().enumerate() {
+                let pts = vec![s(0.5, *y), s(0.92, *y + 0.14), s(0.5, *y + 0.28), s(0.08, *y + 0.14)];
+                p.add(Shape::convex_polygon(pts.clone(), if i == 2 { c.gamma_multiply(0.55) } else { soft }, EStroke::NONE));
+                p.add(Shape::closed_line(pts, st));
+            }
+        }
+        Editor::RoomProps => {
+            for (i, (y, k)) in [(0.22f32, 0.3f32), (0.5, 0.68), (0.78, 0.45)].iter().enumerate() {
+                let _ = i;
+                p.line_segment([s(0.1, *y), s(0.9, *y)], st);
+                p.circle_filled(s(*k, *y), r.width() * 0.1, c);
+            }
+        }
+        Editor::Schematic => {
+            boxr(s(0.06, 0.14), s(0.34, 0.38));
+            boxr(s(0.06, 0.62), s(0.34, 0.86));
+            boxr(s(0.66, 0.38), s(0.94, 0.62));
+            p.line_segment([s(0.34, 0.26), s(0.66, 0.5)], st);
+            p.line_segment([s(0.34, 0.74), s(0.66, 0.5)], st);
+        }
+        Editor::Explorer => {
+            let pts = vec![s(0.06, 0.26), s(0.38, 0.26), s(0.48, 0.38), s(0.94, 0.38), s(0.94, 0.84), s(0.06, 0.84)];
+            p.add(Shape::convex_polygon(pts.clone(), soft, EStroke::NONE));
+            p.add(Shape::closed_line(pts, st));
+        }
+        Editor::Palettes => {
+            p.circle_filled(s(0.5, 0.5), r.width() * 0.42, soft);
+            p.circle_stroke(s(0.5, 0.5), r.width() * 0.42, st);
+            for (x, y, col) in [(0.34, 0.38, Color32::from_rgb(0xfd, 0x67, 0x24)), (0.58, 0.32, Color32::from_rgb(0xf2, 0xd2, 0x7a)), (0.66, 0.56, Color32::from_rgb(0x8f, 0xb3, 0xcf)), (0.38, 0.64, Color32::from_rgb(0xa8, 0xcf, 0x8f))] {
+                p.circle_filled(s(x, y), r.width() * 0.07, col);
+            }
+        }
+        Editor::Substitution => {
+            boxr(s(0.06, 0.2), s(0.46, 0.6));
+            boxr(s(0.54, 0.4), s(0.94, 0.8));
+            p.line_segment([s(0.3, 0.8), s(0.46, 0.8)], st);
+            p.line_segment([s(0.54, 0.2), s(0.7, 0.2)], st);
+        }
+        Editor::Storyboard => {
+            for (x, y) in [(0.06, 0.1), (0.54, 0.1), (0.06, 0.54), (0.54, 0.54)] {
+                boxr(s(x, y), s(x + 0.4, y + 0.36));
+            }
+        }
+        Editor::Camera => {
+            boxr(s(0.05, 0.28), s(0.65, 0.72));
+            let pts = vec![s(0.65, 0.45), s(0.95, 0.28), s(0.95, 0.72), s(0.65, 0.55)];
+            p.add(Shape::convex_polygon(pts.clone(), soft, EStroke::NONE));
+            p.add(Shape::closed_line(pts, st));
+        }
+    }
+}
