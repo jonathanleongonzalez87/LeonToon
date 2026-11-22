@@ -25,6 +25,7 @@ mod panelsize;
 mod context;
 mod smcap;
 mod smdragon;
+mod slots;
 mod smroom;
 mod smui;
 mod smview;
@@ -246,7 +247,10 @@ pub struct LeonApp {
     show_n: bool,
     n_tab: u8,
     /// Editor elegido en el panel de propiedades (None = el de la sala).
-    props_editor: Option<Editor>,
+    /// Editor elegido en cada hueco de cada sala (lo que no está aquí usa el del preset de la sala). Se guarda en editores.json.
+    slot_editors: std::collections::HashMap<(RoomKind, Slot), Editor>,
+    /// Hueco que se está dibujando (para que los editores con cabecera propia sepan de qué hueco es el selector).
+    cur_slot: Slot,
     /// Ventana emergente abierta en el visor: 1 mesa de luz, 2 guías, 3 papel cebolla.
     hud_pop: u8,
     /// Mesa de luz: gris del fondo (0 negro…100 blanco), cuadrícula de transparencia, barra de registro.
@@ -598,7 +602,11 @@ impl LeonApp {
             show_toolbar: true,
             show_n: true,
             n_tab: std::env::var("LEONTOON_NTAB").ok().and_then(|v| v.parse().ok()).unwrap_or(0),
-            props_editor: None,
+            slot_editors: match std::env::var("LEONTOON_TAM") {
+                Ok(_) => Default::default(),
+                Err(_) => safety::data_dir().map(|d| slots::load(&d)).unwrap_or_default(),
+            },
+            cur_slot: Slot::Main,
             // Variables de prueba para capturas: LEONTOON_POP=1|2|3, LEONTOON_ALPHA=1, LEONTOON_ADDMENU=1.
             hud_pop: std::env::var("LEONTOON_POP").ok().and_then(|v| v.parse().ok()).unwrap_or(0),
             light_gray: 10.0,
@@ -922,7 +930,6 @@ impl LeonApp {
         self.room_idx = i;
         let def = self.room_kind().def();
         self.xs_horizontal = def.tl_horizontal;
-        self.props_editor = None;
         self.hud_pop = std::env::var("LEONTOON_POP").ok().and_then(|v| v.parse().ok()).unwrap_or(0);
         if let Some(t) = def.tool {
             self.obj_mode = false;

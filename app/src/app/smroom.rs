@@ -2,7 +2,7 @@
 //! de la secuencia o de la foto elegida. Todo lo que se hace aquí cambia solo la secuencia (`sequence.json`), nunca los
 //! archivos de las fotos, y se puede deshacer y rehacer.
 
-use super::shell::{area_header, muted, panel_header, pill};
+use super::shell::{muted, panel_header, pill};
 use super::smui::SmState;
 use super::*;
 use crate::stopmotion::{Item, Key, Loader, Sequence, SmRef, SourceFrame, MARKER, POSE};
@@ -177,8 +177,8 @@ impl LeonApp {
         let ctx = ui.ctx().clone();
         self.sm_poll_thumbs(&ctx);
         self.sm_ui.over_panel = ui.rect_contains_pointer(ui.max_rect());
-        let hr = area_header(ui, "");
-        let mut h = ui.new_child(egui::UiBuilder::new().max_rect(hr.shrink2(Vec2::new(6.0, 2.0))).layout(egui::Layout::left_to_right(egui::Align::Center)));
+        let hr = self.slot_head(ui);
+        let mut h = ui.new_child(egui::UiBuilder::new().max_rect(hr).layout(egui::Layout::left_to_right(egui::Align::Center)));
         h.spacing_mut().item_spacing.x = 3.0;
         // La X-Sheet va en la columna izquierda de la sala y la cámara en la derecha: aquí solo la tira y el Frame Browser.
         for (i, name) in ["Secuencia", "Frame Browser"].into_iter().enumerate() {

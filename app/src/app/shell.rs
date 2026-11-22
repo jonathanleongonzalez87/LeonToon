@@ -70,29 +70,32 @@ impl LeonApp {
         let full = ui.max_rect();
         let gap = 2.0;
         let def = self.room_kind().def();
+        let kind = self.room_kind();
+        let sm_room = kind == RoomKind::StopMotion;
         // Tamaños de los paneles: los elegidos por la persona, ajustados a la ventana (Issue #44).
         let sz = self.sizes.effective(full.size());
         self.sz = sz;
         let right = Rect::from_min_max(Pos2::new(full.max.x - sz.right, full.min.y), full.max);
-        // La barra de herramientas entra y sale cambiando de ancho (T), con el contenido recortado.
-        let tb_t = panel_t(ui.ctx(), "toolbar", self.show_toolbar && !def.story);
+        // La cabecera y la barra de herramientas son del visor: solo están si el hueco principal es el visor (o la sala
+        // Stop Motion, que siempre las tuvo). La barra entra y sale cambiando de ancho (T), con el contenido recortado.
+        let toolhead = self.main_toolhead();
+        let tb_t = panel_t(ui.ctx(), "toolbar", self.show_toolbar && toolhead);
         let left_w = (sz.toolbar + gap) * tb_t;
         let work = Rect::from_min_max(full.min, Pos2::new(right.min.x - gap, full.max.y));
         let pointer = ui.input(|i| i.pointer.hover_pos());
         self.hover_area = 0;
 
-        // Columna derecha: Capas y Propiedades
+        // Columna derecha: Capas y Propiedades (dos huecos)
         let split_y = self.right_column(ui, right);
 
-        if def.story {
-            in_area(ui, work, |ui| self.storyboard_room(ui));
-            self.right_handles(ui, full, right, split_y, gap);
-            return;
-        }
         // Cabecera de herramienta (ocupa también el ancho de la barra de herramientas)
-        let head = Rect::from_min_size(work.min, Vec2::new(work.width(), TOOLHEAD_H));
-        in_area(ui, head, |ui| self.tool_head(ui));
-        let below = Rect::from_min_max(Pos2::new(work.min.x, head.max.y + gap), work.max);
+        let below = if toolhead {
+            let head = Rect::from_min_size(work.min, Vec2::new(work.width(), TOOLHEAD_H));
+            in_area(ui, head, |ui| self.tool_head(ui));
+            Rect::from_min_max(Pos2::new(work.min.x, head.max.y + gap), work.max)
+        } else {
+            work
+        };
         if tb_t > 0.01 {
             let vis = Rect::from_min_size(below.min, Vec2::new(sz.toolbar * tb_t, below.height()));
             let full_r = Rect::from_min_size(below.min, Vec2::new(sz.toolbar, below.height()));
@@ -102,6 +105,13 @@ impl LeonApp {
             self.tool_column(&mut child);
         }
         let center = Rect::from_min_max(Pos2::new(below.min.x + left_w, below.min.y), below.max);
+        if !sm_room && !kind.slots().contains(&Slot::Time) {
+            // Sala sin línea de tiempo (Storyboard): el hueco principal ocupa todo el centro.
+            self.sm_cap_leave();
+            self.draw_slot(ui, center, Slot::Main);
+            self.right_handles(ui, full, right, split_y, gap);
+            return;
+        }
         let (view, tl) = if self.xs_horizontal {
             let h = (if sz.timeline > 0.0 { sz.timeline } else { def.tl_h.max(150.0) }).max(panelsize::PanelSizes::TIMELINE_MIN).min(center.height() * 0.6);
             (
@@ -116,7 +126,9 @@ impl LeonApp {
             )
         };
         if let Some(p) = pointer {
-            self.hover_area = if view.contains(p) {
+            self.hover_area = if sm_room {
+                if right.contains(p) { 3 } else { 0 }
+            } else if view.contains(p) {
                 1
             } else if tl.contains(p) {
                 2
@@ -126,17 +138,15 @@ impl LeonApp {
                 0
             };
         }
-        let sm_room = self.room_kind() == RoomKind::StopMotion;
         if sm_room {
-            // Sala Stop Motion: disposición tipo Dragonframe en todo el centro (X-Sheet, escenario, cámara y tira de fotos).
+            // Sala Stop Motion: cuatro huecos (X-Sheet, escenario, cámara y tira de fotos) en todo el centro.
             self.sm_dragon(ui, center);
         } else {
-            in_area(ui, view, |ui| self.viewer(ui));
+            self.draw_slot(ui, view, Slot::Main);
             // Al salir de la sala se cierra la cámara: la luz de la webcam no debe quedar encendida.
             self.sm_cap_leave();
-            in_area(ui, tl, |ui| self.timeline_area(ui));
+            self.draw_slot(ui, tl, Slot::Time);
         }
-
         // Bordes arrastrables (van al final para quedar por encima de las áreas): toolbar, línea de tiempo u hoja, y columna derecha.
         use panelsize::{resize_handle, PanelSizes, Resize};
         let mut save = false;

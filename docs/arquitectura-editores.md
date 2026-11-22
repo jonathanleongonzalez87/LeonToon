@@ -157,4 +157,5 @@ Respuestas de la persona a las seis preguntas de la primera versión de este doc
 |---|---|
 | A. Registro de editores | Hecha en el Issue #80: catálogo con grupos, menú agrupado, y los paneles Capas, X-Sheet de Stop Motion y Cámara y captura disponibles como editores en el hueco de la columna derecha |
 | D. Contexto y vacíos explicativos | Hecha en el Issue #83: cada editor declara su requisito (context.rs), explica qué falta y ofrece el botón que lo arregla, y el menú atenúa los que no encajan |
-| B, C, E, F, G | Pendientes |
+| C. Salas como presets de huecos | Hecha en el Issue #86: cada sala es una lista de huecos (`Slot`) con un editor por defecto; cada hueco tiene su selector de editor y la elección se recuerda por sala en `editores.json`. La geometría de cada hueco sigue siendo la de su tipo de sala (dividir y unir es la fase G) |
+| B, E, F, G | Pendientes |

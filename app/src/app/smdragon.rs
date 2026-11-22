@@ -5,7 +5,6 @@
 //! Si la capa todavía no tiene secuencia, la sala muestra el visor y, debajo, el panel con los botones para crearla.
 
 use super::panelsize::{resize_handle, Resize};
-use super::shell::{area_header, in_area};
 use super::smui::SmState;
 use super::*;
 
@@ -41,66 +40,28 @@ impl LeonApp {
         !matches!(self.sm_state(&r), SmState::Missing(_)) && self.sm.contains_key(&r.id)
     }
 
-    /// Dibuja toda la sala Stop Motion dentro de `area`.
+    /// Dibuja toda la sala Stop Motion dentro de `area`: cuatro huecos (izquierda, escenario, derecha y franja de abajo)
+    /// que muestran el editor que toque (por defecto X-Sheet, escenario, cámara y tira de fotos).
     pub(super) fn sm_dragon(&mut self, ui: &mut egui::Ui, area: Rect) {
         let gap = 2.0;
         if !self.playing {
             self.sm_play_range = None;
         }
         let pointer = ui.input(|i| i.pointer.hover_pos());
-        if !self.sm_dragon_ready() {
-            // Sin secuencia: visor arriba y, abajo, los avisos y botones para crearla o buscarla.
-            let h = BOTTOM_DEFAULT.min(area.height() * 0.5);
-            let view = Rect::from_min_max(area.min, Pos2::new(area.max.x, area.max.y - h - gap));
-            let bottom = Rect::from_min_max(Pos2::new(area.min.x, area.max.y - h), area.max);
-            in_area(ui, view, |ui| self.viewer(ui));
-            in_area(ui, bottom, |ui| self.sm_bottom(ui));
-            if let Some(p) = pointer {
-                if view.contains(p) {
-                    self.hover_area = 1;
-                }
-            }
-            return;
-        }
-        let r = self.sm_room_layer().and_then(|li| self.project.layers[li].stopmotion.clone()).expect("comprobado en sm_dragon_ready");
-        let id = r.id.clone();
         let (lw, rw, bh) = sizes(&self.sm_ui.dw, area);
         let bottom = Rect::from_min_max(Pos2::new(area.min.x, area.max.y - bh), area.max);
         let upper = Rect::from_min_max(area.min, Pos2::new(area.max.x, bottom.min.y - gap));
         let left = Rect::from_min_max(upper.min, Pos2::new(upper.min.x + lw, upper.max.y));
         let right = Rect::from_min_max(Pos2::new(upper.max.x - rw, upper.min.y), upper.max);
         let mid = Rect::from_min_max(Pos2::new(left.max.x + gap, upper.min.y), Pos2::new(right.min.x - gap, upper.max.y));
-        let bar = Rect::from_min_max(Pos2::new(mid.min.x, (mid.max.y - BAR_H).max(mid.min.y)), mid.max);
-        let stage = Rect::from_min_max(mid.min, Pos2::new(mid.max.x, (bar.min.y - gap).max(mid.min.y)));
-
-        // X-Sheet (columna izquierda).
-        in_area(ui, left, |ui| {
-            area_header(ui, "X-Sheet");
-            let mut acts = Vec::new();
-            self.sm_xsheet(ui, &id, &r, &mut acts, true);
-            for a in acts {
-                self.sm_act(&id, &r, a);
-            }
-        });
-        // Escenario: el Live View mientras se anima; al reproducir, lo capturado (la cámara sigue conectada).
-        if self.sm_ui.cap.live && !self.playing {
-            in_area(ui, stage, |ui| self.sm_live_view(ui));
-        } else {
-            in_area(ui, stage, |ui| self.viewer(ui));
-        }
-        in_area(ui, bar, |ui| self.sm_capture_bar(ui));
-        in_area(ui, right, |ui| self.sm_cam_panel(ui));
-        in_area(ui, bottom, |ui| self.sm_bottom(ui));
+        self.draw_slot(ui, left, Slot::SmLeft);
+        self.draw_slot(ui, mid, Slot::SmStage);
+        self.draw_slot(ui, right, Slot::SmRight);
+        self.draw_slot(ui, bottom, Slot::SmBottom);
         if let Some(p) = pointer {
-            if stage.contains(p) {
-                self.hover_area = 1;
-            } else if bottom.contains(p) || left.contains(p) {
-                self.hover_area = 2;
-            }
             // Los atajos de edición de la sala (Supr, Ctrl+D, +/−…) valen sobre la X-Sheet y la tira de fotos.
             self.sm_ui.over_panel = bottom.contains(p) || left.contains(p);
         }
-
         // Bordes arrastrables.
         let mut sz = std::mem::take(&mut self.sm_ui.dw);
         let v = Rect::from_center_size(Pos2::new(left.max.x + gap * 0.5, upper.center().y), Vec2::new(8.0, upper.height()));
@@ -124,6 +85,31 @@ impl LeonApp {
         self.sm_ui.dw = sz;
     }
 
+    /// El escenario de Stop Motion: el Live View mientras se anima (o el visor, al reproducir o sin cámara) y, debajo, la
+    /// barra de transporte y captura. Sin secuencia solo muestra el visor.
+    pub(super) fn sm_stage_editor(&mut self, ui: &mut egui::Ui) {
+        let avail = ui.available_rect_before_wrap();
+        let clip = ui.clip_rect();
+        if !self.sm_dragon_ready() {
+            self.viewer(ui);
+            return;
+        }
+        let gap = 2.0;
+        let bar = Rect::from_min_max(Pos2::new(avail.min.x, (avail.max.y - BAR_H).max(avail.min.y)), avail.max);
+        let stage = Rect::from_min_max(avail.min, Pos2::new(avail.max.x, (bar.min.y - gap).max(avail.min.y)));
+        let mut sui = ui.new_child(egui::UiBuilder::new().max_rect(stage).layout(egui::Layout::top_down(egui::Align::Min)));
+        sui.set_clip_rect(stage.intersect(clip));
+        // El Live View mientras se anima; al reproducir, lo capturado (la cámara sigue conectada).
+        if self.sm_ui.cap.live && !self.playing {
+            self.sm_live_view(&mut sui);
+        } else {
+            self.viewer(&mut sui);
+        }
+        let mut bui = ui.new_child(egui::UiBuilder::new().max_rect(bar).layout(egui::Layout::top_down(egui::Align::Min)));
+        bui.set_clip_rect(bar.intersect(clip));
+        bui.painter().rect_filled(bar, 0.0, BG2);
+        self.sm_capture_bar(&mut bui);
+    }
     /// La X-Sheet de Stop Motion como editor suelto (versión compacta). Sin secuencia, dice qué falta.
     pub(super) fn sm_xsheet_editor(&mut self, ui: &mut egui::Ui) {
         if !self.sm_dragon_ready() {

@@ -183,7 +183,7 @@ impl Tool {
 
 // ---------- Salas ----------
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub(crate) enum RoomKind {
     Layout,
     Dibujo,
@@ -347,9 +347,9 @@ impl EditorGroup {
     }
 }
 
-/// Lo que puede mostrar un área de editor. Cada editor tiene un grupo, un nombre y una función que lo dibuja
+/// Lo que puede mostrar un hueco de la pantalla. Cada editor tiene un grupo, un nombre y una función que lo dibuja
 /// (`LeonApp::draw_editor`); añadir uno es añadir una variante aquí y una línea allí.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub(crate) enum Editor {
     /// Lo que pide la sala (Color, Interpolación, Exportar…).
     RoomProps,
@@ -365,19 +365,33 @@ pub(crate) enum Editor {
     SmXSheet,
     /// Cámara, controles y herramientas del Live View de Stop Motion.
     Camera,
+    /// El visor 2D o de composición (mesa de luz) con sus controles flotantes.
+    Viewer,
+    /// La línea de tiempo (o la hoja de exposición, según la orientación de la sala).
+    Timeline,
+    Storyboard,
+    /// El escenario de Stop Motion: Live View o visor, con la barra de transporte y captura.
+    SmStage,
+    /// La tira de fotos y el Frame Browser de Stop Motion.
+    SmStrip,
 }
 
 impl Editor {
-    pub(crate) const ALL: [Editor; 10] = [
-        Editor::RoomProps,
-        Editor::Palettes,
-        Editor::Curves,
-        Editor::Explorer,
-        Editor::Schematic,
-        Editor::Substitution,
+    pub(crate) const ALL: [Editor; 15] = [
+        Editor::Viewer,
+        Editor::SmStage,
         Editor::Preview,
-        Editor::Layers,
+        Editor::Timeline,
+        Editor::SmStrip,
         Editor::SmXSheet,
+        Editor::Curves,
+        Editor::Layers,
+        Editor::RoomProps,
+        Editor::Schematic,
+        Editor::Explorer,
+        Editor::Palettes,
+        Editor::Substitution,
+        Editor::Storyboard,
         Editor::Camera,
     ];
     pub(crate) fn name(self) -> &'static str {
@@ -392,19 +406,122 @@ impl Editor {
             Editor::Layers => "Capas",
             Editor::SmXSheet => "X-Sheet de Stop Motion",
             Editor::Camera => "Cámara y captura",
+            Editor::Viewer => "Visor",
+            Editor::Timeline => "Línea de tiempo",
+            Editor::Storyboard => "Storyboard",
+            Editor::SmStage => "Escenario de Stop Motion",
+            Editor::SmStrip => "Tira de fotos y Frame Browser",
         }
+    }
+    /// Identificador estable para guardarlo en el archivo de ajustes (no cambia aunque cambie el nombre).
+    pub(crate) fn id(self) -> &'static str {
+        match self {
+            Editor::RoomProps => "props",
+            Editor::Palettes => "palettes",
+            Editor::Curves => "curves",
+            Editor::Explorer => "explorer",
+            Editor::Schematic => "schematic",
+            Editor::Substitution => "substitution",
+            Editor::Preview => "preview",
+            Editor::Layers => "layers",
+            Editor::SmXSheet => "sm_xsheet",
+            Editor::Camera => "camera",
+            Editor::Viewer => "viewer",
+            Editor::Timeline => "timeline",
+            Editor::Storyboard => "storyboard",
+            Editor::SmStage => "sm_stage",
+            Editor::SmStrip => "sm_strip",
+        }
+    }
+    pub(crate) fn from_id(id: &str) -> Option<Editor> {
+        Editor::ALL.into_iter().find(|e| e.id() == id)
     }
     pub(crate) fn group(self) -> EditorGroup {
         match self {
-            Editor::Preview => EditorGroup::Visores,
-            Editor::Curves | Editor::SmXSheet => EditorGroup::Tiempo,
-            Editor::RoomProps | Editor::Palettes | Editor::Explorer | Editor::Schematic | Editor::Substitution | Editor::Layers => EditorGroup::Datos,
-            Editor::Camera => EditorGroup::Produccion,
+            Editor::Viewer | Editor::SmStage | Editor::Preview => EditorGroup::Visores,
+            Editor::Timeline | Editor::SmStrip | Editor::SmXSheet | Editor::Curves => EditorGroup::Tiempo,
+            Editor::Layers | Editor::RoomProps | Editor::Schematic | Editor::Explorer | Editor::Palettes | Editor::Substitution => EditorGroup::Datos,
+            Editor::Storyboard | Editor::Camera => EditorGroup::Produccion,
         }
     }
-    /// Los editores que traen su propia barra de desplazamiento no van dentro del marco con margen del área.
+    /// Editores que traen su propia cabecera: ellos mismos piden el selector de editor (`slot_head`).
+    pub(crate) fn own_header(self) -> bool {
+        matches!(self, Editor::Timeline | Editor::Layers | Editor::SmStrip)
+    }
+    /// Editores que reparten su espacio y su desplazamiento ellos mismos: no van dentro del marco con margen del hueco.
     pub(crate) fn scrolls_itself(self) -> bool {
-        matches!(self, Editor::Layers | Editor::SmXSheet | Editor::Camera)
+        matches!(self, Editor::SmXSheet | Editor::Camera | Editor::Viewer | Editor::Storyboard | Editor::SmStage)
+    }
+}
+
+/// Un hueco de la pantalla: el sitio donde una sala muestra un editor. La geometría de cada hueco depende del tipo de
+/// sala (por ahora); lo que muestra lo elige la persona.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub(crate) enum Slot {
+    /// El centro de la sala (el visor, o el storyboard).
+    Main,
+    /// La línea de tiempo (abajo o al lado, según la sala).
+    Time,
+    /// Arriba a la derecha.
+    Layers,
+    /// Abajo a la derecha.
+    Props,
+    /// Sala Stop Motion: columna izquierda.
+    SmLeft,
+    /// Sala Stop Motion: el centro.
+    SmStage,
+    /// Sala Stop Motion: columna derecha.
+    SmRight,
+    /// Sala Stop Motion: la franja de abajo.
+    SmBottom,
+}
+
+impl Slot {
+    pub(crate) const ALL: [Slot; 8] = [Slot::Main, Slot::Time, Slot::Layers, Slot::Props, Slot::SmLeft, Slot::SmStage, Slot::SmRight, Slot::SmBottom];
+    pub(crate) fn id(self) -> &'static str {
+        match self {
+            Slot::Main => "main",
+            Slot::Time => "time",
+            Slot::Layers => "layers",
+            Slot::Props => "props",
+            Slot::SmLeft => "sm_left",
+            Slot::SmStage => "sm_stage",
+            Slot::SmRight => "sm_right",
+            Slot::SmBottom => "sm_bottom",
+        }
+    }
+    pub(crate) fn from_id(id: &str) -> Option<Slot> {
+        Slot::ALL.into_iter().find(|s| s.id() == id)
+    }
+}
+
+impl RoomKind {
+    /// Los huecos que tiene la sala.
+    pub(crate) fn slots(self) -> &'static [Slot] {
+        match self {
+            RoomKind::StopMotion => &[Slot::SmLeft, Slot::SmStage, Slot::SmRight, Slot::SmBottom, Slot::Layers, Slot::Props],
+            RoomKind::Story => &[Slot::Main, Slot::Layers, Slot::Props],
+            _ => &[Slot::Main, Slot::Time, Slot::Layers, Slot::Props],
+        }
+    }
+    /// El editor que la sala pone por defecto en cada hueco (el preset de la sala).
+    pub(crate) fn default_editor(self, slot: Slot) -> Editor {
+        match slot {
+            Slot::Main => {
+                if self.def().story {
+                    Editor::Storyboard
+                } else {
+                    Editor::Viewer
+                }
+            }
+            Slot::Time => Editor::Timeline,
+            Slot::Layers => Editor::Layers,
+            Slot::Props => Editor::RoomProps,
+            Slot::SmLeft => Editor::SmXSheet,
+            Slot::SmStage => Editor::SmStage,
+            Slot::SmRight => Editor::Camera,
+            Slot::SmBottom => Editor::SmStrip,
+        }
     }
 }
 impl RightKind {
@@ -439,7 +556,7 @@ mod editor_tests {
         }
         // Un editor que se añada a la enumeración pero no a ALL no saldría en el menú: esta comprobación lo detecta.
         let sample = |e: Editor| match e {
-            Editor::RoomProps | Editor::Palettes | Editor::Curves | Editor::Explorer | Editor::Schematic | Editor::Substitution | Editor::Preview | Editor::Layers | Editor::SmXSheet | Editor::Camera => true,
+            Editor::RoomProps | Editor::Palettes | Editor::Curves | Editor::Explorer | Editor::Schematic | Editor::Substitution | Editor::Preview | Editor::Layers | Editor::SmXSheet | Editor::Camera | Editor::Viewer | Editor::Timeline | Editor::Storyboard | Editor::SmStage | Editor::SmStrip => true,
         };
         assert!(Editor::ALL.iter().all(|e| sample(*e)));
     }

@@ -1,7 +1,7 @@
 //! Paneles (prototipo v0.3): barra de herramientas por modo, cabecera de herramienta,
 //! columna derecha con Capas y Propiedades (según la sala o el editor elegido) y barra lateral N.
 
-use super::shell::{area_header, muted, panel_header, pill};
+use super::shell::{muted, panel_header, pill};
 use super::*;
 
 impl LeonApp {
@@ -65,6 +65,11 @@ impl LeonApp {
             ui.add_space(8.0);
             ui.spacing_mut().item_spacing.x = 8.0;
             ui.spacing_mut().slider_width = 64.0;
+            // El selector de editor del hueco principal vive en la cabecera de herramienta (si la sala tiene ese hueco).
+            if self.room_kind().slots().contains(&Slot::Main) {
+                self.slot_combo(ui, Slot::Main, 150.0);
+                ui.separator();
+            }
             let narrow = ui.available_width() < 1500.0;
             let mut obj = self.obj_mode;
             egui::ComboBox::from_id_salt("modesel")
@@ -195,14 +200,9 @@ impl LeonApp {
         let lh = if self.sz.layers > 0.0 { self.sz.layers.min((rect.height() - 120.0).max(panelsize::PanelSizes::LAYERS_MIN)) } else { auto };
         let lr = Rect::from_min_size(rect.min, Vec2::new(rect.width(), lh));
         let pr = Rect::from_min_max(Pos2::new(rect.min.x, lr.max.y + 2.0), rect.max);
-        shell::in_area(ui, lr, |ui| self.layers_area(ui));
-        shell::in_area(ui, pr, |ui| self.props_area(ui));
+        self.draw_slot(ui, lr, Slot::Layers);
+        self.draw_slot(ui, pr, Slot::Props);
         lr.max.y
-    }
-
-    fn layers_area(&mut self, ui: &mut egui::Ui) {
-        area_header(ui, "Capas");
-        self.layers_body(ui);
     }
 
     /// La lista de capas con sus botones (sin cabecera: sirve para el área de capas y para el editor «Capas»).
@@ -296,60 +296,9 @@ impl LeonApp {
         });
     }
 
-    /// Área de propiedades: su cabecera cambia el tipo de editor, como en el prototipo.
-    fn props_area(&mut self, ui: &mut egui::Ui) {
-        let def = self.room_kind().def();
-        let ed = self.props_editor.unwrap_or(Editor::RoomProps);
-        let title = if ed == Editor::RoomProps { def.right.title() } else { ed.name() };
-        let hr = area_header(ui, "");
-        let mut child = ui.new_child(egui::UiBuilder::new().max_rect(hr.shrink2(Vec2::new(4.0, 2.0))).layout(egui::Layout::left_to_right(egui::Align::Center)));
-        let mut chosen = ed;
-        egui::ComboBox::from_id_salt("props_editor")
-            .selected_text(RichText::new(title).color(TX))
-            .width(200.0)
-            .show_ui(&mut child, |ui| {
-                for g in EditorGroup::ALL {
-                    let list: Vec<Editor> = Editor::ALL.into_iter().filter(|e| e.group() == g).collect();
-                    if list.is_empty() {
-                        continue;
-                    }
-                    ui.label(RichText::new(g.name().to_uppercase()).size(10.0).color(INK3));
-                    for e in list {
-                        let n = if e == Editor::RoomProps { format!("Propiedades de la sala ({})", def.right.title()) } else { e.name().to_string() };
-                        // Un editor al que le falta contexto se atenúa y dice qué falta (el que ya está elegido sigue activo).
-                        let reason = self.context_gap(e.needs()).map(|g| g.msg);
-                        let r = ui.add_enabled(reason.is_none() || e == ed, egui::SelectableLabel::new(chosen == e, n));
-                        let r = match &reason { Some(m) => r.on_hover_text(m.clone()).on_disabled_hover_text(m.clone()), None => r };
-                        if r.clicked() {
-                            chosen = e;
-                        }
-                    }
-                }
-            });
-        if chosen != ed {
-            self.props_editor = if chosen == Editor::RoomProps { None } else { Some(chosen) };
-        }
-        if chosen.scrolls_itself() {
-            // Estos editores traen su propia barra de desplazamiento y su propio margen.
-            self.draw_editor(ui, chosen, def.right);
-            return;
-        }
-        egui::ScrollArea::vertical().id_salt(("props", title)).auto_shrink([false, false]).show(ui, |ui| {
-            egui::Frame::default().inner_margin(egui::Margin::same(8)).show(ui, |ui| {
-                ui.set_width(ui.available_width());
-                ui.spacing_mut().item_spacing.y = 6.0;
-                self.draw_editor(ui, chosen, def.right);
-            });
-        });
-    }
-
-    /// Dibuja un editor dentro de un área. Es el único sitio que sabe qué función dibuja cada editor.
+    /// Dibuja el contenido de un editor dentro de su hueco. Es el único sitio que sabe qué función dibuja cada editor.
+    /// Los editores con cabecera propia (`own_header`) piden ellos mismos el selector con `slot_head`.
     pub(super) fn draw_editor(&mut self, ui: &mut egui::Ui, ed: Editor, room_right: RightKind) {
-        // Si al contexto le falta algo que el editor necesita, se explica y se ofrece arreglarlo.
-        if let Some(gap) = self.context_gap(ed.needs()) {
-            self.gap_ui(ui, gap);
-            return;
-        }
         match ed {
             Editor::RoomProps => self.room_props(ui, room_right),
             Editor::Palettes => self.palette_panel(ui),
@@ -358,9 +307,17 @@ impl LeonApp {
             Editor::Schematic => self.schematic_room(ui),
             Editor::Substitution => self.substitution_panel(ui),
             Editor::Preview => self.preview_panel(ui),
-            Editor::Layers => self.layers_body(ui),
+            Editor::Layers => {
+                self.slot_head(ui);
+                self.layers_body(ui);
+            }
             Editor::SmXSheet => self.sm_xsheet_editor(ui),
             Editor::Camera => self.sm_cam_panel(ui),
+            Editor::Viewer => self.viewer(ui),
+            Editor::Timeline => self.timeline_area(ui),
+            Editor::Storyboard => self.storyboard_room(ui),
+            Editor::SmStage => self.sm_stage_editor(ui),
+            Editor::SmStrip => self.sm_bottom(ui),
         }
     }
     fn room_props(&mut self, ui: &mut egui::Ui, k: RightKind) {

@@ -21,9 +21,10 @@ impl LeonApp {
     /// Hoja de exposición, el transporte y los contadores; la barra de cuadros (con los bordes
     /// del papel cebolla y el rango) y la rejilla de capas y cuadros.
     pub(super) fn timeline_area(&mut self, ui: &mut egui::Ui) {
-        let hr = super::shell::area_header(ui, "");
+        // El selector de editor del hueco va a la izquierda de la cabecera; el resto de la cabecera es de la línea de tiempo.
+        let hr = self.slot_head(ui);
         let mut h = ui.new_child(
-            egui::UiBuilder::new().max_rect(hr.shrink2(Vec2::new(6.0, 2.0))).layout(egui::Layout::left_to_right(egui::Align::Center)),
+            egui::UiBuilder::new().max_rect(hr).layout(egui::Layout::left_to_right(egui::Align::Center)),
         );
         h.spacing_mut().item_spacing.x = 3.0;
         let wide = hr.width() > 560.0;
