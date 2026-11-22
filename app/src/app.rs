@@ -22,6 +22,7 @@ mod penui;
 mod flow_tests;
 mod papers;
 mod panelsize;
+mod smcap;
 mod smroom;
 mod smui;
 mod smview;

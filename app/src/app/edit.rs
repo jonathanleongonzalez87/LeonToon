@@ -736,6 +736,10 @@ impl LeonApp {
             self.space_down = false;
             return;
         }
+        // Captura con cámara: F5 e Intro valen en toda la sala mientras el Live View está abierto.
+        if self.sm_cap_keys(ctx) {
+            return;
+        }
         // Atajos de la sala Stop Motion (solo con el puntero sobre su panel).
         if self.sm_room_keys(ctx) {
             return;

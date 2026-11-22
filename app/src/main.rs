@@ -3,6 +3,7 @@
 mod app;
 mod abr;
 mod brush;
+mod capture;
 mod model;
 mod paper;
 mod presets;

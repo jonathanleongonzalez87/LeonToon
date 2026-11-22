@@ -226,3 +226,20 @@ impl Sequence {
         self.markers.iter().filter(|m| m.at >= a && m.at < b).collect()
     }
 }
+
+impl SeqFolder {
+    /// Pone una foto capturada al final de la secuencia (con la exposición predeterminada) como un cambio que se puede
+    /// deshacer. Si algo falla (foto incompleta, disco lleno), la secuencia y el historial quedan exactamente como estaban.
+    /// No guarda `sequence.json`: lo hace quien llama, igual que con las demás ediciones.
+    pub fn capture_to_end(&mut self, hist: &mut History, bytes: &[u8], device: Option<Device>) -> Result<String, String> {
+        hist.record(&self.seq);
+        let added = self.add_photo_bytes(bytes, device, Some(std::time::SystemTime::now())).and_then(|out| {
+            let exposure = self.seq.default_exposure;
+            self.seq.push_item(&out.id, exposure)
+        });
+        if added.is_err() {
+            hist.forget_last();
+        }
+        added
+    }
+}

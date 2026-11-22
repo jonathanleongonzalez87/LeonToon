@@ -23,6 +23,7 @@ mod tests;
 
 #[allow(unused_imports)]
 pub use edit::{History, Snapshot, MARKER, POSE};
+#[allow(unused_imports)]
 pub use playback::{load_proxy, load_thumb, proxy_path, Decoded, Key, Loader, Photo, SmCache, PROXY_SIDE};
 #[allow(unused_imports)]
 pub use reference::{relative_path, resolve_relative, Located, SmRef};

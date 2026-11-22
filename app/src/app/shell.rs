@@ -126,7 +126,15 @@ impl LeonApp {
                 0
             };
         }
-        in_area(ui, view, |ui| self.viewer(ui));
+        if self.room_kind() == RoomKind::StopMotion && self.sm_ui.cap.live {
+            in_area(ui, view, |ui| self.sm_live_view(ui));
+        } else {
+            in_area(ui, view, |ui| self.viewer(ui));
+        }
+        if self.room_kind() != RoomKind::StopMotion {
+            // Al salir de la sala se cierra la cámara: la luz de la webcam no debe quedar encendida.
+            self.sm_cap_leave();
+        }
         if self.room_kind() == RoomKind::StopMotion && self.xs_horizontal {
             // Sala Stop Motion: transporte y línea de tiempo arriba, y debajo secuencia, Frame Browser y X-Sheet.
             let top_h = 150.0f32.min(tl.height() * 0.45);

@@ -29,12 +29,20 @@ pub(super) struct SmUi {
     drag: Option<Vec<String>>,
     /// Posición bajo el cabezal la última vez, para llevar la franja hasta ella cuando cambia.
     last_cur: Option<usize>,
+    /// Captura con cámara (Issue #62).
+    pub(super) cap: super::smcap::CapState,
 }
 
 impl SmUi {
+    /// Deja elegida solo esta posición.
+    pub(super) fn sel_one(&mut self, id: String) {
+        self.sel = vec![id.clone()];
+        self.anchor = Some(id);
+    }
+
     /// Para capturas: LEONTOON_SMTAB=0|1|2 abre esa pestaña del panel de la sala.
     pub(super) fn from_env() -> SmUi {
-        SmUi { tab: std::env::var("LEONTOON_SMTAB").ok().and_then(|v| v.parse().ok()).unwrap_or(0), ..Default::default() }
+        SmUi { tab: std::env::var("LEONTOON_SMTAB").ok().and_then(|v| v.parse().ok()).unwrap_or(0), cap: super::smcap::CapState::from_env(), ..Default::default() }
     }
 }
 
@@ -132,13 +140,13 @@ fn paint_thumb(p: &egui::Painter, rect: Rect, tex: Option<egui::TextureId>, fail
 }
 
 /// Cuadro del proyecto en el que empieza la posición `idx` de la secuencia.
-fn project_frame_of(seq: &Sequence, r: &SmRef, pfps: u32, idx: usize) -> u32 {
+pub(super) fn project_frame_of(seq: &Sequence, r: &SmRef, pfps: u32, idx: usize) -> u32 {
     r.start + (seq.start_frame(idx) as u64 * pfps as u64).div_ceil(seq.fps.max(1) as u64) as u32
 }
 
 impl LeonApp {
     /// La capa Stop Motion con la que trabaja la sala: la actual si lo es, o la primera del proyecto.
-    fn sm_room_layer(&self) -> Option<usize> {
+    pub(super) fn sm_room_layer(&self) -> Option<usize> {
         let ok = |i: usize| self.project.layers[i].kind == LayerKind::StopMotion;
         if ok(self.cl) { Some(self.cl) } else { (0..self.project.layers.len()).find(|&i| ok(i)) }
     }
@@ -170,10 +178,21 @@ impl LeonApp {
         let hr = area_header(ui, "");
         let mut h = ui.new_child(egui::UiBuilder::new().max_rect(hr.shrink2(Vec2::new(6.0, 2.0))).layout(egui::Layout::left_to_right(egui::Align::Center)));
         h.spacing_mut().item_spacing.x = 3.0;
-        for (i, name) in ["Secuencia", "Frame Browser", "X-Sheet"].into_iter().enumerate() {
+        for (i, name) in ["Secuencia", "Frame Browser", "X-Sheet", "Captura"].into_iter().enumerate() {
             if pill(&mut h, name, self.sm_ui.tab as usize == i).clicked() {
                 self.sm_ui.tab = i as u8;
             }
+        }
+        let live = self.sm_ui.cap.live;
+        if pill(&mut h, "● Live View", live).on_hover_text("Muestra la cámara en el visor para capturar fotos").clicked() {
+            self.sm_ui.cap.live = !live;
+            if !live && self.sm_ui.cap.session_is_none() {
+                self.sm_cap_connect();
+            }
+        }
+        if self.sm_ui.tab == 3 {
+            self.sm_cap_panel(ui);
+            return;
         }
         let Some(li) = self.sm_room_layer() else {
             ui.add_space(10.0);
@@ -605,7 +624,7 @@ impl LeonApp {
         self.sm_after_edit(id, pdir)
     }
 
-    fn sm_after_edit(&mut self, id: &str, pdir: Option<std::path::PathBuf>) -> bool {
+    pub(super) fn sm_after_edit(&mut self, id: &str, pdir: Option<std::path::PathBuf>) -> bool {
         let Some(v) = self.sm.get_mut(id) else { return false };
         let saved = v.folder.save();
         v.problems = None;

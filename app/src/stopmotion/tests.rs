@@ -693,3 +693,38 @@ fn a_thousand_photos_are_listed_and_thumbnailed_without_blocking() {
     assert_eq!(done, 1000);
     finish(&dir);
 }
+
+#[test]
+fn a_captured_photo_goes_to_the_end_with_its_device_and_can_be_undone() {
+    let (dir, mut f) = new_folder("capture_ok");
+    let mut h = History::default();
+    let dev = Device { name: "Cámara simulada".into(), provider: "simulada".into() };
+    let bytes = jpeg(640, 360, 7);
+    let a = f.capture_to_end(&mut h, &bytes, Some(dev.clone())).unwrap();
+    let b = f.capture_to_end(&mut h, &jpeg(640, 360, 9), Some(dev.clone())).unwrap();
+    assert_eq!(f.seq.items.iter().map(|i| i.id.clone()).collect::<Vec<_>>(), vec![a, b]);
+    let src = f.seq.source(&f.seq.items[0].source).unwrap();
+    assert_eq!((src.width, src.height), (640, 360), "la foto conserva la resolución del dispositivo");
+    assert_eq!(src.device, Some(dev));
+    assert_eq!(std::fs::read(f.dir.join(&src.file)).unwrap(), bytes, "se guarda tal como la dio la cámara");
+    assert!(h.undo(&mut f.seq));
+    assert_eq!(f.seq.items.len(), 1);
+    finish(&dir);
+}
+
+#[test]
+fn a_broken_capture_leaves_the_sequence_and_the_history_untouched() {
+    let (dir, mut f) = new_folder("capture_bad");
+    let mut h = History::default();
+    f.capture_to_end(&mut h, &jpeg(64, 64, 1), None).unwrap();
+    let before = f.seq.clone();
+    let files = files_in(&f.dir);
+    // La cámara se desconectó a mitad de la foto: llega cortada.
+    let good = jpeg(64, 64, 2);
+    assert!(f.capture_to_end(&mut h, &good[..good.len() / 2], None).is_err());
+    assert!(f.capture_to_end(&mut h, b"no es una imagen", None).is_err());
+    assert_eq!(f.seq, before, "la secuencia no cambia");
+    assert_eq!(files_in(&f.dir), files, "no queda ningún archivo a medias");
+    assert!(h.can_undo() && { h.undo(&mut f.seq); f.seq.items.is_empty() }, "el historial solo tiene la captura buena");
+    finish(&dir);
+}
