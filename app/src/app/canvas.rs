@@ -12,7 +12,7 @@ impl LeonApp {
         let rect = ui.available_rect_before_wrap();
         let resp = ui.allocate_rect(rect, Sense::click_and_drag());
         // Zona útil para centrar la hoja: sin la barra lateral N.
-        let n_w = 236.0 * panel_t(&ctx, "nside", self.show_n);
+        let n_w = self.sz.n * panel_t(&ctx, "nside", self.show_n);
         let vrect = Rect::from_min_max(rect.min, Pos2::new((rect.max.x - n_w).max(rect.min.x + 100.0), rect.max.y));
         if self.view3d {
             self.viewer_3d(ui, rect, resp, n_w);

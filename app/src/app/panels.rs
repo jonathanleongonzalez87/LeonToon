@@ -38,16 +38,19 @@ impl LeonApp {
             ui.add_space(6.0);
             ui.spacing_mut().item_spacing.y = 2.0;
             let set: &[Option<Tool>] = if self.obj_mode { &TOOLS_OBJ } else { &TOOLS_EDIT };
+            // Los botones crecen con el ancho de la barra: 34×32 al ancho normal (44 px), hasta 82×64.
+            let w = (self.sz.toolbar - 10.0).clamp(34.0, 82.0);
+            let btn = Vec2::new(w, 32.0 * w / 34.0);
             for t in set {
                 match t {
                     None => {
-                        let (r, _) = ui.allocate_exact_size(Vec2::new(24.0, 9.0), Sense::hover());
+                        let (r, _) = ui.allocate_exact_size(Vec2::new((btn.x * 0.7).max(24.0), 9.0), Sense::hover());
                         ui.painter().hline(r.x_range(), r.center().y, stk(1.0, LINE_STRONG));
                     }
                     Some(t) => {
                         let t = *t;
                         let tip = format!("{}  ({})\n{}", t.name(), t.letter(), t.tip());
-                        if tool_button(ui, self.tool == t, t.pending(), &tip, move |p, r, c| draw_tool_icon(t, p, r, c)).clicked() {
+                        if tool_button(ui, btn, self.tool == t, t.pending(), &tip, move |p, r, c| draw_tool_icon(t, p, r, c)).clicked() {
                             self.set_tool(t);
                         }
                     }
@@ -158,11 +161,15 @@ impl LeonApp {
                     self.set_xkey(None);
                 }
             }
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.add_space(8.0);
-                let l = self.layer();
-                ui.label(RichText::new(format!("Capa {}, {}", l.name, l.kind.label().to_lowercase())).size(11.5).color(MU));
-            });
+            // El nombre de la capa solo se muestra si cabe (con paneles más anchos la cabecera se estrecha).
+            let layer_text = { let l = self.layer(); format!("Capa {}, {}", l.name, l.kind.label().to_lowercase()) };
+            let need = layer_text.chars().count() as f32 * 6.2 + 24.0;
+            if ui.available_width() > need {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.add_space(8.0);
+                    ui.label(RichText::new(layer_text).size(11.5).color(MU));
+                });
+            }
         });
     }
 
@@ -180,13 +187,17 @@ impl LeonApp {
 
     // ---------- Columna derecha ----------
 
-    pub(super) fn right_column(&mut self, ui: &mut egui::Ui, rect: Rect) {
+    /// Devuelve la posición vertical donde termina la lista de capas (el borde que se arrastra para repartir la columna).
+    pub(super) fn right_column(&mut self, ui: &mut egui::Ui, rect: Rect) -> f32 {
         let rows = self.project.layers.len() as f32;
-        let lh = (28.0 + 8.0 + rows * 28.0 + 40.0).min(rect.height() * 0.45).max(150.0);
+        let auto = (28.0 + 8.0 + rows * 28.0 + 40.0).min(rect.height() * 0.45).max(150.0);
+        // La persona puede fijar el alto de la lista de capas; las propiedades se quedan con al menos 120 px.
+        let lh = if self.sz.layers > 0.0 { self.sz.layers.min((rect.height() - 120.0).max(panelsize::PanelSizes::LAYERS_MIN)) } else { auto };
         let lr = Rect::from_min_size(rect.min, Vec2::new(rect.width(), lh));
         let pr = Rect::from_min_max(Pos2::new(rect.min.x, lr.max.y + 2.0), rect.max);
         shell::in_area(ui, lr, |ui| self.layers_area(ui));
         shell::in_area(ui, pr, |ui| self.props_area(ui));
+        lr.max.y
     }
 
     fn layers_area(&mut self, ui: &mut egui::Ui) {

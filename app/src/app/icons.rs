@@ -107,12 +107,13 @@ pub(super) fn setup_style(ctx: &egui::Context) {
 /// apagado si la herramienta está pendiente).
 pub(super) fn tool_button(
     ui: &mut egui::Ui,
+    size: Vec2,
     selected: bool,
     pending: bool,
     tip: &str,
     draw: impl FnOnce(&egui::Painter, Rect, Color32),
 ) -> egui::Response {
-    let (rect, resp) = ui.allocate_exact_size(Vec2::new(34.0, 32.0), Sense::click());
+    let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
     let p = ui.painter();
     if selected {
         p.rect_filled(rect, 6.0, ACCENT);
@@ -128,7 +129,8 @@ pub(super) fn tool_button(
     } else {
         MU
     };
-    draw(p, Rect::from_center_size(rect.center(), Vec2::splat(16.0)), fg);
+    // El icono crece con el botón (barra de herramientas más ancha).
+    draw(p, Rect::from_center_size(rect.center(), Vec2::splat((size.y * 0.5).max(16.0))), fg);
     resp.on_hover_text(tip)
 }
 

@@ -52,7 +52,7 @@ LeonToon está en construcción. Entre lo que todavía falta o no se ha probado 
 
 - La presión de **tableta gráfica** no se ha probado con hardware real, y la inclinación del lápiz no está disponible.
 - Los `.abr` exportados no se han abierto todavía en Photoshop.
-- Pendientes: herramienta Texto, rigging, luz y profundidad de campo en 3D, sonido, exportar con la cámara 3D, paneles redimensionables.
+- Pendientes: herramienta Texto, rigging, luz y profundidad de campo en 3D, sonido, exportar con la cámara 3D.
 
 El trabajo se organiza con [Issues](https://github.com/jonathanleongonzalez87/LeonToon/issues) (con etiquetas de área, tipo y
 prioridad, y hitos por versión) y se entrega con Pull Requests. Para publicar una versión, ver [RELEASING.md](RELEASING.md).

@@ -5,7 +5,6 @@
 use super::shell::GUIDE_NAMES;
 use super::*;
 
-const N_W: f32 = 236.0;
 
 /// Papeles de la mesa de luz (prototipo v0.3): blanco, crema, arena y gris.
 const PAPERS: [(&str, [u8; 3]); 4] = [("Blanco", [0xfb, 0xfa, 0xf7]), ("Crema", [0xf6, 0xef, 0xe2]), ("Arena", [0xec, 0xe2, 0xd2]), ("Gris", [0xd9, 0xd6, 0xd2])];
@@ -30,7 +29,8 @@ fn pop_frame() -> egui::Frame {
 impl LeonApp {
     pub(super) fn viewport_hud(&mut self, ui: &mut egui::Ui, rect: Rect) {
         let n_t = panel_t(ui.ctx(), "nside", self.show_n);
-        let n_w = N_W * n_t;
+        let n_full = self.sz.n;
+        let n_w = n_full * n_t;
         // ---- Izquierda: zoom y 2D/3D ----
         let band_l = Rect::from_min_size(rect.min + Vec2::new(8.0, 8.0), Vec2::new(420.0, 30.0));
         let mut cl = ui.new_child(egui::UiBuilder::new().max_rect(band_l).layout(egui::Layout::left_to_right(egui::Align::Center)));
@@ -109,7 +109,7 @@ impl LeonApp {
         // ---- Barra lateral N ----
         // Entra y sale deslizándose desde el borde derecho (translateX del prototipo).
         if n_t > 0.01 {
-            let nr = Rect::from_min_max(Pos2::new(rect.max.x - n_w, rect.min.y), Pos2::new(rect.max.x - n_w + N_W, rect.max.y));
+            let nr = Rect::from_min_max(Pos2::new(rect.max.x - n_w, rect.min.y), Pos2::new(rect.max.x - n_w + n_full, rect.max.y));
             let clip = rect.intersect(ui.clip_rect());
             let pn = ui.painter().with_clip_rect(clip);
             pn.rect_filled(nr, egui::CornerRadius { nw: 0, ne: 6, sw: 0, se: 6 }, Color32::from_rgba_unmultiplied(33, 31, 30, 248));
@@ -119,6 +119,19 @@ impl LeonApp {
             // Bloquea el dibujo bajo la barra
             let _ = cn.interact(nr.intersect(clip), cn.id().with("n_block"), Sense::click_and_drag());
             egui::ScrollArea::vertical().id_salt("nside").show(&mut cn, |ui| self.n_sidebar(ui));
+            // Borde izquierdo arrastrable para cambiar el ancho de la barra N.
+            if n_t > 0.99 {
+                let bar = Rect::from_center_size(Pos2::new(nr.min.x, nr.center().y), Vec2::new(8.0, nr.height()));
+                match panelsize::resize_handle(ui, "n", bar, true) {
+                    panelsize::Resize::Drag(p) => self.sizes.n = rect.max.x - p.x,
+                    panelsize::Resize::Reset => {
+                        self.sizes.n = panelsize::PanelSizes::default().n;
+                        self.save_panel_sizes();
+                    }
+                    panelsize::Resize::Done => self.save_panel_sizes(),
+                    panelsize::Resize::None => {}
+                }
+            }
         }
     }
 

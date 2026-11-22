@@ -55,10 +55,7 @@ pub(super) const GUIDE_NAMES: [&str; 6] = [
     "Cruz de centro",
 ];
 
-const TOOLBAR_W: f32 = 44.0;
-const RIGHT_W: f32 = 268.0;
 const TOOLHEAD_H: f32 = 34.0;
-const SHEET_W: f32 = 330.0;
 
 impl LeonApp {
     pub(super) fn shell(&mut self, ctx: &egui::Context) {
@@ -73,19 +70,23 @@ impl LeonApp {
         let full = ui.max_rect();
         let gap = 2.0;
         let def = self.room_kind().def();
-        let right = Rect::from_min_max(Pos2::new(full.max.x - RIGHT_W, full.min.y), full.max);
+        // Tamaños de los paneles: los elegidos por la persona, ajustados a la ventana (Issue #44).
+        let sz = self.sizes.effective(full.size());
+        self.sz = sz;
+        let right = Rect::from_min_max(Pos2::new(full.max.x - sz.right, full.min.y), full.max);
         // La barra de herramientas entra y sale cambiando de ancho (T), con el contenido recortado.
         let tb_t = panel_t(ui.ctx(), "toolbar", self.show_toolbar && !def.story);
-        let left_w = (TOOLBAR_W + gap) * tb_t;
+        let left_w = (sz.toolbar + gap) * tb_t;
         let work = Rect::from_min_max(full.min, Pos2::new(right.min.x - gap, full.max.y));
         let pointer = ui.input(|i| i.pointer.hover_pos());
         self.hover_area = 0;
 
         // Columna derecha: Capas y Propiedades
-        self.right_column(ui, right);
+        let split_y = self.right_column(ui, right);
 
         if def.story {
             in_area(ui, work, |ui| self.storyboard_room(ui));
+            self.right_handles(ui, full, right, split_y, gap);
             return;
         }
         // Cabecera de herramienta (ocupa también el ancho de la barra de herramientas)
@@ -93,8 +94,8 @@ impl LeonApp {
         in_area(ui, head, |ui| self.tool_head(ui));
         let below = Rect::from_min_max(Pos2::new(work.min.x, head.max.y + gap), work.max);
         if tb_t > 0.01 {
-            let vis = Rect::from_min_size(below.min, Vec2::new(TOOLBAR_W * tb_t, below.height()));
-            let full_r = Rect::from_min_size(below.min, Vec2::new(TOOLBAR_W, below.height()));
+            let vis = Rect::from_min_size(below.min, Vec2::new(sz.toolbar * tb_t, below.height()));
+            let full_r = Rect::from_min_size(below.min, Vec2::new(sz.toolbar, below.height()));
             ui.painter().rect_filled(vis, 6.0, BG2);
             let mut child = ui.new_child(egui::UiBuilder::new().max_rect(full_r).layout(egui::Layout::top_down(egui::Align::Min)));
             child.set_clip_rect(vis.intersect(ui.clip_rect()));
@@ -102,13 +103,13 @@ impl LeonApp {
         }
         let center = Rect::from_min_max(Pos2::new(below.min.x + left_w, below.min.y), below.max);
         let (view, tl) = if self.xs_horizontal {
-            let h = def.tl_h.max(150.0).min(center.height() * 0.6);
+            let h = (if sz.timeline > 0.0 { sz.timeline } else { def.tl_h.max(150.0) }).max(panelsize::PanelSizes::TIMELINE_MIN).min(center.height() * 0.6);
             (
                 Rect::from_min_max(center.min, Pos2::new(center.max.x, center.max.y - h - gap)),
                 Rect::from_min_max(Pos2::new(center.min.x, center.max.y - h), center.max),
             )
         } else {
-            let w = SHEET_W.min(center.width() * 0.45);
+            let w = sz.sheet.min(center.width() * 0.6);
             (
                 Rect::from_min_max(center.min, Pos2::new(center.max.x - w - gap, center.max.y)),
                 Rect::from_min_max(Pos2::new(center.max.x - w, center.min.y), center.max),
@@ -127,6 +128,76 @@ impl LeonApp {
         }
         in_area(ui, view, |ui| self.viewer(ui));
         in_area(ui, tl, |ui| self.timeline_area(ui));
+
+        // Bordes arrastrables (van al final para quedar por encima de las áreas): toolbar, línea de tiempo u hoja, y columna derecha.
+        use panelsize::{resize_handle, PanelSizes, Resize};
+        let mut save = false;
+        if tb_t > 0.99 {
+            let bar = Rect::from_center_size(Pos2::new(below.min.x + sz.toolbar + gap * 0.5, below.center().y), Vec2::new(8.0, below.height()));
+            match resize_handle(ui, "toolbar", bar, true) {
+                Resize::Drag(p) => self.sizes.toolbar = p.x - below.min.x - gap * 0.5,
+                Resize::Reset => {
+                    self.sizes.toolbar = PanelSizes::default().toolbar;
+                    save = true;
+                }
+                Resize::Done => save = true,
+                Resize::None => {}
+            }
+        }
+        if self.xs_horizontal {
+            let bar = Rect::from_center_size(Pos2::new(tl.center().x, tl.min.y - gap * 0.5), Vec2::new(tl.width(), 8.0));
+            match resize_handle(ui, "timeline", bar, false) {
+                Resize::Drag(p) => self.sizes.timeline = center.max.y - p.y - gap * 0.5,
+                Resize::Reset => {
+                    self.sizes.timeline = 0.0;
+                    save = true;
+                }
+                Resize::Done => save = true,
+                Resize::None => {}
+            }
+        } else {
+            let bar = Rect::from_center_size(Pos2::new(tl.min.x - gap * 0.5, tl.center().y), Vec2::new(8.0, tl.height()));
+            match resize_handle(ui, "sheet", bar, true) {
+                Resize::Drag(p) => self.sizes.sheet = center.max.x - p.x - gap * 0.5,
+                Resize::Reset => {
+                    self.sizes.sheet = PanelSizes::default().sheet;
+                    save = true;
+                }
+                Resize::Done => save = true,
+                Resize::None => {}
+            }
+        }
+        if self.right_handles(ui, full, right, split_y, gap) || save {
+            self.save_panel_sizes();
+        }
+    }
+
+    /// Bordes arrastrables de la columna derecha: su ancho y el reparto entre capas y propiedades.
+    /// Devuelve true si hay que guardar los tamaños.
+    fn right_handles(&mut self, ui: &mut egui::Ui, full: Rect, right: Rect, split_y: f32, gap: f32) -> bool {
+        use panelsize::{resize_handle, PanelSizes, Resize};
+        let mut save = false;
+        let bar = Rect::from_center_size(Pos2::new(right.min.x - gap * 0.5, right.center().y), Vec2::new(8.0, right.height()));
+        match resize_handle(ui, "right", bar, true) {
+            Resize::Drag(p) => self.sizes.right = full.max.x - p.x - gap * 0.5,
+            Resize::Reset => {
+                self.sizes.right = PanelSizes::default().right;
+                save = true;
+            }
+            Resize::Done => save = true,
+            Resize::None => {}
+        }
+        let bar = Rect::from_center_size(Pos2::new(right.center().x, split_y + 1.0), Vec2::new(right.width(), 8.0));
+        match resize_handle(ui, "layers", bar, false) {
+            Resize::Drag(p) => self.sizes.layers = p.y - right.min.y,
+            Resize::Reset => {
+                self.sizes.layers = 0.0;
+                save = true;
+            }
+            Resize::Done => save = true,
+            Resize::None => {}
+        }
+        save
     }
 
     fn title_bar(&mut self, ctx: &egui::Context) {

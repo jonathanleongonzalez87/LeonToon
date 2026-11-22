@@ -21,6 +21,7 @@ mod penui;
 #[cfg(test)]
 mod flow_tests;
 mod papers;
+mod panelsize;
 mod hud;
 mod view3d;
 mod timebar;
@@ -275,6 +276,9 @@ pub struct LeonApp {
     /// Escala del grano (porcentaje) y semilla de su variante.
     paper_scale: f32,
     paper_seed: u32,
+    /// Tamaños de los paneles elegidos por la persona (se guardan) y los que se usan ahora según la ventana.
+    sizes: panelsize::PanelSizes,
+    sz: panelsize::PanelSizes,
     pen_path: Option<penui::PenPath>,
     sel_node: Option<usize>,
     /// Última presión leída del lápiz (1 si no hay lápiz).
@@ -567,6 +571,12 @@ impl LeonApp {
             vui: Default::default(),
             sui: Default::default(),
             paper_tex: Default::default(),
+            sizes: match std::env::var("LEONTOON_TAM") {
+                Ok(spec) => panelsize::PanelSizes::from_spec(&spec),
+                Err(_) if screenshot.is_some() => Default::default(),
+                Err(_) => safety::data_dir().map(|d| panelsize::load(&d)).unwrap_or_default(),
+            },
+            sz: Default::default(),
             paper_scale: crate::paper::SCALE_DEFAULT,
             paper_seed: std::env::var("LEONTOON_SEMILLA").ok().and_then(|v| v.parse().ok()).unwrap_or(1),
             pen_path: None,
