@@ -324,6 +324,31 @@ pub(crate) fn room_set(id: &str) -> &'static RoomSet {
 
 // ---------- Editores de panel (el tipo de editor se cambia desde su cabecera) ----------
 
+/// Grupo de un editor en el menú de tipo de editor (docs/arquitectura-editores.md).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum EditorGroup {
+    Visores,
+    Tiempo,
+    Datos,
+    Produccion,
+    Sistema,
+}
+
+impl EditorGroup {
+    pub(crate) const ALL: [EditorGroup; 5] = [EditorGroup::Visores, EditorGroup::Tiempo, EditorGroup::Datos, EditorGroup::Produccion, EditorGroup::Sistema];
+    pub(crate) fn name(self) -> &'static str {
+        match self {
+            EditorGroup::Visores => "Visores",
+            EditorGroup::Tiempo => "Tiempo",
+            EditorGroup::Datos => "Datos",
+            EditorGroup::Produccion => "Producción",
+            EditorGroup::Sistema => "Sistema",
+        }
+    }
+}
+
+/// Lo que puede mostrar un área de editor. Cada editor tiene un grupo, un nombre y una función que lo dibuja
+/// (`LeonApp::draw_editor`); añadir uno es añadir una variante aquí y una línea allí.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Editor {
     /// Lo que pide la sala (Color, Interpolación, Exportar…).
@@ -334,11 +359,27 @@ pub(crate) enum Editor {
     Schematic,
     Substitution,
     Preview,
+    /// La lista de capas.
+    Layers,
+    /// La X-Sheet de la secuencia de Stop Motion (en versión compacta).
+    SmXSheet,
+    /// Cámara, controles y herramientas del Live View de Stop Motion.
+    Camera,
 }
 
 impl Editor {
-    pub(crate) const ALL: [Editor; 7] =
-        [Editor::RoomProps, Editor::Palettes, Editor::Curves, Editor::Explorer, Editor::Schematic, Editor::Substitution, Editor::Preview];
+    pub(crate) const ALL: [Editor; 10] = [
+        Editor::RoomProps,
+        Editor::Palettes,
+        Editor::Curves,
+        Editor::Explorer,
+        Editor::Schematic,
+        Editor::Substitution,
+        Editor::Preview,
+        Editor::Layers,
+        Editor::SmXSheet,
+        Editor::Camera,
+    ];
     pub(crate) fn name(self) -> &'static str {
         match self {
             Editor::RoomProps => "Propiedades",
@@ -348,10 +389,24 @@ impl Editor {
             Editor::Schematic => "Esquema de capas",
             Editor::Substitution => "Sustitución de dibujo",
             Editor::Preview => "Vista previa",
+            Editor::Layers => "Capas",
+            Editor::SmXSheet => "X-Sheet de Stop Motion",
+            Editor::Camera => "Cámara y captura",
         }
     }
+    pub(crate) fn group(self) -> EditorGroup {
+        match self {
+            Editor::Preview => EditorGroup::Visores,
+            Editor::Curves | Editor::SmXSheet => EditorGroup::Tiempo,
+            Editor::RoomProps | Editor::Palettes | Editor::Explorer | Editor::Schematic | Editor::Substitution | Editor::Layers => EditorGroup::Datos,
+            Editor::Camera => EditorGroup::Produccion,
+        }
+    }
+    /// Los editores que traen su propia barra de desplazamiento no van dentro del marco con margen del área.
+    pub(crate) fn scrolls_itself(self) -> bool {
+        matches!(self, Editor::Layers | Editor::SmXSheet | Editor::Camera)
+    }
 }
-
 impl RightKind {
     pub(crate) fn title(self) -> &'static str {
         match self {
@@ -364,6 +419,37 @@ impl RightKind {
             RightKind::Animatic => "Animatic",
             RightKind::StopMotion => "Stop Motion",
             RightKind::Export => "Exportar",
+        }
+    }
+}
+
+#[cfg(test)]
+mod editor_tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    #[test]
+    fn todo_editor_tiene_grupo_y_nombre_unicos_y_la_lista_los_cubre_todos() {
+        let names: HashSet<&str> = Editor::ALL.iter().map(|e| e.name()).collect();
+        assert_eq!(names.len(), Editor::ALL.len(), "nombres repetidos");
+        let unique: HashSet<String> = Editor::ALL.iter().map(|e| format!("{e:?}")).collect();
+        assert_eq!(unique.len(), Editor::ALL.len(), "un editor está dos veces en ALL");
+        for e in Editor::ALL {
+            assert!(EditorGroup::ALL.contains(&e.group()));
+        }
+        // Un editor que se añada a la enumeración pero no a ALL no saldría en el menú: esta comprobación lo detecta.
+        let sample = |e: Editor| match e {
+            Editor::RoomProps | Editor::Palettes | Editor::Curves | Editor::Explorer | Editor::Schematic | Editor::Substitution | Editor::Preview | Editor::Layers | Editor::SmXSheet | Editor::Camera => true,
+        };
+        assert!(Editor::ALL.iter().all(|e| sample(*e)));
+    }
+
+    #[test]
+    fn los_grupos_no_estan_vacios_salvo_los_reservados() {
+        for g in EditorGroup::ALL {
+            let n = Editor::ALL.iter().filter(|e| e.group() == g).count();
+            // Sistema está reservado para Preferencias, Registro y Atajos; aún no tiene editores.
+            assert!(n > 0 || g == EditorGroup::Sistema, "el grupo {} está vacío", g.name());
         }
     }
 }

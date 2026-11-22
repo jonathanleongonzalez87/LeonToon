@@ -202,6 +202,11 @@ impl LeonApp {
 
     fn layers_area(&mut self, ui: &mut egui::Ui) {
         area_header(ui, "Capas");
+        self.layers_body(ui);
+    }
+
+    /// La lista de capas con sus botones (sin cabecera: sirve para el área de capas y para el editor «Capas»).
+    fn layers_body(&mut self, ui: &mut egui::Ui) {
         let foot_h = 30.0;
         let list_h = (ui.available_height() - foot_h).max(30.0);
         let mut pick = None;
@@ -303,31 +308,50 @@ impl LeonApp {
             .selected_text(RichText::new(title).color(TX))
             .width(200.0)
             .show_ui(&mut child, |ui| {
-                for e in Editor::ALL {
-                    let n = if e == Editor::RoomProps { format!("Propiedades de la sala ({})", def.right.title()) } else { e.name().to_string() };
-                    ui.selectable_value(&mut chosen, e, n);
+                for g in EditorGroup::ALL {
+                    let list: Vec<Editor> = Editor::ALL.into_iter().filter(|e| e.group() == g).collect();
+                    if list.is_empty() {
+                        continue;
+                    }
+                    ui.label(RichText::new(g.name().to_uppercase()).size(10.0).color(INK3));
+                    for e in list {
+                        let n = if e == Editor::RoomProps { format!("Propiedades de la sala ({})", def.right.title()) } else { e.name().to_string() };
+                        ui.selectable_value(&mut chosen, e, n);
+                    }
                 }
             });
         if chosen != ed {
             self.props_editor = if chosen == Editor::RoomProps { None } else { Some(chosen) };
         }
+        if chosen.scrolls_itself() {
+            // Estos editores traen su propia barra de desplazamiento y su propio margen.
+            self.draw_editor(ui, chosen, def.right);
+            return;
+        }
         egui::ScrollArea::vertical().id_salt(("props", title)).auto_shrink([false, false]).show(ui, |ui| {
             egui::Frame::default().inner_margin(egui::Margin::same(8)).show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 ui.spacing_mut().item_spacing.y = 6.0;
-                match chosen {
-                    Editor::RoomProps => self.room_props(ui, def.right),
-                    Editor::Palettes => self.palette_panel(ui),
-                    Editor::Curves => self.curves_panel(ui),
-                    Editor::Explorer => self.browser_room(ui),
-                    Editor::Schematic => self.schematic_room(ui),
-                    Editor::Substitution => self.substitution_panel(ui),
-                    Editor::Preview => self.preview_panel(ui),
-                }
+                self.draw_editor(ui, chosen, def.right);
             });
         });
     }
 
+    /// Dibuja un editor dentro de un área. Es el único sitio que sabe qué función dibuja cada editor.
+    pub(super) fn draw_editor(&mut self, ui: &mut egui::Ui, ed: Editor, room_right: RightKind) {
+        match ed {
+            Editor::RoomProps => self.room_props(ui, room_right),
+            Editor::Palettes => self.palette_panel(ui),
+            Editor::Curves => self.curves_panel(ui),
+            Editor::Explorer => self.browser_room(ui),
+            Editor::Schematic => self.schematic_room(ui),
+            Editor::Substitution => self.substitution_panel(ui),
+            Editor::Preview => self.preview_panel(ui),
+            Editor::Layers => self.layers_body(ui),
+            Editor::SmXSheet => self.sm_xsheet_editor(ui),
+            Editor::Camera => self.sm_cam_panel(ui),
+        }
+    }
     fn room_props(&mut self, ui: &mut egui::Ui, k: RightKind) {
         match k {
             RightKind::Color => {

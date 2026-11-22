@@ -123,4 +123,18 @@ impl LeonApp {
         }
         self.sm_ui.dw = sz;
     }
-}
+
+    /// La X-Sheet de Stop Motion como editor suelto (versión compacta). Sin secuencia, dice qué falta.
+    pub(super) fn sm_xsheet_editor(&mut self, ui: &mut egui::Ui) {
+        if !self.sm_dragon_ready() {
+            ui.add_space(8.0);
+            super::shell::muted(ui, "Este editor necesita una capa Stop Motion con su secuencia. Elige una capa Stop Motion o crea la secuencia en la sala Stop Motion.");
+            return;
+        }
+        let r = self.sm_room_layer().and_then(|li| self.project.layers[li].stopmotion.clone()).expect("comprobado arriba");
+        let mut acts = Vec::new();
+        self.sm_xsheet(ui, &r.id, &r, &mut acts, true);
+        for a in acts {
+            self.sm_act(&r.id, &r, a);
+        }
+    }}
