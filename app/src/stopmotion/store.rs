@@ -386,17 +386,25 @@ impl SeqFolder {
 
     /// Miniatura de 320 px de ancho de una foto. Es un recurso derivado: si falta, se regenera; nunca toca el original.
     pub fn ensure_thumbnail(&self, source: &str) -> Result<PathBuf, String> {
-        let path = self.thumbnail_path(source);
+        let s = self.seq.source(source).ok_or_else(|| format!("la foto «{source}» no está en la secuencia"))?;
+        make_thumbnail(&self.dir, s)
+    }
+}
+
+/// Miniatura de 320 px de una foto (la crea en `Thumbnails/` si no existe). No usa la secuencia entera, así que se puede
+/// llamar desde un hilo con solo la carpeta y los datos de la foto.
+pub fn make_thumbnail(dir: &Path, s: &SourceFrame) -> Result<PathBuf, String> {
+    {
+        let path = dir.join(THUMBNAILS).join(format!("{}.jpg", s.id));
         if path.is_file() {
             return Ok(path);
         }
-        let s = self.seq.source(source).ok_or_else(|| format!("la foto «{source}» no está en la secuencia"))?;
-        let bytes = std::fs::read(self.dir.join(&s.file)).map_err(|e| format!("no se pudo leer el original: {e}"))?;
+        let bytes = std::fs::read(dir.join(&s.file)).map_err(|e| format!("no se pudo leer el original: {e}"))?;
         let img = image::load_from_memory(&bytes).map_err(|e| format!("no se pudo decodificar la foto: {e}"))?.to_rgb8();
         let w = 320.min(img.width()).max(1);
         let h = ((img.height() as f32 * w as f32 / img.width() as f32).round() as u32).max(1);
         let thumb = image::imageops::thumbnail(&img, w, h);
-        std::fs::create_dir_all(self.dir.join(THUMBNAILS)).map_err(|e| e.to_string())?;
+        std::fs::create_dir_all(dir.join(THUMBNAILS)).map_err(|e| e.to_string())?;
         let tmp = path.with_extension("tmp");
         thumb.save_with_format(&tmp, image::ImageFormat::Jpeg).map_err(|e| e.to_string())?;
         std::fs::rename(&tmp, &path).map_err(|e| {

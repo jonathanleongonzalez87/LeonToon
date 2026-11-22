@@ -22,6 +22,7 @@ mod penui;
 mod flow_tests;
 mod papers;
 mod panelsize;
+mod smroom;
 mod smui;
 mod smview;
 mod hud;
@@ -286,6 +287,9 @@ pub struct LeonApp {
     sm_thumbs: std::collections::HashMap<(String, String), egui::TextureHandle>,
     /// Fotos de Stop Motion para el visor: cargador en segundo plano, texturas (con el último cuadro en que se usaron) y las que fallaron.
     sm_loader: crate::stopmotion::Loader,
+    /// Miniaturas del Frame Browser (hilo aparte) y estado de la interfaz de la sala Stop Motion.
+    sm_tloader: crate::stopmotion::Loader,
+    sm_ui: smroom::SmUi,
     sm_tex: std::collections::HashMap<crate::stopmotion::Key, (egui::TextureHandle, u64)>,
     sm_failed: std::collections::HashSet<crate::stopmotion::Key>,
     pen_path: Option<penui::PenPath>,
@@ -618,6 +622,8 @@ impl LeonApp {
             sm: Default::default(),
             sm_thumbs: Default::default(),
             sm_loader: crate::stopmotion::Loader::new(),
+            sm_tloader: crate::stopmotion::Loader::thumbs(),
+            sm_ui: smroom::SmUi::from_env(),
             sm_tex: Default::default(),
             sm_failed: Default::default(),
             paper_scale: crate::paper::SCALE_DEFAULT,
@@ -813,6 +819,8 @@ impl LeonApp {
     }
 
     fn checkpoint(&mut self) {
+        // Un cambio del proyecto: Ctrl+Z vuelve a deshacer el proyecto, no la secuencia.
+        self.sm_ui.last_was_seq = false;
         let p = self.project.clone();
         self.push_undo(p);
         self.meta_skip = true;
@@ -826,6 +834,9 @@ impl LeonApp {
     }
 
     fn do_undo(&mut self) {
+        if self.sm_history(true) {
+            return;
+        }
         self.finish_gesture();
         self.pen_path = None;
         if let Some(p) = self.undo.pop() {
@@ -843,6 +854,9 @@ impl LeonApp {
     }
 
     fn do_redo(&mut self) {
+        if self.sm_history(false) {
+            return;
+        }
         self.finish_gesture();
         self.pen_path = None;
         if let Some(p) = self.redo.pop() {
@@ -1016,6 +1030,7 @@ impl LeonApp {
         self.sm_thumbs.clear();
         self.sm_tex.clear();
         self.sm_failed.clear();
+        self.sm_ui = Default::default();
         self.adopt_project_brush();
         self.undo.clear();
         self.redo.clear();

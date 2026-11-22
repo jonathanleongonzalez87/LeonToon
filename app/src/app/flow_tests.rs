@@ -684,3 +684,64 @@ fn the_project_does_not_save_the_runtime_folder_cache() {
     assert!(!json.contains("base_dir") && !json.contains("\"sm\""), "la caché y la carpeta base no se guardan");
     finish(&root);
 }
+
+// ---------- Fase 3 (#61): la sala ----------
+
+#[test]
+fn the_stop_motion_room_is_registered_and_survives_saving() {
+    use super::catalog::{room_set, RoomKind, ROOM_GROUPS};
+    let k = RoomKind::from_id("stopmotion").expect("la sala existe por su id");
+    assert_eq!(k, RoomKind::StopMotion);
+    assert!(RoomKind::ALL.contains(&k));
+    assert!(ROOM_GROUPS.iter().any(|(_, rooms)| rooms.contains(&k)), "sale en el menú «+ Nueva sala»");
+    let set = room_set("stopmotion");
+    assert_eq!(set.id, "stopmotion");
+    assert!(set.rooms.contains(&k));
+    let def = k.def();
+    assert!(def.tl_horizontal && !def.story && def.tl_h >= 300.0, "la sala necesita espacio abajo para la secuencia");
+    // Las salas no se repiten ni chocan por id.
+    let mut ids: Vec<&str> = RoomKind::ALL.iter().map(|r| r.def().id).collect();
+    ids.sort();
+    ids.dedup();
+    assert_eq!(ids.len(), RoomKind::ALL.len());
+    // Un proyecto con la sala la conserva al guardar y abrir.
+    let root = temp_dir("sala_sm");
+    let mut p = Project::demo();
+    p.rooms.push(crate::model::RoomTab { kind: "stopmotion".into(), name: Some("Mi sala".into()) });
+    let file = root.join("p.ltoon");
+    write_project(&p, &file, false).unwrap();
+    let back = read_project(&file).unwrap();
+    assert!(back.rooms.iter().any(|r| r.kind == "stopmotion" && r.name.as_deref() == Some("Mi sala")));
+    finish(&root);
+}
+
+#[test]
+fn editing_the_sequence_changes_the_summary_but_never_the_photos() {
+    let root = temp_dir("sala_edit");
+    let (p, mut f) = stop_motion_project(&root, (100, 50));
+    let before: Vec<Vec<u8>> = f.seq.sources.iter().map(|s| std::fs::read(f.dir.join(&s.file)).unwrap()).collect();
+    // Reordenar y quitar una posición cambia lo que se ve en cada cuadro, pero no los archivos.
+    let ids: Vec<String> = f.seq.items.iter().map(|i| i.id.clone()).collect();
+    f.seq.move_items(&ids[2..3], 0); // el azul pasa a ser el primero
+    f.seq.remove_items(&ids[1..2]); // se quita el verde
+    f.save().unwrap();
+    let want = [[0, 0, 255, 255], [0, 0, 255, 255], [0, 0, 255, 255], [255, 0, 0, 255], [255, 0, 0, 255], [0, 0, 0, 255]];
+    for (fr, w) in want.iter().enumerate() {
+        let pm = render::render_frame(&p, fr as u32, 1.0).unwrap();
+        assert!(near(spx(&pm, 50, 25), *w), "cuadro {fr}: {:?}", spx(&pm, 50, 25));
+    }
+    let after: Vec<Vec<u8>> = f.seq.sources.iter().map(|s| std::fs::read(f.dir.join(&s.file)).unwrap()).collect();
+    assert_eq!(before, after, "las fotos originales no cambian al editar la secuencia");
+    // Un fotograma vacío no pinta nada y deshacer lo quita.
+    let mut h = crate::stopmotion::History::default();
+    h.record(&f.seq);
+    f.seq.insert_blank(0, 2);
+    f.save().unwrap();
+    let pm = render::render_frame(&p, 0, 1.0).unwrap();
+    assert!(near(spx(&pm, 50, 25), [0, 0, 0, 255]), "el fotograma vacío se ve vacío");
+    assert!(h.undo(&mut f.seq));
+    f.save().unwrap();
+    let pm = render::render_frame(&p, 0, 1.0).unwrap();
+    assert!(near(spx(&pm, 50, 25), [0, 0, 255, 255]), "tras deshacer vuelve la foto");
+    finish(&root);
+}

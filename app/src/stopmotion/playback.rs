@@ -71,6 +71,15 @@ pub fn load_proxy(dir: &Path, s: &SourceFrame, max_side: u32) -> Result<Decoded,
     }
 }
 
+/// Miniatura lista para mostrar (320 px): se lee de `Thumbnails/` y, si falta, se crea desde el original.
+pub fn load_thumb(dir: &Path, s: &SourceFrame, _max_side: u32) -> Result<Decoded, String> {
+    let path = store::make_thumbnail(dir, s)?;
+    let bytes = std::fs::read(&path).map_err(|e| format!("no se pudo leer la miniatura: {e}"))?;
+    Ok(to_decoded(image::load_from_memory(&bytes).map_err(|e| format!("miniatura dañada: {e}"))?))
+}
+
+type LoadFn = fn(&Path, &SourceFrame, u32) -> Result<Decoded, String>;
+
 struct Request {
     key: Key,
     dir: PathBuf,
@@ -86,11 +95,20 @@ pub struct Loader {
 
 impl Loader {
     pub fn new() -> Loader {
+        Loader::with(load_proxy)
+    }
+
+    /// Cargador de miniaturas (el Frame Browser): trabaja en su hilo y nunca bloquea la interfaz.
+    pub fn thumbs() -> Loader {
+        Loader::with(load_thumb)
+    }
+
+    fn with(load: LoadFn) -> Loader {
         let (tx, worker_rx) = channel::<Request>();
         let (done_tx, rx) = channel();
         std::thread::spawn(move || {
             while let Ok(req) = worker_rx.recv() {
-                let res = load_proxy(&req.dir, &req.source, PROXY_SIDE);
+                let res = load(&req.dir, &req.source, PROXY_SIDE);
                 if done_tx.send((req.key, res)).is_err() {
                     break;
                 }
@@ -196,6 +214,13 @@ impl SmCache {
         let folder = Arc::new(folder);
         g.folders.insert(r.id.clone(), Entry { dir, stamp: st, folder: folder.clone(), abs: r.abs.clone(), rel: r.rel.clone(), base: base.map(|b| b.to_path_buf()) });
         Some(folder)
+    }
+
+    /// Olvida la secuencia abierta de una referencia (cuando se acaba de editar y guardar).
+    pub fn forget(&self, id: &str) {
+        if let Ok(mut g) = self.0.lock() {
+            g.folders.remove(id);
+        }
     }
 
     /// El original descodificado y reducido a `max_side` como mucho (para exportar sin leer una foto enorme por cada cuadro).

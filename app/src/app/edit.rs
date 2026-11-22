@@ -736,6 +736,10 @@ impl LeonApp {
             self.space_down = false;
             return;
         }
+        // Atajos de la sala Stop Motion (solo con el puntero sobre su panel).
+        if self.sm_room_keys(ctx) {
+            return;
+        }
         // Pluma con una curva en curso: Intro termina, Esc cancela, Retroceso quita el último nodo.
         if self.pen_keys(ctx) {
             return;
@@ -790,7 +794,9 @@ impl LeonApp {
             self.zoom_by(f);
         }
         if k(cmd, Key::Tab) {
-            self.xs_horizontal = !self.xs_horizontal;
+            if self.room_kind() != RoomKind::StopMotion {
+                self.xs_horizontal = !self.xs_horizontal;
+            }
         }
         if k(cmd, Key::J) {
             self.duplicate_layer();

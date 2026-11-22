@@ -17,9 +17,13 @@ pub(super) struct SmView {
     pub last: String,
     /// Los fotogramas por segundo cambiaron y falta guardarlos en sequence.json (se guardan al soltar el control).
     pub dirty: bool,
+    /// Deshacer y rehacer de las ediciones de la secuencia (sala Stop Motion).
+    pub hist: crate::stopmotion::History,
+    /// Momento de la última edición, para juntar los cambios seguidos de un mismo control.
+    pub last_edit: f64,
 }
 
-enum SmState {
+pub(super) enum SmState {
     Ready,
     Missing(String),
 }
@@ -28,12 +32,12 @@ enum SmState {
 const THUMBS_PER_FRAME: usize = 2;
 
 impl LeonApp {
-    fn project_dir(&self) -> Option<PathBuf> {
+    pub(super) fn project_dir(&self) -> Option<PathBuf> {
         self.path.as_ref().and_then(|p| p.parent()).map(|p| p.to_path_buf())
     }
 
     /// Carga la secuencia de la referencia (o usa la que ya está en memoria).
-    fn sm_state(&mut self, r: &SmRef) -> SmState {
+    pub(super) fn sm_state(&mut self, r: &SmRef) -> SmState {
         if self.sm.contains_key(&r.id) {
             return SmState::Ready;
         }
@@ -42,7 +46,7 @@ impl LeonApp {
                 Ok((folder, note)) => {
                     let orphans = folder.orphans().len();
                     let last = if note == OpenNote::FromBackup { "sequence.json estaba dañado: se abrió la copia anterior. Se guardará de nuevo al importar o recuperar.".to_string() } else { String::new() };
-                    self.sm.insert(r.id.clone(), SmView { folder, note, problems: None, orphans, last, dirty: false });
+                    self.sm.insert(r.id.clone(), SmView { folder, note, problems: None, orphans, last, dirty: false, hist: Default::default(), last_edit: -10.0 });
                     SmState::Ready
                 }
                 Err(e) => SmState::Missing(e),
@@ -65,11 +69,11 @@ impl LeonApp {
         let orphans = folder.orphans().len();
         self.checkpoint();
         self.sm_set_ref(Some(r.clone()));
-        self.sm.insert(r.id, SmView { folder, note, problems: None, orphans, last: String::new(), dirty: false });
+        self.sm.insert(r.id, SmView { folder, note, problems: None, orphans, last: String::new(), dirty: false, hist: Default::default(), last_edit: -10.0 });
     }
 
     /// Crea una secuencia nueva en una carpeta que elige la persona.
-    fn sm_create(&mut self) {
+    pub(super) fn sm_create(&mut self) {
         let Some(dir) = rfd::FileDialog::new().set_title("Elige la carpeta donde se guardará la secuencia (se crea si no existe)").pick_folder() else { return };
         let name = dir.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "Secuencia".into());
         match SeqFolder::create(&dir, &name, self.project.fps) {
@@ -82,7 +86,7 @@ impl LeonApp {
     }
 
     /// Usa una secuencia que ya existe en una carpeta.
-    fn sm_open_existing(&mut self) {
+    pub(super) fn sm_open_existing(&mut self) {
         let Some(dir) = rfd::FileDialog::new().set_title("Elige la carpeta de una secuencia Stop Motion que ya existe").pick_folder() else { return };
         match SeqFolder::open(&dir) {
             Ok((f, note)) => {
@@ -99,7 +103,7 @@ impl LeonApp {
         }
     }
 
-    fn sm_relocate(&mut self, r: &SmRef) {
+    pub(super) fn sm_relocate(&mut self, r: &SmRef) {
         let Some(dir) = rfd::FileDialog::new().set_title(format!("Elige la carpeta de la secuencia «{}»", r.name)).pick_folder() else { return };
         let mut nr = r.clone();
         match nr.relocate(&dir, self.project_dir().as_deref()) {
@@ -112,7 +116,7 @@ impl LeonApp {
         }
     }
 
-    fn sm_import(&mut self, id: &str) {
+    pub(super) fn sm_import(&mut self, id: &str) {
         let Some(files) = rfd::FileDialog::new().set_title("Importar fotos a la secuencia").add_filter("Fotos (JPEG o PNG)", &["jpg", "jpeg", "png"]).pick_files() else { return };
         let pdir = self.project_dir();
         let Some(view) = self.sm.get_mut(id) else { return };
@@ -139,11 +143,13 @@ impl LeonApp {
         self.say(text.lines().next().unwrap_or("").to_string());
     }
 
-    fn sm_verify(&mut self, id: &str) {
+    pub(super) fn sm_verify(&mut self, id: &str) {
         if let Some(v) = self.sm.get_mut(id) {
             v.problems = Some(v.folder.verify(true));
             v.orphans = v.folder.orphans().len();
         }
+        // Tras verificar, las fotos que fallaron se vuelven a intentar (por ejemplo, si se devolvió el archivo).
+        self.sm_failed.retain(|k| k.0 != id);
     }
 
     fn sm_recover(&mut self, id: &str) {
@@ -208,7 +214,7 @@ impl LeonApp {
     }
 
     /// Dónde empieza la secuencia en el proyecto, a cuántos fotogramas por segundo va y si cabe en la duración del proyecto.
-    fn sm_timing_ui(&mut self, ui: &mut egui::Ui, r: &SmRef, id: &str, frames: u32, fps: u32) {
+    pub(super) fn sm_timing_ui(&mut self, ui: &mut egui::Ui, r: &SmRef, id: &str, frames: u32, fps: u32) {
         let (pfps, plen) = (self.project.fps, self.project.length);
         ui.horizontal(|ui| {
             ui.label(RichText::new("Empieza en el cuadro").size(11.5).color(MU));
@@ -370,6 +376,6 @@ impl LeonApp {
                 muted(ui, &format!("… y {} más", photos - sources.len()));
             }
         }
-        muted(ui, "Las fotos son recursos originales: reordenar, repetir o cambiar su exposición nunca las modifica. Ver la secuencia en la escena y exportarla llega en la Fase 2 (#60).");
+        muted(ui, "Las fotos son recursos originales: reordenar, repetir o cambiar su exposición nunca las modifica. La sala Stop Motion (pestaña de salas) permite reordenar y editar la secuencia.");
     }
 }

@@ -196,6 +196,7 @@ pub(crate) enum RoomKind {
     Color,
     Story,
     Animatic,
+    StopMotion,
     Exportar,
 }
 
@@ -209,6 +210,7 @@ pub(crate) enum RightKind {
     Palettes,
     StoryPdf,
     Animatic,
+    StopMotion,
     Export,
 }
 
@@ -228,7 +230,7 @@ pub(crate) struct RoomDef {
 }
 
 impl RoomKind {
-    pub(crate) const ALL: [RoomKind; 12] = [
+    pub(crate) const ALL: [RoomKind; 13] = [
         RoomKind::Layout,
         RoomKind::Dibujo,
         RoomKind::Limpieza,
@@ -240,6 +242,7 @@ impl RoomKind {
         RoomKind::Color,
         RoomKind::Story,
         RoomKind::Animatic,
+        RoomKind::StopMotion,
         RoomKind::Exportar,
     ];
     pub(crate) fn def(self) -> RoomDef {
@@ -266,6 +269,7 @@ impl RoomKind {
             RoomKind::Color => d("color", "Color", true, 160.0, R::Palettes, Some(Tool::Fill), false, "Paletas y relleno"),
             RoomKind::Story => d("story", "Storyboard", true, 0.0, R::StoryPdf, None, true, "Planos con textos y exportación a PDF"),
             RoomKind::Animatic => d("animatic", "Animatic", true, 230.0, R::Animatic, None, false, "Planos en el tiempo con duración y transiciones"),
+            RoomKind::StopMotion => d("stopmotion", "Stop Motion", true, 400.0, R::StopMotion, None, false, "Secuencia de fotos, Frame Browser y X-Sheet"),
             RoomKind::Exportar => d("exportar", "Exportar", true, 150.0, R::Export, None, false, "PNG, hoja de sprites, GIF y MP4"),
         }
     }
@@ -278,7 +282,7 @@ impl RoomKind {
 pub(crate) const ROOM_GROUPS: [(&str, &[RoomKind]); 4] = [
     ("Producción", &[RoomKind::Story, RoomKind::Animatic]),
     ("Dibujo", &[RoomKind::Layout, RoomKind::Dibujo, RoomKind::Limpieza, RoomKind::Color]),
-    ("Animación", &[RoomKind::Animacion, RoomKind::Timing, RoomKind::Interp, RoomKind::Rig]),
+    ("Animación", &[RoomKind::Animacion, RoomKind::Timing, RoomKind::Interp, RoomKind::Rig, RoomKind::StopMotion]),
     ("Composición y salida", &[RoomKind::Comp, RoomKind::Exportar]),
 ];
 
@@ -289,7 +293,7 @@ pub(crate) struct RoomSet {
     pub rooms: &'static [RoomKind],
 }
 
-pub(crate) const ROOM_SETS: [RoomSet; 5] = [
+pub(crate) const ROOM_SETS: [RoomSet; 6] = [
     RoomSet {
         id: "trad",
         name: "Animación tradicional",
@@ -309,6 +313,7 @@ pub(crate) const ROOM_SETS: [RoomSet; 5] = [
         rooms: &[RoomKind::Layout, RoomKind::Rig, RoomKind::Animacion, RoomKind::Interp, RoomKind::Exportar],
     },
     RoomSet { id: "mg", name: "Motion graphics", rooms: &[RoomKind::Layout, RoomKind::Interp, RoomKind::Comp, RoomKind::Exportar] },
+    RoomSet { id: "stopmotion", name: "Stop Motion", rooms: &[RoomKind::Layout, RoomKind::StopMotion, RoomKind::Timing, RoomKind::Exportar] },
     RoomSet { id: "story", name: "Storyboard", rooms: &[RoomKind::Story, RoomKind::Exportar] },
     RoomSet { id: "animatic", name: "Animatic", rooms: &[RoomKind::Story, RoomKind::Animatic, RoomKind::Exportar] },
 ];
@@ -357,6 +362,7 @@ impl RightKind {
             RightKind::Palettes => "Paletas",
             RightKind::StoryPdf => "Plano",
             RightKind::Animatic => "Animatic",
+            RightKind::StopMotion => "Stop Motion",
             RightKind::Export => "Exportar",
         }
     }

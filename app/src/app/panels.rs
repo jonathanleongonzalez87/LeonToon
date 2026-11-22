@@ -360,6 +360,7 @@ impl LeonApp {
             }
             RightKind::StoryPdf => self.story_side(ui),
             RightKind::Animatic => self.animatic_side(ui),
+            RightKind::StopMotion => self.sm_room_props(ui),
             RightKind::Export => self.render_room(ui),
         }
     }

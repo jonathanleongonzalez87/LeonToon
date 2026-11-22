@@ -127,7 +127,16 @@ impl LeonApp {
             };
         }
         in_area(ui, view, |ui| self.viewer(ui));
-        in_area(ui, tl, |ui| self.timeline_area(ui));
+        if self.room_kind() == RoomKind::StopMotion && self.xs_horizontal {
+            // Sala Stop Motion: transporte y línea de tiempo arriba, y debajo secuencia, Frame Browser y X-Sheet.
+            let top_h = 150.0f32.min(tl.height() * 0.45);
+            let top = Rect::from_min_size(tl.min, Vec2::new(tl.width(), top_h));
+            let bottom = Rect::from_min_max(Pos2::new(tl.min.x, tl.min.y + top_h + gap), tl.max);
+            in_area(ui, top, |ui| self.timeline_area(ui));
+            in_area(ui, bottom, |ui| self.sm_bottom(ui));
+        } else {
+            in_area(ui, tl, |ui| self.timeline_area(ui));
+        }
 
         // Bordes arrastrables (van al final para quedar por encima de las áreas): toolbar, línea de tiempo u hoja, y columna derecha.
         use panelsize::{resize_handle, PanelSizes, Resize};

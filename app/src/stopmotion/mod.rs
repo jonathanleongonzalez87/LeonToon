@@ -14,6 +14,7 @@
 
 use serde::{Deserialize, Serialize};
 
+mod edit;
 mod playback;
 mod reference;
 mod store;
@@ -21,7 +22,8 @@ mod store;
 mod tests;
 
 #[allow(unused_imports)]
-pub use playback::{load_proxy, proxy_path, Decoded, Key, Loader, Photo, SmCache, PROXY_SIDE};
+pub use edit::{History, Snapshot, MARKER, POSE};
+pub use playback::{load_proxy, load_thumb, proxy_path, Decoded, Key, Loader, Photo, SmCache, PROXY_SIDE};
 #[allow(unused_imports)]
 pub use reference::{relative_path, resolve_relative, Located, SmRef};
 #[allow(unused_imports)]
@@ -211,7 +213,7 @@ impl Sequence {
         self.fps = self.fps.clamp(1, 120);
         self.default_exposure = self.default_exposure.clamp(1, MAX_EXPOSURE);
         let ids: Vec<String> = self.sources.iter().map(|s| s.id.clone()).collect();
-        self.items.retain(|i| ids.contains(&i.source));
+        self.items.retain(|i| i.source.is_empty() || ids.contains(&i.source));
         for i in &mut self.items {
             i.exposure = i.exposure.clamp(1, MAX_EXPOSURE);
         }

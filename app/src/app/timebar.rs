@@ -27,14 +27,20 @@ impl LeonApp {
         );
         h.spacing_mut().item_spacing.x = 3.0;
         let wide = hr.width() > 560.0;
-        if pill(&mut h, if wide { "Línea de tiempo" } else { "Línea" }, self.xs_horizontal).on_hover_text("Capas en filas, cuadros en columnas (Ctrl+Tab)").clicked() {
-            self.xs_horizontal = true;
-        }
-        if pill(&mut h, if wide { "Hoja de exposición" } else { "Hoja" }, !self.xs_horizontal)
-            .on_hover_text("Cuadros en filas, capas en columnas, al lado de la mesa de luz (Ctrl+Tab)")
-            .clicked()
-        {
-            self.xs_horizontal = false;
+        // En la sala Stop Motion la hoja de exposición es la pestaña X-Sheet de su panel: aquí solo va la línea de tiempo.
+        let sala = self.room_kind() == RoomKind::StopMotion;
+        if sala {
+            h.label(RichText::new("Línea de tiempo").size(12.0).color(TX));
+        } else {
+            if pill(&mut h, if wide { "Línea de tiempo" } else { "Línea" }, self.xs_horizontal).on_hover_text("Capas en filas, cuadros en columnas (Ctrl+Tab)").clicked() {
+                self.xs_horizontal = true;
+            }
+            if pill(&mut h, if wide { "Hoja de exposición" } else { "Hoja" }, !self.xs_horizontal)
+                .on_hover_text("Cuadros en filas, capas en columnas, al lado de la mesa de luz (Ctrl+Tab)")
+                .clicked()
+            {
+                self.xs_horizontal = false;
+            }
         }
         h.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.spacing_mut().item_spacing.x = 6.0;

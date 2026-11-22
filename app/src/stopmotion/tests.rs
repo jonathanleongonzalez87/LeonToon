@@ -523,3 +523,173 @@ fn a_sequence_with_thousands_of_photos_saves_and_opens_quickly() {
     assert!(t.elapsed().as_millis() < 500);
     finish(&dir);
 }
+
+// ---------- Edición de la secuencia (Fase 3, #61) ----------
+
+fn edit_seq(n_items: usize) -> (PathBuf, SeqFolder, Vec<String>) {
+    static N: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+    let (dir, mut f) = new_folder(&format!("edit{}", N.fetch_add(1, std::sync::atomic::Ordering::Relaxed)));
+    for s in 0..3u8 {
+        f.add_photo_bytes(&png(8, 6, s), None, None).unwrap();
+    }
+    let mut ids = Vec::new();
+    for i in 0..n_items {
+        ids.push(f.seq.push_item(&format!("s{:06}", i % 3 + 1), 1 + (i as u32 % 3)).unwrap());
+    }
+    f.save().unwrap();
+    (dir, f, ids)
+}
+
+fn order(s: &Sequence) -> Vec<String> {
+    s.items.iter().map(|i| i.id.clone()).collect()
+}
+
+#[test]
+fn items_can_be_moved_to_a_slot_one_or_many() {
+    let (dir, mut f, ids) = edit_seq(5);
+    // Mover la 1.ª después de la 3.ª (hueco 3).
+    assert!(f.seq.move_items(&ids[0..1], 3));
+    assert_eq!(order(&f.seq), [ids[1].clone(), ids[2].clone(), ids[0].clone(), ids[3].clone(), ids[4].clone()]);
+    // Varias a la vez al principio, conservando su orden relativo.
+    assert!(f.seq.move_items(&[ids[3].clone(), ids[4].clone()], 0));
+    assert_eq!(order(&f.seq), [ids[3].clone(), ids[4].clone(), ids[1].clone(), ids[2].clone(), ids[0].clone()]);
+    // Soltar en su mismo sitio no cambia nada.
+    assert!(!f.seq.move_items(&ids[3..4], 0));
+    assert!(!f.seq.move_items(&ids[3..4], 1));
+    // Al final.
+    assert!(f.seq.move_items(&ids[3..4], 99));
+    assert_eq!(f.seq.items.last().unwrap().id, ids[3]);
+    assert_eq!(f.seq.items.len(), 5);
+    finish(&dir);
+}
+
+#[test]
+fn duplicate_remove_replace_and_blank_never_touch_the_files() {
+    let (dir, mut f, ids) = edit_seq(3);
+    let before = files_in(&f.dir.join(SOURCES));
+    let dup = f.seq.duplicate_items(&ids[0..2]);
+    assert_eq!(dup.len(), 2);
+    assert_eq!(f.seq.items.len(), 5);
+    assert_eq!(f.seq.items[1].source, f.seq.items[0].source);
+    let blank = f.seq.insert_blank(1, 3);
+    assert_eq!(f.seq.items[1].id, blank);
+    assert!(f.seq.items[1].source.is_empty());
+    assert_eq!(f.seq.replace_source(&ids[2..3], "s000001").unwrap(), 1);
+    assert!(f.seq.replace_source(&ids[2..3], "s999").is_err());
+    assert_eq!(f.seq.remove_items(&ids[0..1]), 1);
+    f.save().unwrap();
+    // Un fotograma vacío sobrevive a guardar y abrir, y las fotos siguen todas en su sitio.
+    let (again, _) = SeqFolder::open(&f.dir).unwrap();
+    assert!(again.seq.items.iter().any(|i| i.source.is_empty()));
+    assert_eq!(files_in(&f.dir.join(SOURCES)), before);
+    assert!(again.verify(true).is_empty());
+    assert_eq!(again.seq.sources.len(), 3);
+    finish(&dir);
+}
+
+#[test]
+fn exposures_holds_and_freezes_stay_in_range() {
+    let (dir, mut f, ids) = edit_seq(3);
+    assert_eq!(f.seq.set_exposures(&ids, 4), 3);
+    f.seq.add_exposure(&ids[0..1], 6);
+    assert_eq!(f.seq.items[0].exposure, 10);
+    f.seq.add_exposure(&ids[1..2], -99);
+    assert_eq!(f.seq.items[1].exposure, 1, "nunca baja de un cuadro");
+    f.seq.add_exposure(&ids[2..3], i32::MAX);
+    assert_eq!(f.seq.items[2].exposure, MAX_EXPOSURE);
+    let total = f.seq.total_frames();
+    let fr = f.seq.freeze(&ids[1], 12).unwrap();
+    assert_eq!(f.seq.items[f.seq.index_of(&fr).unwrap()].exposure, 12);
+    assert_eq!(f.seq.total_frames(), total + 12);
+    assert_eq!(f.seq.items[1].source, f.seq.items[2].source);
+    finish(&dir);
+}
+
+#[test]
+fn markers_and_poses_are_kept_sorted_and_saved() {
+    let (dir, mut f, _) = edit_seq(4);
+    f.seq.add_marker(5, POSE, "contacto");
+    f.seq.add_marker(2, MARKER, "");
+    f.seq.add_marker(5, POSE, "contacto fuerte");
+    assert_eq!(f.seq.markers.len(), 2, "una pose por cuadro: la segunda cambia el texto");
+    assert_eq!(f.seq.markers[0].at, 2);
+    assert_eq!(f.seq.markers[1].label, "contacto fuerte");
+    f.save().unwrap();
+    let (again, _) = SeqFolder::open(&f.dir).unwrap();
+    assert_eq!(again.seq.markers, f.seq.markers);
+    assert!(!again.seq.markers_in(0).is_empty() || again.seq.markers_in(1).len() + again.seq.markers_in(2).len() + again.seq.markers_in(3).len() > 0);
+    assert!(f.seq.remove_marker(0) && !f.seq.remove_marker(7));
+    finish(&dir);
+}
+
+#[test]
+fn every_edit_can_be_undone_and_redone() {
+    let (dir, mut f, ids) = edit_seq(4);
+    let mut h = History::default();
+    let start = f.seq.snapshot();
+    h.record(&f.seq);
+    f.seq.move_items(&ids[0..1], 4);
+    h.record(&f.seq);
+    f.seq.remove_items(&ids[1..3]);
+    h.record(&f.seq);
+    f.seq.add_marker(1, POSE, "x");
+    let end = f.seq.snapshot();
+    assert!(h.undo(&mut f.seq) && f.seq.markers.is_empty());
+    assert!(h.undo(&mut f.seq) && f.seq.items.len() == 4);
+    assert!(h.undo(&mut f.seq));
+    assert_eq!(f.seq.snapshot(), start);
+    assert!(!h.undo(&mut f.seq) && h.can_redo());
+    assert!(h.redo(&mut f.seq) && h.redo(&mut f.seq) && h.redo(&mut f.seq));
+    assert_eq!(f.seq.snapshot(), end);
+    assert!(!h.redo(&mut f.seq));
+    // Un cambio nuevo borra lo que se podía rehacer.
+    h.undo(&mut f.seq);
+    h.record(&f.seq);
+    assert!(!h.can_redo());
+    finish(&dir);
+}
+
+#[test]
+fn history_is_bounded() {
+    let (dir, f, _) = edit_seq(1);
+    let mut h = History::default();
+    for _ in 0..(History::LIMIT + 50) {
+        h.record(&f.seq);
+    }
+    let mut s = f.seq.clone();
+    let mut n = 0;
+    while h.undo(&mut s) {
+        n += 1;
+    }
+    assert_eq!(n, History::LIMIT);
+    finish(&dir);
+}
+
+#[test]
+fn a_thousand_photos_are_listed_and_thumbnailed_without_blocking() {
+    let (dir, mut f) = new_folder("thousand");
+    for i in 0..1000u32 {
+        // Tamaños distintos para que cada foto tenga su propio hash.
+        f.add_photo_bytes(&jpeg(96 + i % 50, 54 + i / 50, (i % 7) as u8), None, None).unwrap();
+    }
+    assert_eq!(f.seq.sources.len(), 1000);
+    // Pedir 1000 miniaturas solo apunta trabajo al hilo: volver es inmediato.
+    let mut loader = Loader::thumbs();
+    let t = std::time::Instant::now();
+    for s in &f.seq.sources {
+        loader.request((f.seq.id.clone(), s.id.clone()), f.dir.clone(), s.clone());
+    }
+    assert!(t.elapsed().as_millis() < 500, "pedir las miniaturas tardó {:?}", t.elapsed());
+    // Y llegan todas, sin fallos.
+    let start = std::time::Instant::now();
+    let mut done = 0;
+    while done < 1000 && start.elapsed().as_secs() < 120 {
+        for (_, r) in loader.poll() {
+            assert!(r.is_ok());
+            done += 1;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    assert_eq!(done, 1000);
+    finish(&dir);
+}
