@@ -18,6 +18,8 @@ mod brushui;
 mod vectorui;
 mod strokeui;
 mod penui;
+#[cfg(test)]
+mod flow_tests;
 mod papers;
 mod hud;
 mod view3d;

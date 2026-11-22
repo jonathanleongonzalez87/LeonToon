@@ -1,0 +1,468 @@
+//! Pruebas del flujo completo (Issue #20): guardar y abrir un `.ltoon`, abrir proyectos de versiones anteriores,
+//! archivos dañados, escrituras que fallan y exportaciones. Son más cercanas a lo que hace la persona que las pruebas
+//! del modelo: pasan por `write_project` y `read_project` (los mismos de Guardar y Abrir) y por el exportador real.
+//!
+//! `app/testdata/` guarda proyectos **reales de la versión 0.1.0**, generados con aquel programa, para comprobar que
+//! los proyectos viejos siguen abriendo sin perder nada.
+
+use super::safety::{read_project, write_project};
+use crate::model::{Drawing, Layer, LayerKind, Panel, Project, ShapeKind, Stroke, XKey};
+use crate::paper;
+use crate::raster::Raster;
+use crate::render;
+use crate::vector::bezier::Node;
+use crate::vector::edit::{self, Prop};
+use crate::vector::{default_shape, Cap, Join, Profile, VStyle};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+const V010_DEMO: &[u8] = include_bytes!("../../testdata/proyecto_v0.1.0_demo.ltoon");
+const V010_COMPLETO: &[u8] = include_bytes!("../../testdata/proyecto_v0.1.0_completo.ltoon");
+
+/// Carpeta temporal propia de cada prueba (se borra al terminar con `finish`).
+fn temp_dir(name: &str) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("leontoon_flujo_{}_{name}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+fn finish(dir: &Path) {
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+fn stroke(points: Vec<[f32; 2]>, pressure: Vec<f32>, style: Option<VStyle>, color: [u8; 4], width: f32) -> Stroke {
+    Stroke { kind: ShapeKind::Free, points, color, width, closed: false, fill: None, pressure, style, original: None, nodes: None }
+}
+
+fn curve(nodes: Vec<Node>, closed: bool, style: VStyle) -> Stroke {
+    let mut s = stroke(Vec::new(), Vec::new(), Some(style), [30, 30, 120, 255], 14.0);
+    s.closed = closed;
+    s.nodes = Some(nodes);
+    s.regen();
+    s
+}
+
+/// Un proyecto con de todo: una capa de cada tipo, 3D, claves de animación, trazos con presión, estilo personalizado,
+/// aspecto original, curvas Bézier abiertas y cerradas, mapa de bits, storyboard, rango y papel de estudio.
+fn rich_project() -> Project {
+    let mut p = Project::demo();
+    p.background = [paper::PAPERS[8].rgb[0], paper::PAPERS[8].rgb[1], paper::PAPERS[8].rgb[2], 255];
+
+    let custom = VStyle { profile: Profile::Custom, shape: default_shape(), cap: Cap::Square, join: Join::Bevel, ..VStyle::default() };
+    let mut pressured = stroke(vec![[100.0, 300.0], [250.0, 260.0], [400.0, 330.0]], vec![0.2, 0.9, 0.5], Some(custom.clone()), [10, 20, 30, 255], 12.0);
+    edit::set_prop(&mut pressured, &Prop::Width(22.0)); // guarda su aspecto original
+    let open = curve(
+        vec![
+            Node { p: [500.0, 300.0], hin: [500.0, 300.0], hout: [540.0, 240.0], pr: 1.0, smooth: true },
+            Node { p: [700.0, 320.0], hin: [660.0, 380.0], hout: [740.0, 260.0], pr: 0.6, smooth: true },
+            Node::corner([850.0, 300.0]),
+        ],
+        false,
+        custom.clone(),
+    );
+    let closed = curve(
+        vec![Node::corner([200.0, 450.0]), Node::corner([420.0, 450.0]), Node::corner([420.0, 600.0]), Node::corner([200.0, 600.0])],
+        true,
+        VStyle { profile: Profile::TaperBoth, ..VStyle::default() },
+    );
+    let mut vec_layer = Layer::new("Vectorial");
+    let d = Arc::new(Drawing { strokes: vec![pressured, open, closed], raster: None });
+    vec_layer.keys.insert(0, d.clone());
+    vec_layer.keys.insert(6, d);
+    vec_layer.xform.insert(0, XKey::default());
+    vec_layer.xform.insert(8, XKey { x: 30.0, r: 12.0, s: 1.1, ..XKey::default() });
+    p.layers.push(vec_layer);
+
+    let mut bitmap = Layer::new("Píxeles");
+    bitmap.kind = LayerKind::Bitmap;
+    let mut r = Raster::new(p.width, p.height);
+    render::stamp_stroke(&mut r, &Stroke::shape(ShapeKind::Line, [100.0, 120.0], [500.0, 120.0], [30, 90, 220, 255], 24.0, None));
+    bitmap.keys.insert(0, Arc::new(Drawing { strokes: Vec::new(), raster: Some(Arc::new(r)) }));
+    p.layers.push(bitmap);
+
+    for (i, k) in [LayerKind::Solid, LayerKind::Null, LayerKind::Text, LayerKind::Light, LayerKind::Camera].into_iter().enumerate() {
+        let mut l = Layer::new(format!("Capa {k:?}"));
+        l.kind = k;
+        l.solid = [40, 90, 60, 255];
+        l.is3d = i % 2 == 0;
+        l.plane = (i % 3) as u8;
+        l.depth = i as f32 * 40.0 - 80.0;
+        l.opacity = 0.8;
+        p.layers.push(l);
+    }
+    p.storyboard.push(Panel { title: "Plano 1".into(), dur: 2.5, action: "Entra el personaje".into(), ..Default::default() });
+    p.range = Some((1, 10));
+    p.sanitize();
+    p
+}
+
+fn value(p: &Project) -> serde_json::Value {
+    serde_json::to_value(p).unwrap()
+}
+
+fn save_and_open(p: &Project, dir: &Path, name: &str) -> Project {
+    let path = dir.join(name);
+    write_project(p, &path, false).unwrap();
+    read_project(&path).unwrap()
+}
+
+// ---------- Guardar y abrir ----------
+
+#[test]
+fn rich_project_survives_save_and_open_identically() {
+    let dir = temp_dir("rico");
+    let p = rich_project();
+    let back = save_and_open(&p, &dir, "rico.ltoon");
+    assert_eq!(value(&p), value(&back), "el proyecto cambió al guardar y abrir");
+
+    // Los campos nuevos de cada fase siguen ahí, no solo «lo mismo en JSON».
+    let v = &back.layers.iter().find(|l| l.name == "Vectorial").unwrap().keys[&0].strokes;
+    assert_eq!(v[0].pressure, vec![0.2, 0.9, 0.5]);
+    assert_eq!(v[0].style.as_ref().unwrap().profile, Profile::Custom);
+    assert_eq!(v[0].style.as_ref().unwrap().shape, default_shape());
+    assert_eq!(v[0].original.as_ref().map(|o| o.width), Some(12.0), "se conserva el aspecto original");
+    assert!(v[1].nodes.as_ref().map_or(false, |n| n.len() == 3) && !v[1].points.is_empty(), "la curva abierta conserva sus nodos");
+    assert!(v[2].closed && v[2].nodes.is_some());
+    let kinds: Vec<LayerKind> = back.layers.iter().map(|l| l.kind).collect();
+    for k in LayerKind::ALL {
+        assert!(kinds.contains(&k), "falta una capa {k:?}");
+    }
+    let cam = back.layers.iter().find(|l| l.kind == LayerKind::Camera).unwrap();
+    assert!((cam.depth - (4.0 * 40.0 - 80.0)).abs() < 1e-4 && cam.is3d);
+    assert_eq!(back.range, Some((1, 10)));
+    assert_eq!(back.storyboard.len(), p.storyboard.len());
+    assert_eq!(back.storyboard.last().map(|s| s.title.as_str()), Some("Plano 1"));
+    assert_eq!(paper::for_background(back.background).map(|p| p.id), Some("tmk"), "el papel de estudio se reconoce al abrir");
+    let px = back.layers.iter().find(|l| l.kind == LayerKind::Bitmap).unwrap().keys[&0].pick([300.0, 120.0]);
+    assert_eq!(px, Some([30, 90, 220, 255]), "el mapa de bits conserva sus píxeles");
+    finish(&dir);
+}
+
+#[test]
+fn saving_is_stable_and_keeps_a_previous_version() {
+    let dir = temp_dir("estable");
+    let p = rich_project();
+    let path = dir.join("estable.ltoon");
+    write_project(&p, &path, true).unwrap();
+    let first = std::fs::read(&path).unwrap();
+    // Abrir y volver a guardar no cambia ni un byte ni hace crecer el archivo.
+    let again = read_project(&path).unwrap();
+    write_project(&again, &path, true).unwrap();
+    assert_eq!(std::fs::read(&path).unwrap(), first, "guardar de nuevo cambió el archivo");
+    assert_eq!(std::fs::read(path.with_extension("ltoon.bak")).unwrap(), first, "la copia anterior no coincide");
+    assert!(!path.with_extension("ltoon.tmp").exists());
+    finish(&dir);
+}
+
+#[test]
+fn the_image_is_the_same_after_saving_and_opening() {
+    let dir = temp_dir("imagen");
+    let p = rich_project();
+    let back = save_and_open(&p, &dir, "imagen.ltoon");
+    for f in [0, 3, 6, 9] {
+        let (a, b) = (render::render_frame(&p, f, 0.25).unwrap(), render::render_frame(&back, f, 0.25).unwrap());
+        assert_eq!(a.data(), b.data(), "el fotograma {f} se ve distinto al abrir el proyecto");
+    }
+    finish(&dir);
+}
+
+// ---------- Proyectos de versiones anteriores ----------
+
+fn raw(bytes: &[u8]) -> serde_json::Value {
+    serde_json::from_slice(bytes).unwrap()
+}
+
+fn count_strokes(v: &serde_json::Value) -> usize {
+    v["layers"].as_array().unwrap().iter().flat_map(|l| l["keys"].as_object().unwrap().values()).map(|d| d["strokes"].as_array().map_or(0, |s| s.len())).sum()
+}
+
+fn open_bytes(bytes: &[u8], name: &str) -> Project {
+    let dir = temp_dir(name);
+    let path = dir.join("viejo.ltoon");
+    std::fs::write(&path, bytes).unwrap();
+    let p = read_project(&path).unwrap();
+    finish(&dir);
+    p
+}
+
+#[test]
+fn projects_saved_by_v0_1_0_open_without_losing_anything() {
+    for (name, bytes) in [("demo", V010_DEMO), ("completo", V010_COMPLETO)] {
+        let old = raw(bytes);
+        let p = open_bytes(bytes, name);
+        assert_eq!(p.layers.len(), old["layers"].as_array().unwrap().len(), "{name}: capas");
+        assert_eq!(count_strokes(&serde_json::to_value(&p).unwrap()), count_strokes(&old), "{name}: trazos");
+        assert_eq!((p.width, p.height, p.fps, p.length), (old["width"].as_u64().unwrap() as u32, old["height"].as_u64().unwrap() as u32, old["fps"].as_u64().unwrap() as u32, old["length"].as_u64().unwrap() as u32));
+        for (new, old) in p.layers.iter().zip(old["layers"].as_array().unwrap()) {
+            assert_eq!(new.name, old["name"].as_str().unwrap());
+            assert_eq!(new.keys.len(), old["keys"].as_object().unwrap().len(), "{name}: claves de {}", new.name);
+            assert_eq!(new.xform.len(), old["xform"].as_object().map_or(0, |o| o.len()), "{name}: claves de animación de {}", new.name);
+            // Los datos de 3D y el tipo de capa guardados en 0.1.0 se conservan tal cual.
+            assert_eq!(new.is3d, old["is3d"].as_bool().unwrap_or(false));
+            assert_eq!(new.depth, old["depth"].as_f64().unwrap_or(0.0) as f32);
+            assert_eq!(serde_json::to_value(new.kind).unwrap(), old.get("kind").cloned().unwrap_or(serde_json::json!("Vector")));
+        }
+        // Los trazos viejos no ganan campos nuevos: se ven y se editan como siempre.
+        for l in &p.layers {
+            for d in l.keys.values() {
+                for s in &d.strokes {
+                    assert!(s.style.is_none() && s.pressure.is_empty() && s.nodes.is_none() && s.original.is_none(), "{name}: un trazo viejo cambió");
+                }
+            }
+        }
+        assert!(!p.palettes.is_empty(), "{name}: un proyecto viejo recibe sus paletas");
+    }
+}
+
+#[test]
+fn old_projects_keep_their_details_and_render() {
+    let old = raw(V010_COMPLETO);
+    let p = open_bytes(V010_COMPLETO, "detalles");
+    assert_eq!(p.range, Some((2, 18)));
+    let kinds: Vec<LayerKind> = p.layers.iter().map(|l| l.kind).collect();
+    for k in LayerKind::ALL {
+        assert!(kinds.contains(&k), "falta una capa {k:?} del proyecto viejo");
+    }
+    assert_eq!(old["range"], serde_json::json!([2, 18]));
+    let pm = render::render_frame(&p, 0, 0.25).unwrap();
+    assert!(pm.pixels().iter().any(|px| px.alpha() > 0));
+    // Un proyecto viejo, al guardarse con la versión nueva, no escribe campos que no usa y se vuelve a abrir igual.
+    let dir = temp_dir("viejo_guardado");
+    let path = dir.join("v.ltoon");
+    write_project(&p, &path, false).unwrap();
+    let text = std::fs::read_to_string(&path).unwrap();
+    for field in ["\"nodes\"", "\"original\"", "\"shape\"", "\"pressure\"", "\"style\""] {
+        assert!(!text.contains(field), "el proyecto viejo ganó el campo {field}");
+    }
+    assert_eq!(value(&read_project(&path).unwrap()), value(&p));
+    finish(&dir);
+}
+
+#[test]
+fn files_with_missing_or_unknown_fields_still_open() {
+    // Mínimo imprescindible: solo lo que tenía la primera versión.
+    let minimal = br#"{"width":640,"height":360,"fps":12,"length":24,"background":[255,255,255,255],
+        "layers":[{"name":"A","visible":true,"locked":false,"opacity":1.0,"keys":{}}],"palette":[]}"#;
+    let p = open_bytes(minimal, "minimo");
+    assert_eq!((p.width, p.fps), (640, 12));
+    assert!(!p.palettes.is_empty() && p.layers[0].kind == LayerKind::Vector);
+    // Un archivo de una versión futura puede traer campos desconocidos: se ignoran sin fallar.
+    let mut v = raw(V010_DEMO);
+    v["campo_del_futuro"] = serde_json::json!({"a": 1});
+    v["layers"][0]["otro_campo"] = serde_json::json!([1, 2, 3]);
+    let p = open_bytes(&serde_json::to_vec(&v).unwrap(), "futuro");
+    assert_eq!(p.layers.len(), raw(V010_DEMO)["layers"].as_array().unwrap().len());
+}
+
+// ---------- Archivos dañados ----------
+
+#[test]
+fn damaged_files_give_a_clear_error_and_never_panic() {
+    let dir = temp_dir("danados");
+    let half = V010_DEMO[..V010_DEMO.len() / 2].to_vec();
+    let cases: Vec<(&str, Vec<u8>)> = vec![
+        ("vacío", Vec::new()),
+        ("texto", b"esto no es un proyecto".to_vec()),
+        ("recortado a la mitad", half),
+        ("otro JSON", b"[1, 2, 3]".to_vec()),
+        ("sin lo imprescindible", br#"{"width": 0}"#.to_vec()),
+        ("bytes sueltos", vec![0xff, 0xfe, 0x00, 0x13, 0x37]),
+    ];
+    for (name, bytes) in cases {
+        let path = dir.join("danado.ltoon");
+        std::fs::write(&path, &bytes).unwrap();
+        let err = read_project(&path).expect_err(name);
+        assert!(err.contains("no es un proyecto válido"), "{name}: mensaje poco claro: {err}");
+    }
+    // Un archivo que no existe también da un error, no un fallo.
+    assert!(read_project(&dir.join("no_existe.ltoon")).is_err());
+    finish(&dir);
+}
+
+#[test]
+fn absurd_values_in_a_valid_file_are_repaired() {
+    let mut v = raw(V010_DEMO);
+    v["width"] = serde_json::json!(0);
+    v["height"] = serde_json::json!(99999);
+    v["fps"] = serde_json::json!(0);
+    v["length"] = serde_json::json!(0);
+    v["layers"][0]["opacity"] = serde_json::json!(7.5);
+    let p = open_bytes(&serde_json::to_vec(&v).unwrap(), "absurdo");
+    assert!(p.width >= 16 && p.height <= 8192 && p.fps >= 1 && p.length >= 1);
+    assert!((0.0..=1.0).contains(&p.layers[0].opacity));
+    // Y se puede dibujar y exportar con él sin fallar.
+    assert!(render::render_frame(&p, 0, 0.1).is_some());
+}
+
+#[test]
+fn a_failed_save_leaves_the_previous_file_intact() {
+    let dir = temp_dir("escritura_fallida");
+    let path = dir.join("p.ltoon");
+    let p = rich_project();
+    write_project(&p, &path, false).unwrap();
+    let before = std::fs::read(&path).unwrap();
+    // El archivo temporal no se puede crear (hay una carpeta con ese nombre): el guardado falla sin tocar nada.
+    std::fs::create_dir_all(path.with_extension("ltoon.tmp")).unwrap();
+    let mut q = p.clone();
+    q.fps = 7;
+    let err = write_project(&q, &path, true).expect_err("debería fallar");
+    assert!(!err.is_empty());
+    assert_eq!(std::fs::read(&path).unwrap(), before, "el archivo anterior cambió");
+    assert_eq!(read_project(&path).unwrap().fps, p.fps);
+    // Una carpeta que no existe y no se puede crear (el padre es un archivo) también da error.
+    let blocker = dir.join("bloqueo");
+    std::fs::write(&blocker, b"x").unwrap();
+    assert!(write_project(&p, &blocker.join("dentro").join("p.ltoon"), false).is_err());
+    finish(&dir);
+}
+
+// ---------- Exportación ----------
+
+/// Proyecto con la hoja vacía del color de un papel de estudio, una línea vectorial roja y una línea de píxeles azul.
+fn export_project() -> Project {
+    let mut p = Project::demo();
+    let tmk = &paper::PAPERS[8];
+    p.background = [tmk.rgb[0], tmk.rgb[1], tmk.rgb[2], 255];
+    p.layers.clear();
+    let mut v = Layer::new("Vectorial");
+    let red = Stroke::shape(ShapeKind::Line, [300.0, 200.0], [900.0, 200.0], [220, 30, 30, 255], 40.0, None);
+    v.keys.insert(0, Arc::new(Drawing { strokes: vec![red], raster: None }));
+    let mut b = Layer::new("Píxeles");
+    b.kind = LayerKind::Bitmap;
+    let mut r = Raster::new(p.width, p.height);
+    render::stamp_stroke(&mut r, &Stroke::shape(ShapeKind::Line, [300.0, 500.0], [900.0, 500.0], [30, 90, 220, 255], 40.0, None));
+    b.keys.insert(0, Arc::new(Drawing { strokes: Vec::new(), raster: Some(Arc::new(r)) }));
+    p.layers = vec![v, b];
+    p.length = 12;
+    p
+}
+
+fn px(pm: &tiny_skia::Pixmap, x: f32, y: f32, scale: f32) -> [u8; 4] {
+    let c = pm.pixel((x * scale) as u32, (y * scale) as u32).unwrap().demultiply();
+    [c.red(), c.green(), c.blue(), c.alpha()]
+}
+
+#[test]
+fn png_export_has_the_right_size_content_and_no_paper_grain() {
+    let dir = temp_dir("png");
+    let p = export_project();
+    let path = dir.join("f.png");
+    render::export_png_opts(&p, 0, 0.5, false, &path).unwrap();
+    let pm = tiny_skia::Pixmap::load_png(&path).unwrap();
+    assert_eq!((pm.width(), pm.height()), ((p.width as f32 * 0.5).round() as u32, (p.height as f32 * 0.5).round() as u32));
+    let tmk = &paper::PAPERS[8];
+    // La hoja vacía es del color exacto del papel: el grano es solo una ayuda de la vista y no se exporta.
+    assert_eq!(px(&pm, 20.0, 20.0, 0.5), [tmk.rgb[0], tmk.rgb[1], tmk.rgb[2], 255]);
+    let red = px(&pm, 600.0, 200.0, 0.5);
+    assert!(red[0] > 200 && red[1] < 60 && red[2] < 60, "la línea vectorial no salió roja: {red:?}");
+    let blue = px(&pm, 600.0, 500.0, 0.5);
+    assert!(blue[2] > 180 && blue[0] < 70, "la línea de píxeles no salió azul: {blue:?}");
+    // Con fondo transparente, lo vacío queda transparente y el trazo se conserva.
+    let tp = dir.join("t.png");
+    render::export_png_opts(&p, 0, 0.5, true, &tp).unwrap();
+    let t = tiny_skia::Pixmap::load_png(&tp).unwrap();
+    assert_eq!(px(&t, 20.0, 20.0, 0.5)[3], 0);
+    assert!(px(&t, 600.0, 200.0, 0.5)[3] > 200);
+    finish(&dir);
+}
+
+#[test]
+fn image_sequence_export_writes_one_valid_png_per_frame() {
+    let dir = temp_dir("secuencia");
+    let p = export_project();
+    let n = render::export_sequence_range(&p, &dir, 2, 5, 0.25, false).unwrap();
+    assert_eq!(n, 4);
+    for f in 3..=6 {
+        let path = dir.join(format!("fotograma_{f:04}.png"));
+        let pm = tiny_skia::Pixmap::load_png(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+        assert_eq!((pm.width(), pm.height()), ((p.width as f32 * 0.25).round() as u32, (p.height as f32 * 0.25).round() as u32));
+    }
+    assert!(!dir.join("fotograma_0007.png").exists() && !dir.join("fotograma_0002.png").exists());
+    finish(&dir);
+}
+
+#[test]
+fn gif_export_has_one_frame_per_step_and_respects_the_max_width() {
+    let dir = temp_dir("gif");
+    let p = export_project();
+    let path = dir.join("a.gif");
+    render::export_gif_range(&p, &path, 0, 4, 320).unwrap();
+    let bytes = std::fs::read(&path).unwrap();
+    assert!(bytes.starts_with(b"GIF89a") || bytes.starts_with(b"GIF87a"), "no empieza como un GIF");
+    let mut dec = gif::DecodeOptions::new();
+    dec.set_color_output(gif::ColorOutput::RGBA);
+    let mut r = dec.read_info(std::fs::File::open(&path).unwrap()).unwrap();
+    let (w, h) = (r.width() as u32, r.height() as u32);
+    assert!(w <= 320 && w >= 300, "ancho del GIF: {w}");
+    assert!((w as f32 / h as f32 - p.width as f32 / p.height as f32).abs() < 0.02, "se deformó el GIF: {w}×{h}");
+    let mut frames = 0;
+    let mut red_seen = false;
+    while let Some(f) = r.read_next_frame().unwrap() {
+        frames += 1;
+        let (fw, i) = (f.width as usize, (((200.0 * w as f32 / p.width as f32) as usize) * f.width as usize + (600.0 * w as f32 / p.width as f32) as usize) * 4);
+        let _ = fw;
+        red_seen |= f.buffer[i] > 180 && f.buffer[i + 1] < 90;
+    }
+    assert_eq!(frames, 5);
+    assert!(red_seen, "la línea roja no aparece en el GIF");
+    finish(&dir);
+}
+
+#[test]
+fn sprite_sheet_export_lays_out_every_frame_and_describes_them() {
+    let dir = temp_dir("hoja");
+    let p = export_project();
+    let path = dir.join("hoja.png");
+    let n = render::export_sprite_sheet(&p, &path, 0, 3, 0.25, 2, false).unwrap();
+    assert_eq!(n, 4);
+    let pm = tiny_skia::Pixmap::load_png(&path).unwrap();
+    let (cw, ch) = ((p.width as f32 * 0.25).round() as u32, (p.height as f32 * 0.25).round() as u32);
+    assert_eq!((pm.width(), pm.height()), (cw * 2, ch * 2));
+    let meta: serde_json::Value = serde_json::from_slice(&std::fs::read(path.with_extension("json")).unwrap()).unwrap();
+    assert_eq!(meta["frames"].as_array().unwrap().len(), 4);
+    assert_eq!(meta["columns"], 2);
+    finish(&dir);
+}
+
+#[test]
+fn export_after_save_and_open_matches_the_original() {
+    let dir = temp_dir("exportar_abierto");
+    let p = rich_project();
+    let back = save_and_open(&p, &dir, "p.ltoon");
+    let (a, b) = (dir.join("a.png"), dir.join("b.png"));
+    render::export_png_opts(&p, 0, 0.5, false, &a).unwrap();
+    render::export_png_opts(&back, 0, 0.5, false, &b).unwrap();
+    assert_eq!(tiny_skia::Pixmap::load_png(&a).unwrap().data(), tiny_skia::Pixmap::load_png(&b).unwrap().data());
+    finish(&dir);
+}
+
+#[test]
+fn mp4_export_works_when_ffmpeg_is_installed() {
+    let Some(ffmpeg) = render::find_ffmpeg() else {
+        eprintln!("ffmpeg no está instalado en este equipo: se omite la prueba de MP4");
+        return;
+    };
+    let dir = temp_dir("mp4");
+    let p = export_project();
+    let path = dir.join("v.mp4");
+    let n = render::export_video(&p, &ffmpeg, &path, 0, 5, 0.25).unwrap();
+    assert_eq!(n, 6);
+    assert!(std::fs::metadata(&path).map_or(false, |m| m.len() > 500), "el MP4 está vacío");
+    finish(&dir);
+}
+
+/// Hallazgo de esta revisión: el exportador no dibuja las capas de color sólido (el visor sí). Cuando se corrija,
+/// quitar `ignore` y esta prueba debe pasar.
+#[test]
+#[ignore = "pendiente (Issue #65): la exportación ignora las capas de color sólido"]
+fn solid_color_layers_are_exported_like_in_the_viewer() {
+    let mut p = Project::demo();
+    p.layers.clear();
+    let mut s = Layer::new("Color");
+    s.kind = LayerKind::Solid;
+    s.solid = [10, 200, 10, 255];
+    p.layers.push(s);
+    let pm = render::render_frame(&p, 0, 0.1).unwrap();
+    assert_eq!(px(&pm, 100.0, 100.0, 0.1), [10, 200, 10, 255]);
+}
