@@ -14,11 +14,14 @@
 
 use serde::{Deserialize, Serialize};
 
+mod playback;
 mod reference;
 mod store;
 #[cfg(test)]
 mod tests;
 
+#[allow(unused_imports)]
+pub use playback::{load_proxy, proxy_path, Decoded, Key, Loader, Photo, SmCache, PROXY_SIDE};
 #[allow(unused_imports)]
 pub use reference::{relative_path, resolve_relative, Located, SmRef};
 #[allow(unused_imports)]
@@ -146,6 +149,18 @@ impl Sequence {
             start += it.exposure;
         }
         None
+    }
+
+    /// Posición de la secuencia que se ve en un cuadro del **proyecto**. La secuencia empieza en el cuadro start del
+    /// proyecto y cada cuadro de la secuencia dura project_fps / fps cuadros del proyecto, de modo que ninguna foto se
+    /// pierde cuando la secuencia va a menos fotogramas por segundo que el proyecto (por ejemplo, 12 en un proyecto de 24).
+    /// Si va a más, se muestrean los cuadros que caen en cada instante del proyecto (las fotos siguen en la secuencia).
+    pub fn item_for_project_frame(&self, start: u32, project_fps: u32, frame: u32) -> Option<usize> {
+        if frame < start || project_fps == 0 {
+            return None;
+        }
+        let seq_frame = ((frame - start) as u64 * self.fps.max(1) as u64 / project_fps as u64) as u32;
+        self.item_at_frame(seq_frame)
     }
 
     fn take_item_id(&mut self) -> String {

@@ -15,6 +15,8 @@ pub(super) struct SmView {
     pub orphans: usize,
     /// Resultado de la última importación o recuperación, para mostrarlo en el panel.
     pub last: String,
+    /// Los fotogramas por segundo cambiaron y falta guardarlos en sequence.json (se guardan al soltar el control).
+    pub dirty: bool,
 }
 
 enum SmState {
@@ -40,7 +42,7 @@ impl LeonApp {
                 Ok((folder, note)) => {
                     let orphans = folder.orphans().len();
                     let last = if note == OpenNote::FromBackup { "sequence.json estaba dañado: se abrió la copia anterior. Se guardará de nuevo al importar o recuperar.".to_string() } else { String::new() };
-                    self.sm.insert(r.id.clone(), SmView { folder, note, problems: None, orphans, last });
+                    self.sm.insert(r.id.clone(), SmView { folder, note, problems: None, orphans, last, dirty: false });
                     SmState::Ready
                 }
                 Err(e) => SmState::Missing(e),
@@ -63,7 +65,7 @@ impl LeonApp {
         let orphans = folder.orphans().len();
         self.checkpoint();
         self.sm_set_ref(Some(r.clone()));
-        self.sm.insert(r.id, SmView { folder, note, problems: None, orphans, last: String::new() });
+        self.sm.insert(r.id, SmView { folder, note, problems: None, orphans, last: String::new(), dirty: false });
     }
 
     /// Crea una secuencia nueva en una carpeta que elige la persona.
@@ -205,6 +207,73 @@ impl LeonApp {
         }
     }
 
+    /// Dónde empieza la secuencia en el proyecto, a cuántos fotogramas por segundo va y si cabe en la duración del proyecto.
+    fn sm_timing_ui(&mut self, ui: &mut egui::Ui, r: &SmRef, id: &str, frames: u32, fps: u32) {
+        let (pfps, plen) = (self.project.fps, self.project.length);
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("Empieza en el cuadro").size(11.5).color(MU));
+            let mut start = r.start + 1;
+            let resp = ui.add(egui::DragValue::new(&mut start).range(1..=plen.max(1)).speed(0.2));
+            if resp.drag_started() || resp.gained_focus() {
+                self.checkpoint();
+            }
+            if resp.changed() && start - 1 != r.start {
+                let mut nr = r.clone();
+                nr.start = start - 1;
+                self.sm_set_ref(Some(nr));
+            }
+        });
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("Fotogramas por segundo").size(11.5).color(MU));
+            let mut f = fps;
+            let resp = ui.add(egui::DragValue::new(&mut f).range(1..=120).speed(0.1));
+            if resp.changed() && f != fps {
+                if let Some(v) = self.sm.get_mut(id) {
+                    v.folder.seq.fps = f;
+                    v.dirty = true;
+                }
+            }
+            if resp.drag_stopped() || resp.lost_focus() {
+                self.sm_save_fps(id);
+            }
+        });
+        // Cuántos cuadros del proyecto ocupa la secuencia (cada cuadro suyo dura ps proyecto / fps secuencia cuadros del proyecto).
+        let need = r.start + (frames as u64 * pfps as u64).div_ceil(fps.max(1) as u64) as u32;
+        if need > plen {
+            ui.label(RichText::new(format!("⚠ La secuencia llega hasta el cuadro {need} y el proyecto dura {plen}: los últimos no se verán ni se exportarán.")).size(11.0).color(ACCENT2));
+        }
+        if frames > 0 && need != plen && ui.small_button("Ajustar la duración del proyecto a la secuencia").on_hover_text(format!("Pone el proyecto en {need} cuadros")).clicked() {
+            self.checkpoint();
+            self.project.length = need.clamp(1, 100_000);
+            self.dirty = true;
+            self.say(format!("El proyecto ahora dura {} cuadros", self.project.length));
+        }
+    }
+
+    /// Guarda en sequence.json el cambio de fotogramas por segundo y actualiza el resumen de la capa.
+    fn sm_save_fps(&mut self, id: &str) {
+        let pdir = self.project_dir();
+        let mut r = self.layer().stopmotion.clone();
+        let Some(v) = self.sm.get_mut(id) else { return };
+        if !v.dirty {
+            return;
+        }
+        v.dirty = false;
+        let saved = v.folder.save();
+        if saved.is_ok() {
+            if let Some(r) = r.as_mut() {
+                r.update(&v.folder, pdir.as_deref());
+            }
+        }
+        match saved {
+            Ok(()) => {
+                self.sm_set_ref(r);
+                self.say("Fotogramas por segundo de la secuencia guardados");
+            }
+            Err(e) => self.say(format!("No se pudo guardar sequence.json: {e}")),
+        }
+    }
+
     fn sm_ready_ui(&mut self, ui: &mut egui::Ui, r: &SmRef) {
         let id = r.id.clone();
         let (name, dir, photos, items, frames, fps, note, orphans, last, sources, problems) = {
@@ -226,6 +295,7 @@ impl LeonApp {
         ui.label(RichText::new(&name).strong().color(TX));
         muted(ui, &format!("Carpeta: {}", dir.display()));
         muted(ui, &format!("{photos} fotos · {items} posiciones · {frames} cuadros · {fps} fps"));
+        self.sm_timing_ui(ui, r, &id, frames, fps);
         if note == OpenNote::FromBackup {
             ui.label(RichText::new("Se abrió la copia anterior de sequence.json").size(11.0).color(ACCENT2));
         }

@@ -23,6 +23,7 @@ mod flow_tests;
 mod papers;
 mod panelsize;
 mod smui;
+mod smview;
 mod hud;
 mod view3d;
 mod timebar;
@@ -283,6 +284,10 @@ pub struct LeonApp {
     /// Secuencias Stop Motion abiertas (por identificador) y sus miniaturas como texturas.
     sm: std::collections::HashMap<String, smui::SmView>,
     sm_thumbs: std::collections::HashMap<(String, String), egui::TextureHandle>,
+    /// Fotos de Stop Motion para el visor: cargador en segundo plano, texturas (con el último cuadro en que se usaron) y las que fallaron.
+    sm_loader: crate::stopmotion::Loader,
+    sm_tex: std::collections::HashMap<crate::stopmotion::Key, (egui::TextureHandle, u64)>,
+    sm_failed: std::collections::HashSet<crate::stopmotion::Key>,
     pen_path: Option<penui::PenPath>,
     sel_node: Option<usize>,
     /// Última presión leída del lápiz (1 si no hay lápiz).
@@ -530,7 +535,12 @@ impl LeonApp {
             let dir = std::path::PathBuf::from(dir);
             if let Ok(mut f) = crate::stopmotion::SeqFolder::create(&dir, "Escena de prueba", 12) {
                 for i in 0..14u32 {
-                    let img = image::RgbImage::from_fn(320, 180, |x, y| image::Rgb([((x + i * 17) % 256) as u8, (y * 255 / 180) as u8, (i * 18) as u8]));
+                    // Una bola blanca que avanza de foto en foto sobre un fondo que cambia de color: se nota el movimiento.
+                    let (cx, cy) = (30.0 + i as f32 * 20.0, 90.0 - (i as f32 * 0.5).sin() * 40.0);
+                    let img = image::RgbImage::from_fn(320, 180, |x, y| {
+                        let d = ((x as f32 - cx).powi(2) + (y as f32 - cy).powi(2)).sqrt();
+                        if d < 18.0 { image::Rgb([250, 250, 250]) } else { image::Rgb([(40 + i * 12) as u8, (120 + y / 3) as u8, (200 - i * 9) as u8]) }
+                    });
                     let mut bytes = Vec::new();
                     if image::codecs::jpeg::JpegEncoder::new_with_quality(&mut bytes, 85).encode_image(&img).is_ok() {
                         let _ = f.append_photo(&bytes, None);
@@ -607,6 +617,9 @@ impl LeonApp {
             sz: Default::default(),
             sm: Default::default(),
             sm_thumbs: Default::default(),
+            sm_loader: crate::stopmotion::Loader::new(),
+            sm_tex: Default::default(),
+            sm_failed: Default::default(),
             paper_scale: crate::paper::SCALE_DEFAULT,
             paper_seed: std::env::var("LEONTOON_SEMILLA").ok().and_then(|v| v.parse().ok()).unwrap_or(1),
             pen_path: None,
@@ -756,6 +769,13 @@ impl LeonApp {
         }
         if let Some(l) = std::env::var("LEONTOON_LUZ").ok().and_then(|v| v.parse::<f32>().ok()) {
             app.light_amt = l;
+        }
+        // Capturas: LEONTOON_CUADRO=<n> (desde 0) pone ese cuadro y LEONTOON_ONION=1 activa el papel cebolla.
+        if let Some(n) = std::env::var("LEONTOON_CUADRO").ok().and_then(|v| v.parse::<u32>().ok()) {
+            app.frame = n.min(app.project.length.saturating_sub(1));
+        }
+        if std::env::var("LEONTOON_ONION").is_ok() {
+            app.onion = true;
         }
         // LEONTOON_VNODE=<n> elige ese nodo de la curva elegida (captura de la edición de nodos).
         if let Some(n) = std::env::var("LEONTOON_VNODE").ok().and_then(|v| v.parse().ok()) {
@@ -959,6 +979,7 @@ impl LeonApp {
         match safety::write_project(&self.project, p, true) {
             Ok(()) => {
                 self.path = Some(p.to_path_buf());
+                self.project.base_dir = pdir.clone();
                 self.dirty = false;
                 self.remember_recent(p);
                 self.say(format!("Guardado y verificado: {}", p.display()));
@@ -977,6 +998,7 @@ impl LeonApp {
             Ok(proj) => {
                 self.project = proj;
                 self.path = Some(p.to_path_buf());
+                self.project.base_dir = p.parent().map(|d| d.to_path_buf());
                 self.after_load();
                 self.remember_recent(p);
                 self.say(format!("Abierto: {}", p.display()));
@@ -992,6 +1014,8 @@ impl LeonApp {
     fn after_load(&mut self) {
         self.sm.clear();
         self.sm_thumbs.clear();
+        self.sm_tex.clear();
+        self.sm_failed.clear();
         self.adopt_project_brush();
         self.undo.clear();
         self.redo.clear();

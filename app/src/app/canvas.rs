@@ -90,6 +90,7 @@ impl LeonApp {
         // ---- Dibujo ----
         self.sync_brush_tex(&ctx);
         self.ensure_active_paper_texture(&ctx);
+        self.sm_prepare(&ctx);
         let painter = ui.painter_at(rect);
         // Mesa de luz: el gris del fondo va de 0 (negro) a 100 (blanco).
         let g = (self.light_gray / 100.0 * 255.0).round().clamp(0.0, 255.0) as u8;
@@ -239,6 +240,9 @@ impl LeonApp {
             if layer.kind == LayerKind::Solid {
                 let cam = Rect::from_min_size(origin, Vec2::new(w, h) * z);
                 painter.rect_filled(cam, 0.0, with_alpha(c32(layer.solid), alpha));
+            }
+            if layer.kind == LayerKind::StopMotion {
+                self.paint_stopmotion(painter, li, layer, origin, z, f, alpha, live, op);
             }
             if let Some(d) = layer.drawing_at(f) {
                 paint_raster(painter, d, &map, alpha, 0);

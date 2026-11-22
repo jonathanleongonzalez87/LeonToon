@@ -1,6 +1,6 @@
 //! Dibujo "fuera de pantalla" para exportar: PNG, secuencias, hoja de sprites y GIF animado.
 
-use crate::model::{Drawing, Project, Rgba, Stroke, XKey};
+use crate::model::{Drawing, Layer, LayerKind, Project, Rgba, Stroke, XKey};
 use crate::raster::Raster;
 use std::path::Path;
 use tiny_skia::{BlendMode, Color, FillRule, FilterQuality, LineCap, LineJoin, Paint, PathBuilder, Pixmap, PixmapPaint, PixmapRef, Transform};
@@ -132,6 +132,10 @@ pub fn render_frame_opts(p: &Project, frame: u32, scale: f32, transparent: bool)
         if !layer.visible || op <= 0.0 {
             continue;
         }
+        if layer.kind == LayerKind::StopMotion {
+            draw_stopmotion(&mut pm, p, layer, frame, &t, scale, op);
+            continue;
+        }
         if let Some(d) = layer.drawing_at(frame) {
             let mut lp = Pixmap::new(w, h)?;
             draw_drawing(&mut lp, d, layer_transform(&t, fw, fh, scale));
@@ -140,6 +144,31 @@ pub fn render_frame_opts(p: &Project, frame: u32, scale: f32, transparent: bool)
         }
     }
     Some(pm)
+}
+
+/// Dibuja la foto que toca en este cuadro de una capa Stop Motion, con el mismo cálculo de cuadros, ajuste y transformación
+/// que el visor. Se lee el **original** (reducido al tamaño que hace falta) y nunca se modifica. Si la carpeta, la foto o la
+/// secuencia faltan, la capa no dibuja nada (la exportación no falla por eso).
+fn draw_stopmotion(pm: &mut Pixmap, p: &Project, layer: &Layer, frame: u32, t: &XKey, scale: f32, op: f32) {
+    let Some(r) = &layer.stopmotion else { return };
+    let Some(folder) = p.sm.folder(r, p.base_dir.as_deref()) else { return };
+    let Some(idx) = folder.seq.item_for_project_frame(r.start, p.fps, frame) else { return };
+    let item = &folder.seq.items[idx];
+    let Some(src) = folder.seq.source(&item.source).filter(|_| item.visible) else { return };
+    if src.width == 0 || src.height == 0 {
+        return;
+    }
+    let (fw, fh) = (p.width as f32, p.height as f32);
+    let fit = (fw / src.width as f32).min(fh / src.height as f32);
+    // La foto se reduce a lo que se va a ver: no hace falta pasar 24 megapíxeles para un fotograma de 1280 px.
+    let max_side = (fw.max(fh) * scale * t.s.abs()).ceil().clamp(16.0, 8192.0) as u32;
+    let Some(photo) = p.sm.photo(&folder, src, max_side) else { return };
+    let k = photo.pixmap.width() as f32 / src.width as f32;
+    let (rw, rh) = (src.width as f32 * fit, src.height as f32 * fit);
+    let fit_t = Transform::from_translate((fw - rw) / 2.0, (fh - rh) / 2.0).pre_scale(fit / k, fit / k);
+    let full = layer_transform(t, fw, fh, scale).pre_concat(fit_t);
+    let paint = PixmapPaint { opacity: op, quality: FilterQuality::Bicubic, ..Default::default() };
+    pm.draw_pixmap(0, 0, photo.pixmap.as_ref(), &paint, full, None);
 }
 
 pub fn render_frame(p: &Project, frame: u32, scale: f32) -> Option<Pixmap> {

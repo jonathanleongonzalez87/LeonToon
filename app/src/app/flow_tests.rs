@@ -86,7 +86,7 @@ fn rich_project() -> Project {
         let mut l = Layer::new(format!("Capa {k:?}"));
         l.kind = k;
         if k == LayerKind::StopMotion {
-            l.stopmotion = Some(SmRef { id: "0123456789abcdef".into(), name: "Escena 1".into(), rel: Some("fotos/escena1".into()), abs: "C:/no/existe/escena1".into(), photos: 12, frames: 30, fps: 12 });
+            l.stopmotion = Some(SmRef { id: "0123456789abcdef".into(), name: "Escena 1".into(), rel: Some("fotos/escena1".into()), abs: "C:/no/existe/escena1".into(), photos: 12, frames: 30, fps: 12, start: 0 });
         }
         l.solid = [40, 90, 60, 255];
         l.is3d = i % 2 == 0;
@@ -518,7 +518,6 @@ fn a_stop_motion_layer_with_a_real_folder_survives_saving_and_moving_the_project
     let (opened, _) = SeqFolder::open(&dir).unwrap();
     assert_eq!((opened.seq.sources.len(), opened.seq.items.len(), opened.seq.total_frames()), (2, 3, 6));
     assert!(opened.verify(true).is_empty(), "las fotos están intactas tras mover el proyecto");
-    // Una capa Stop Motion no se dibuja ni se exporta todavía (Fase 2), pero el resto del proyecto sí.
     assert!(render::render_frame(&back, 0, 0.1).is_some());
     finish(&root);
 }
@@ -529,7 +528,159 @@ fn drawing_on_a_stop_motion_layer_is_refused_and_the_layer_is_marked_as_pending(
     for t in [Tool::Brush, Tool::Vector, Tool::Pen, Tool::Eraser, Tool::Shape, Tool::Fill] {
         assert!(t.layer_block(LayerKind::StopMotion).is_some(), "{t:?} no debe dibujar en una capa Stop Motion");
     }
-    assert!(LayerKind::StopMotion.pending(), "la capa existe pero todavía no se ve en la escena (#60)");
+    assert!(!LayerKind::StopMotion.pending(), "desde #60 la capa se ve en la escena y se exporta");
     assert_eq!(LayerKind::StopMotion.label(), "Stop Motion");
     assert!(LayerKind::ALL.contains(&LayerKind::StopMotion));
+}
+
+// ---------- Fase 2 (#60): composición y exportación ----------
+
+fn solid_png(w: u32, h: u32, rgb: [u8; 3]) -> Vec<u8> {
+    let mut out = Vec::new();
+    image::RgbImage::from_pixel(w, h, image::Rgb(rgb)).write_to(&mut std::io::Cursor::new(&mut out), image::ImageFormat::Png).unwrap();
+    out
+}
+
+/// Proyecto de 100×50 a 12 fps con una capa Stop Motion de tres fotos de color (rojo ×2, verde ×1, azul ×3 cuadros).
+fn stop_motion_project(root: &std::path::Path, photo: (u32, u32)) -> (Project, SeqFolder) {
+    let mut folder = SeqFolder::create(&root.join("fotos"), "Colores", 12).unwrap();
+    for (rgb, n) in [([255u8, 0, 0], 2u32), ([0, 255, 0], 1), ([0, 0, 255], 3)] {
+        let id = folder.add_photo_bytes(&solid_png(photo.0, photo.1, rgb), None, None).unwrap().id;
+        folder.seq.push_item(&id, n).unwrap();
+    }
+    folder.save().unwrap();
+    let mut p = Project::blank(100, 50, 12, 6);
+    p.background = [0, 0, 0, 255];
+    p.layers.clear();
+    let mut layer = Layer::new("Stop Motion 1");
+    layer.kind = LayerKind::StopMotion;
+    layer.stopmotion = Some(SmRef::new(&folder, None));
+    p.layers.push(layer);
+    (p, folder)
+}
+
+fn spx(pm: &tiny_skia::Pixmap, x: u32, y: u32) -> [u8; 4] {
+    let c = pm.pixel(x, y).unwrap();
+    [c.red(), c.green(), c.blue(), c.alpha()]
+}
+
+fn near(a: [u8; 4], b: [u8; 4]) -> bool {
+    a.iter().zip(b.iter()).all(|(x, y)| (*x as i32 - *y as i32).abs() <= 3)
+}
+
+#[test]
+fn each_project_frame_shows_the_photo_that_belongs_to_it() {
+    let root = temp_dir("sm_frames");
+    let (p, _f) = stop_motion_project(&root, (100, 50));
+    let want = [[255, 0, 0, 255], [255, 0, 0, 255], [0, 255, 0, 255], [0, 0, 255, 255], [0, 0, 255, 255], [0, 0, 255, 255]];
+    for (f, w) in want.iter().enumerate() {
+        let pm = render::render_frame(&p, f as u32, 1.0).unwrap();
+        assert!(near(spx(&pm, 50, 25), *w), "cuadro {f}: {:?}, se esperaba {w:?}", spx(&pm, 50, 25));
+    }
+    finish(&root);
+}
+
+#[test]
+fn sequence_frames_are_mapped_with_the_project_speed_and_start() {
+    let mut s = crate::stopmotion::Sequence::new("t", 12);
+    s.sources.push(crate::stopmotion::SourceFrame { id: "a".into(), file: "x".into(), width: 1, height: 1, format: "png".into(), bytes: 1, hash: "h".into(), captured_at: None, device: None, exif: None });
+    s.push_item("a", 2).unwrap();
+    s.push_item("a", 1).unwrap();
+    // Secuencia a 12 fps en un proyecto a 24: cada cuadro de la secuencia dura dos del proyecto.
+    assert_eq!(s.item_for_project_frame(0, 24, 0), Some(0));
+    assert_eq!(s.item_for_project_frame(0, 24, 3), Some(0));
+    assert_eq!(s.item_for_project_frame(0, 24, 4), Some(1));
+    assert_eq!(s.item_for_project_frame(0, 24, 6), None);
+    // Misma velocidad y con desplazamiento: antes del inicio no hay foto.
+    assert_eq!(s.item_for_project_frame(5, 12, 4), None);
+    assert_eq!(s.item_for_project_frame(5, 12, 5), Some(0));
+    assert_eq!(s.item_for_project_frame(5, 12, 7), Some(1));
+    assert_eq!(s.item_for_project_frame(5, 12, 8), None);
+    assert_eq!(s.item_for_project_frame(0, 0, 0), None);
+}
+
+#[test]
+fn a_big_photo_is_fitted_without_distortion_and_leaves_bars() {
+    let root = temp_dir("sm_fit");
+    // Foto cuadrada en un cuadro 2:1: ocupa el centro (50×50) y deja barras negras a los lados.
+    let (p, _f) = stop_motion_project(&root, (200, 200));
+    let pm = render::render_frame(&p, 0, 1.0).unwrap();
+    assert!(near(spx(&pm, 50, 25), [255, 0, 0, 255]));
+    assert!(near(spx(&pm, 5, 25), [0, 0, 0, 255]), "barra izquierda: {:?}", spx(&pm, 5, 25));
+    assert!(near(spx(&pm, 95, 25), [0, 0, 0, 255]));
+    finish(&root);
+}
+
+#[test]
+fn layer_opacity_and_visibility_apply_to_the_photo() {
+    let root = temp_dir("sm_opacity");
+    let (mut p, _f) = stop_motion_project(&root, (100, 50));
+    p.layers[0].opacity = 0.5;
+    let pm = render::render_frame(&p, 0, 1.0).unwrap();
+    let c = spx(&pm, 50, 25);
+    assert!((c[0] as i32 - 128).abs() <= 4 && c[1] == 0, "media opacidad sobre negro: {c:?}");
+    p.layers[0].visible = false;
+    let pm = render::render_frame(&p, 0, 1.0).unwrap();
+    assert!(near(spx(&pm, 50, 25), [0, 0, 0, 255]));
+    finish(&root);
+}
+
+#[test]
+fn a_hidden_item_and_frames_outside_the_sequence_show_nothing() {
+    let root = temp_dir("sm_hidden");
+    let (mut p, mut f) = stop_motion_project(&root, (100, 50));
+    f.seq.items[1].visible = false;
+    f.save().unwrap();
+    let pm = render::render_frame(&p, 2, 1.0).unwrap();
+    assert!(near(spx(&pm, 50, 25), [0, 0, 0, 255]), "una posición oculta no se ve");
+    p.layers[0].stopmotion.as_mut().unwrap().start = 4;
+    let pm = render::render_frame(&p, 1, 1.0).unwrap();
+    assert!(near(spx(&pm, 50, 25), [0, 0, 0, 255]), "antes de que empiece la secuencia");
+    finish(&root);
+}
+
+#[test]
+fn a_missing_folder_does_not_break_the_export() {
+    let root = temp_dir("sm_missing");
+    let (p, _f) = stop_motion_project(&root, (100, 50));
+    std::fs::remove_dir_all(root.join("fotos")).unwrap();
+    let pm = render::render_frame(&p, 0, 1.0).expect("la exportación no falla si falta la carpeta");
+    assert!(near(spx(&pm, 50, 25), [0, 0, 0, 255]));
+    finish(&root);
+}
+
+#[test]
+fn rendering_never_modifies_the_originals_and_big_photos_are_read_reduced() {
+    let root = temp_dir("sm_untouched");
+    let (p, f) = stop_motion_project(&root, (3000, 1500));
+    let before = f.verify(true);
+    assert!(before.is_empty());
+    let pm = render::render_frame(&p, 0, 1.0).unwrap();
+    assert!(near(spx(&pm, 50, 25), [255, 0, 0, 255]));
+    let (again, _) = SeqFolder::open(&f.dir).unwrap();
+    assert!(again.verify(true).is_empty(), "los originales siguen intactos tras exportar");
+    finish(&root);
+}
+
+#[test]
+fn the_viewer_proxy_is_created_for_big_photos_and_the_original_is_untouched() {
+    let root = temp_dir("sm_proxy");
+    let (_p, f) = stop_motion_project(&root, (3000, 1500));
+    let s = f.seq.sources[0].clone();
+    let original = std::fs::read(f.dir.join(&s.file)).unwrap();
+    let d = crate::stopmotion::load_proxy(&f.dir, &s, crate::stopmotion::PROXY_SIDE).unwrap();
+    assert_eq!((d.w, d.h), (1280, 640));
+    assert!(crate::stopmotion::proxy_path(&f.dir, &s.id).is_file(), "se creó el proxy");
+    assert_eq!(std::fs::read(f.dir.join(&s.file)).unwrap(), original, "el original no cambió");
+    finish(&root);
+}
+
+#[test]
+fn the_project_does_not_save_the_runtime_folder_cache() {
+    let root = temp_dir("sm_serde");
+    let (mut p, _f) = stop_motion_project(&root, (100, 50));
+    p.base_dir = Some(root.clone());
+    let json = serde_json::to_string(&p).unwrap();
+    assert!(!json.contains("base_dir") && !json.contains("\"sm\""), "la caché y la carpeta base no se guardan");
+    finish(&root);
 }

@@ -577,8 +577,7 @@ impl LayerKind {
     }
     /// Se crean y se guardan, pero aún no se dibujan ni actúan en la escena (necesitan 3D o texto).
     pub fn pending(self) -> bool {
-        // Stop Motion existe como capa (carpeta, fotos, secuencia) pero aún no se ve en la escena ni se exporta (Fase 2, #60).
-        matches!(self, LayerKind::Text | LayerKind::Light | LayerKind::Null | LayerKind::StopMotion)
+        matches!(self, LayerKind::Text | LayerKind::Light | LayerKind::Null)
     }
 }
 
@@ -820,6 +819,12 @@ pub struct Project {
     /// Pincel que estaba en uso al guardar.
     #[serde(default)]
     pub brush_state: Option<crate::presets::BrushState>,
+    /// Carpeta donde está el archivo del proyecto (no se guarda): sirve para encontrar las carpetas de Stop Motion.
+    #[serde(skip)]
+    pub base_dir: Option<std::path::PathBuf>,
+    /// Caché de las secuencias Stop Motion abiertas (no se guarda).
+    #[serde(skip)]
+    pub sm: crate::stopmotion::SmCache,
 }
 
 /// Una pestaña de sala guardada en el proyecto.
@@ -914,6 +919,8 @@ impl Project {
             brush_presets: Vec::new(),
             brush_images: Vec::new(),
             brush_state: None,
+            base_dir: None,
+            sm: Default::default(),
         }
     }
 

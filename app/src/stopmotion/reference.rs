@@ -35,6 +35,9 @@ pub struct SmRef {
     pub frames: u32,
     #[serde(default)]
     pub fps: u32,
+    /// Cuadro del proyecto (desde 0) en el que empieza la secuencia.
+    #[serde(default)]
+    pub start: u32,
 }
 
 fn norm(c: &Component) -> String {
@@ -98,7 +101,7 @@ fn peek(dir: &Path) -> Option<(String, String)> {
 impl SmRef {
     /// Referencia a una secuencia abierta. `project_dir` es la carpeta del proyecto, si ya se guardó.
     pub fn new(f: &SeqFolder, project_dir: Option<&Path>) -> SmRef {
-        let mut r = SmRef { id: f.seq.id.clone(), name: f.seq.name.clone(), rel: None, abs: f.dir.to_string_lossy().to_string(), photos: 0, frames: 0, fps: 0 };
+        let mut r = SmRef { id: f.seq.id.clone(), name: f.seq.name.clone(), rel: None, abs: f.dir.to_string_lossy().to_string(), photos: 0, frames: 0, fps: 0, start: 0 };
         r.update(f, project_dir);
         r
     }
