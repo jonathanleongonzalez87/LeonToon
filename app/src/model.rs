@@ -523,10 +523,12 @@ pub enum LayerKind {
     Text,
     Light,
     Camera,
+    /// Secuencia de fotos (Stop Motion): sus fotos viven en una carpeta elegida por la persona.
+    StopMotion,
 }
 
 impl LayerKind {
-    pub const ALL: [LayerKind; 7] = [
+    pub const ALL: [LayerKind; 8] = [
         LayerKind::Vector,
         LayerKind::Bitmap,
         LayerKind::Solid,
@@ -534,6 +536,7 @@ impl LayerKind {
         LayerKind::Text,
         LayerKind::Light,
         LayerKind::Camera,
+        LayerKind::StopMotion,
     ];
     pub fn label(self) -> &'static str {
         match self {
@@ -544,6 +547,7 @@ impl LayerKind {
             LayerKind::Text => "Texto",
             LayerKind::Light => "Luz",
             LayerKind::Camera => "Cámara",
+            LayerKind::StopMotion => "Stop Motion",
         }
     }
     /// Letra de la etiqueta en la lista de capas.
@@ -556,6 +560,7 @@ impl LayerKind {
             LayerKind::Text => "T",
             LayerKind::Light => "L",
             LayerKind::Camera => "C",
+            LayerKind::StopMotion => "M",
         }
     }
     /// Color de etiqueta del prototipo.
@@ -567,11 +572,13 @@ impl LayerKind {
             LayerKind::Null | LayerKind::Camera => [0xb7, 0xa2, 0xe6, 255],
             LayerKind::Text => [0xe9, 0xa0, 0x7a, 255],
             LayerKind::Light => [0xf2, 0xd2, 0x7a, 255],
+            LayerKind::StopMotion => [0x7a, 0xc9, 0xa4, 255],
         }
     }
     /// Se crean y se guardan, pero aún no se dibujan ni actúan en la escena (necesitan 3D o texto).
     pub fn pending(self) -> bool {
-        matches!(self, LayerKind::Text | LayerKind::Light | LayerKind::Null)
+        // Stop Motion existe como capa (carpeta, fotos, secuencia) pero aún no se ve en la escena ni se exporta (Fase 2, #60).
+        matches!(self, LayerKind::Text | LayerKind::Light | LayerKind::Null | LayerKind::StopMotion)
     }
 }
 
@@ -599,6 +606,9 @@ pub struct Layer {
     /// Claves de animación (mover, girar, escalar, opacidad).
     #[serde(default)]
     pub xform: BTreeMap<u32, XKey>,
+    /// Referencia a la carpeta de la secuencia (solo en capas Stop Motion).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stopmotion: Option<crate::stopmotion::SmRef>,
 }
 
 impl Layer {
@@ -615,6 +625,7 @@ impl Layer {
             depth: 0.0,
             keys: BTreeMap::new(),
             xform: BTreeMap::new(),
+            stopmotion: None,
         }
     }
 

@@ -506,6 +506,9 @@ impl LeonApp {
         };
         match self.n_tab {
             0 => {
+                if self.layer().kind == LayerKind::StopMotion {
+                    self.stopmotion_panel_ui(ui);
+                }
                 let l = self.layer();
                 let key = l.key_at_or_before(self.frame);
                 let num = key.and_then(|k| l.drawing_number(k)).map(|n| format!("#{}", n + 1)).unwrap_or_else(|| "vacío".into());

@@ -22,6 +22,7 @@ mod penui;
 mod flow_tests;
 mod papers;
 mod panelsize;
+mod smui;
 mod hud;
 mod view3d;
 mod timebar;
@@ -279,6 +280,9 @@ pub struct LeonApp {
     /// Tamaños de los paneles elegidos por la persona (se guardan) y los que se usan ahora según la ventana.
     sizes: panelsize::PanelSizes,
     sz: panelsize::PanelSizes,
+    /// Secuencias Stop Motion abiertas (por identificador) y sus miniaturas como texturas.
+    sm: std::collections::HashMap<String, smui::SmView>,
+    sm_thumbs: std::collections::HashMap<(String, String), egui::TextureHandle>,
     pen_path: Option<penui::PenPath>,
     sel_node: Option<usize>,
     /// Última presión leída del lápiz (1 si no hay lápiz).
@@ -520,6 +524,30 @@ impl LeonApp {
             l.keys.insert(0, std::sync::Arc::new(Drawing { strokes, raster: None }));
             project.layers.insert(0, l);
         }
+        // Para capturas de la capa Stop Motion: LEONTOON_STOPMOTION=<carpeta> crea ahí una secuencia con fotos de ejemplo y una capa que la usa;
+        // con LEONTOON_SMFALTA=1 la capa apunta a una carpeta que no existe (para ver el aviso).
+        if let Ok(dir) = std::env::var("LEONTOON_STOPMOTION") {
+            let dir = std::path::PathBuf::from(dir);
+            if let Ok(mut f) = crate::stopmotion::SeqFolder::create(&dir, "Escena de prueba", 12) {
+                for i in 0..14u32 {
+                    let img = image::RgbImage::from_fn(320, 180, |x, y| image::Rgb([((x + i * 17) % 256) as u8, (y * 255 / 180) as u8, (i * 18) as u8]));
+                    let mut bytes = Vec::new();
+                    if image::codecs::jpeg::JpegEncoder::new_with_quality(&mut bytes, 85).encode_image(&img).is_ok() {
+                        let _ = f.append_photo(&bytes, None);
+                    }
+                }
+            }
+            if let Ok((f, _)) = crate::stopmotion::SeqFolder::open(&dir) {
+                let mut l = Layer::new("Stop Motion 1");
+                l.kind = LayerKind::StopMotion;
+                let mut r = crate::stopmotion::SmRef::new(&f, None);
+                if std::env::var("LEONTOON_SMFALTA").is_ok() {
+                    r.abs = dir.join("carpeta_que_no_existe").to_string_lossy().to_string();
+                }
+                l.stopmotion = Some(r);
+                project.layers.insert(0, l);
+            }
+        }
         // Para pruebas y capturas: LEONTOON_SALA=<nombre de sala> abre esa sala.
         let room_idx = std::env::var("LEONTOON_SALA")
             .ok()
@@ -577,6 +605,8 @@ impl LeonApp {
                 Err(_) => safety::data_dir().map(|d| panelsize::load(&d)).unwrap_or_default(),
             },
             sz: Default::default(),
+            sm: Default::default(),
+            sm_thumbs: Default::default(),
             paper_scale: crate::paper::SCALE_DEFAULT,
             paper_seed: std::env::var("LEONTOON_SEMILLA").ok().and_then(|v| v.parse().ok()).unwrap_or(1),
             pen_path: None,
@@ -919,6 +949,13 @@ impl LeonApp {
     }
 
     fn save_to(&mut self, p: &Path) -> bool {
+        // Las secuencias Stop Motion guardan su carpeta relativa a la del proyecto: se recalcula al guardar en otro sitio.
+        let pdir = p.parent().map(|d| d.to_path_buf());
+        for l in &mut self.project.layers {
+            if let Some(r) = l.stopmotion.as_mut() {
+                r.refresh_paths(pdir.as_deref());
+            }
+        }
         match safety::write_project(&self.project, p, true) {
             Ok(()) => {
                 self.path = Some(p.to_path_buf());
@@ -953,6 +990,8 @@ impl LeonApp {
     }
 
     fn after_load(&mut self) {
+        self.sm.clear();
+        self.sm_thumbs.clear();
         self.adopt_project_brush();
         self.undo.clear();
         self.redo.clear();
@@ -1141,7 +1180,7 @@ mod tests {
         // Las formas y el relleno siguen como estaban en las dos.
         assert!(Tool::Shape.layer_block(Bitmap).is_none() && Tool::Shape.layer_block(Vector).is_none());
         // Las capas que no guardan dibujos (cámara, luz, nulo, texto) no admiten ninguna herramienta de dibujo.
-        for k in [Camera, Light, Null, Text] {
+        for k in [Camera, Light, Null, Text, StopMotion] {
             for t in [Tool::Brush, Tool::Vector, Tool::Pen, Tool::Eraser, Tool::Shape, Tool::Fill] {
                 assert!(t.layer_block(k).is_some(), "{t:?} no debe dibujar en {k:?}");
             }

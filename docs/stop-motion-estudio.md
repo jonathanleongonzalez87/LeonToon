@@ -139,7 +139,7 @@ MiSecuencia/                       ← carpeta elegida por la persona
 - **Escritura de `sequence.json`**: archivo temporal y renombrado atómico, igual que hace `write_project` hoy, con copia `.bak`.
 - **Recuperación tras un cierre inesperado**: al abrir, las fotos de `Sources/` que no aparezcan en `sequence.json` se ofrecen para **reincorporar al final** (el diario dice cuáles fueron las últimas capturas).
 - **Integridad**: el hash se calcula al capturar o importar y se verifica bajo demanda y en una revisión de fondo; un archivo faltante o con otro hash se marca, sin romper la secuencia.
-- **Hash**: BLAKE3 (pensado para ser muy rápido; **no lo medí aquí**); es una dependencia nueva pequeña. La alternativa SHA-256 es más lenta. Se decide en F1 midiendo con fotos reales.
+- **Hash**: **SHA-256** (decidido en F1 con la biblioteca sha2, escrita solo en Rust: no añade ninguna dependencia de C, que era el riesgo con la cadena GNU). BLAKE3 queda como mejora posible si algún día el hash pesa; en las pruebas de F1 verificar 5000 fotos registradas no es el cuello de botella.
 - **Referencia desde el `.ltoon`**: id de la secuencia, **ruta relativa** a la carpeta del proyecto si es posible y ruta absoluta si no, y un resumen (nombre, número de fotos, fotograma de inicio). **Relocalización**: si la ruta no existe, se pide la carpeta; se acepta si su `sequence.json` tiene el **mismo id**.
 - **Dos capas con la misma carpeta**: se avisa (comparten originales; cada capa guardaría su propio `sequence.json` y se pisarían).
 - **Importar fotos**: por defecto **copiar** a `Sources/` (la secuencia queda autocontenida y movible); referenciar el original donde está queda como opción avanzada. Pendiente de confirmar con la persona (pregunta abierta de F1).

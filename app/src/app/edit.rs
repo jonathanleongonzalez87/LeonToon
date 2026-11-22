@@ -162,6 +162,11 @@ impl LeonApp {
         self.sel = None;
         if kind == LayerKind::Camera {
             self.say(format!("Cámara «{name}» creada: se ve y se mueve en la vista 3D (Ctrl+3)"));
+        } else if kind == LayerKind::StopMotion {
+            // Abre el panel N en la pestaña Ítem, donde se elige la carpeta de la secuencia.
+            self.show_n = true;
+            self.n_tab = 0;
+            self.say(format!("Capa Stop Motion «{name}» creada: elige la carpeta de la secuencia en el panel N"));
         } else if kind.pending() {
             self.say(format!("Capa «{name}» ({}) creada. Su efecto en la escena queda pendiente.", kind.label()));
         } else {

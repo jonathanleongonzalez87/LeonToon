@@ -10,6 +10,7 @@ use crate::model::{Drawing, Layer, LayerKind, Panel, Project, ShapeKind, Stroke,
 use crate::paper;
 use crate::raster::Raster;
 use crate::render;
+use crate::stopmotion::{Located, SeqFolder, SmRef};
 use crate::vector::bezier::Node;
 use crate::vector::edit::{self, Prop};
 use crate::vector::{default_shape, Cap, Join, Profile, VStyle};
@@ -81,9 +82,12 @@ fn rich_project() -> Project {
     bitmap.keys.insert(0, Arc::new(Drawing { strokes: Vec::new(), raster: Some(Arc::new(r)) }));
     p.layers.push(bitmap);
 
-    for (i, k) in [LayerKind::Solid, LayerKind::Null, LayerKind::Text, LayerKind::Light, LayerKind::Camera].into_iter().enumerate() {
+    for (i, k) in [LayerKind::Solid, LayerKind::Null, LayerKind::Text, LayerKind::Light, LayerKind::Camera, LayerKind::StopMotion].into_iter().enumerate() {
         let mut l = Layer::new(format!("Capa {k:?}"));
         l.kind = k;
+        if k == LayerKind::StopMotion {
+            l.stopmotion = Some(SmRef { id: "0123456789abcdef".into(), name: "Escena 1".into(), rel: Some("fotos/escena1".into()), abs: "C:/no/existe/escena1".into(), photos: 12, frames: 30, fps: 12 });
+        }
         l.solid = [40, 90, 60, 255];
         l.is3d = i % 2 == 0;
         l.plane = (i % 3) as u8;
@@ -128,6 +132,8 @@ fn rich_project_survives_save_and_open_identically() {
     for k in LayerKind::ALL {
         assert!(kinds.contains(&k), "falta una capa {k:?}");
     }
+    let sm = back.layers.iter().find(|l| l.kind == LayerKind::StopMotion).unwrap().stopmotion.clone().unwrap();
+    assert_eq!((sm.name.as_str(), sm.rel.as_deref(), sm.photos, sm.frames, sm.fps), ("Escena 1", Some("fotos/escena1"), 12, 30, 12), "la referencia de Stop Motion se conserva");
     let cam = back.layers.iter().find(|l| l.kind == LayerKind::Camera).unwrap();
     assert!((cam.depth - (4.0 * 40.0 - 80.0)).abs() < 1e-4 && cam.is3d);
     assert_eq!(back.range, Some((1, 10)));
@@ -221,9 +227,11 @@ fn old_projects_keep_their_details_and_render() {
     let p = open_bytes(V010_COMPLETO, "detalles");
     assert_eq!(p.range, Some((2, 18)));
     let kinds: Vec<LayerKind> = p.layers.iter().map(|l| l.kind).collect();
-    for k in LayerKind::ALL {
+    // Las capas Stop Motion no existían en 0.1.0: el resto de clases sí están.
+    for k in LayerKind::ALL.into_iter().filter(|k| *k != LayerKind::StopMotion) {
         assert!(kinds.contains(&k), "falta una capa {k:?} del proyecto viejo");
     }
+    assert!(p.layers.iter().all(|l| l.stopmotion.is_none()), "un proyecto viejo no trae secuencias Stop Motion");
     assert_eq!(old["range"], serde_json::json!([2, 18]));
     let pm = render::render_frame(&p, 0, 0.25).unwrap();
     assert!(pm.pixels().iter().any(|px| px.alpha() > 0));
@@ -465,4 +473,63 @@ fn solid_color_layers_are_exported_like_in_the_viewer() {
     p.layers.push(s);
     let pm = render::render_frame(&p, 0, 0.1).unwrap();
     assert_eq!(px(&pm, 100.0, 100.0, 0.1), [10, 200, 10, 255]);
+}
+
+// ---------- Stop Motion (Issue #59) ----------
+
+#[test]
+fn a_stop_motion_layer_with_a_real_folder_survives_saving_and_moving_the_project() {
+    let root = temp_dir("stopmotion");
+    let project_dir = root.join("proyecto");
+    let jpeg = |seed: u8| {
+        let mut out = Vec::new();
+        let img = image::RgbImage::from_fn(64, 48, |x, y| image::Rgb([(x as u8).wrapping_add(seed), y as u8, seed]));
+        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, 90).encode_image(&img).unwrap();
+        out
+    };
+    let mut folder = SeqFolder::create(&project_dir.join("fotos").join("escena1"), "Escena 1", 12).unwrap();
+    folder.add_photo_bytes(&jpeg(1), None, None).unwrap();
+    folder.add_photo_bytes(&jpeg(2), None, None).unwrap();
+    folder.seq.push_item("s000001", 2).unwrap();
+    folder.seq.push_item("s000002", 1).unwrap();
+    folder.seq.push_item("s000001", 3).unwrap();
+    folder.save().unwrap();
+
+    let mut p = Project::demo();
+    let mut layer = Layer::new("Stop Motion 1");
+    layer.kind = LayerKind::StopMotion;
+    layer.stopmotion = Some(SmRef::new(&folder, Some(&project_dir)));
+    p.layers.insert(0, layer);
+    let file = project_dir.join("peli.ltoon");
+    write_project(&p, &file, false).unwrap();
+
+    // El proyecto solo guarda la referencia, no las fotos: el archivo sigue siendo pequeño.
+    let size = std::fs::metadata(&file).unwrap().len();
+    assert!(size < 200_000, "el proyecto con fotos pesa {size} bytes: las fotos no deben ir dentro");
+    assert!(!std::fs::read_to_string(&file).unwrap().contains("sha256:"), "los hashes de las fotos no van en el proyecto");
+
+    // Se mueve el proyecto entero con su carpeta de fotos: se vuelve a encontrar.
+    let moved = root.join("proyecto_movido");
+    std::fs::rename(&project_dir, &moved).unwrap();
+    let back = read_project(&moved.join("peli.ltoon")).unwrap();
+    let r = back.layers[0].stopmotion.clone().expect("la capa conserva su referencia");
+    assert_eq!(back.layers[0].kind, LayerKind::StopMotion);
+    let Located::Found(dir) = r.locate(Some(&moved)) else { panic!("no se encontró la carpeta tras mover el proyecto") };
+    let (opened, _) = SeqFolder::open(&dir).unwrap();
+    assert_eq!((opened.seq.sources.len(), opened.seq.items.len(), opened.seq.total_frames()), (2, 3, 6));
+    assert!(opened.verify(true).is_empty(), "las fotos están intactas tras mover el proyecto");
+    // Una capa Stop Motion no se dibuja ni se exporta todavía (Fase 2), pero el resto del proyecto sí.
+    assert!(render::render_frame(&back, 0, 0.1).is_some());
+    finish(&root);
+}
+
+#[test]
+fn drawing_on_a_stop_motion_layer_is_refused_and_the_layer_is_marked_as_pending() {
+    use super::Tool;
+    for t in [Tool::Brush, Tool::Vector, Tool::Pen, Tool::Eraser, Tool::Shape, Tool::Fill] {
+        assert!(t.layer_block(LayerKind::StopMotion).is_some(), "{t:?} no debe dibujar en una capa Stop Motion");
+    }
+    assert!(LayerKind::StopMotion.pending(), "la capa existe pero todavía no se ve en la escena (#60)");
+    assert_eq!(LayerKind::StopMotion.label(), "Stop Motion");
+    assert!(LayerKind::ALL.contains(&LayerKind::StopMotion));
 }

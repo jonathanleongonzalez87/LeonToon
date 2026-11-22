@@ -9,6 +9,7 @@ mod presets;
 mod raster;
 mod vector;
 mod render;
+mod stopmotion;
 
 use std::path::PathBuf;
 
