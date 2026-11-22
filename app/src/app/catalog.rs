@@ -293,7 +293,10 @@ pub(crate) struct RoomSet {
     pub rooms: &'static [RoomKind],
 }
 
+/// El orden es el del proceso de producción: primero el storyboard y el animatic, y después las técnicas.
 pub(crate) const ROOM_SETS: [RoomSet; 6] = [
+    RoomSet { id: "story", name: "Storyboard", rooms: &[RoomKind::Story, RoomKind::Exportar] },
+    RoomSet { id: "animatic", name: "Animatic", rooms: &[RoomKind::Story, RoomKind::Animatic, RoomKind::Exportar] },
     RoomSet {
         id: "trad",
         name: "Animación tradicional",
@@ -314,12 +317,10 @@ pub(crate) const ROOM_SETS: [RoomSet; 6] = [
     },
     RoomSet { id: "mg", name: "Motion graphics", rooms: &[RoomKind::Layout, RoomKind::Interp, RoomKind::Comp, RoomKind::Exportar] },
     RoomSet { id: "stopmotion", name: "Stop Motion", rooms: &[RoomKind::Layout, RoomKind::StopMotion, RoomKind::Timing, RoomKind::Exportar] },
-    RoomSet { id: "story", name: "Storyboard", rooms: &[RoomKind::Story, RoomKind::Exportar] },
-    RoomSet { id: "animatic", name: "Animatic", rooms: &[RoomKind::Story, RoomKind::Animatic, RoomKind::Exportar] },
 ];
 
 pub(crate) fn room_set(id: &str) -> &'static RoomSet {
-    ROOM_SETS.iter().find(|s| s.id == id).unwrap_or(&ROOM_SETS[0])
+    ROOM_SETS.iter().find(|s| s.id == id).or_else(|| ROOM_SETS.iter().find(|s| s.id == "trad")).unwrap_or(&ROOM_SETS[0])
 }
 
 // ---------- Editores de panel (el tipo de editor se cambia desde su cabecera) ----------

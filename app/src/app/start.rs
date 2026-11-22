@@ -135,46 +135,8 @@ impl LeonApp {
             }
             let w = (r.width() * 0.6).min(760.0);
             let (iw, ih) = tex.as_ref().map_or((1536.0, 1024.0), |t| (t.size()[0] as f32, t.size()[1] as f32));
-            let h = w * ih / iw;
-            let card = Rect::from_center_size(r.center(), Vec2::new(w, h));
-            if let Some(t) = &tex {
-                p0.image(t.id(), card, Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)), Color32::WHITE);
-            } else {
-                p0.rect_filled(card, 12.0, BG3);
-            }
-            // Franja inferior con nombre, porcentaje y mensaje (como .sp-strip)
-            let strip = Rect::from_min_size(
-                Pos2::new(card.min.x + w * 0.0768, card.min.y + h * 0.824),
-                Vec2::new(w * 0.8464, h * 0.14),
-            );
-            let dark = Color32::from_rgb(0x3b, 0x2b, 0x1f);
-            let warm = Color32::from_rgb(0x8a, 0x5a, 0x35);
-            let pad = strip.width() * 0.034;
-            let name_size = w * 0.036;
-            let g1 = p0.layout_no_wrap("Leon".into(), FontId::proportional(name_size), dark);
-            let base = Pos2::new(strip.min.x + pad, strip.min.y + strip.height() * 0.18);
-            let lw = g1.size().x;
-            p0.galley(base, g1, dark);
-            p0.text(base + Vec2::new(lw, 0.0), Align2::LEFT_TOP, "Toon", FontId::proportional(name_size), warm);
-            p0.text(base + Vec2::new(0.0, name_size * 1.25), Align2::LEFT_TOP, "El León Solitario", FontId::proportional(w * 0.015), warm);
-            let msg = SPLASH_MSG[((e * (SPLASH_MSG.len() - 1) as f64 + 1e-4).floor() as usize).min(SPLASH_MSG.len() - 1)];
-            let right = Pos2::new(strip.max.x - pad, strip.min.y + strip.height() * 0.2);
-            p0.text(right, Align2::RIGHT_TOP, format!("{:.0} %", e * 100.0), FontId::proportional(w * 0.016), dark);
-            p0.text(right + Vec2::new(0.0, w * 0.022), Align2::RIGHT_TOP, msg, FontId::proportional(w * 0.0135), warm);
-            let bar = Rect::from_min_max(
-                Pos2::new(strip.min.x + pad, strip.max.y - strip.height() * 0.14 - w * 0.0035),
-                Pos2::new(strip.max.x - pad, strip.max.y - strip.height() * 0.14),
-            );
-            p0.rect_filled(bar, 2.0, Color32::from_rgba_unmultiplied(59, 43, 31, 30));
-            p0.rect_filled(Rect::from_min_size(bar.min, Vec2::new(bar.width() * e as f32, bar.height())), 2.0, ACCENT);
-            p0.text(
-                Pos2::new(card.max.x - w * 0.03, card.min.y + h * 0.02),
-                Align2::RIGHT_TOP,
-                format!("v{}", env!("CARGO_PKG_VERSION")),
-                FontId::proportional(w * 0.013),
-                Color32::from_rgba_unmultiplied(242, 232, 218, 150),
-            );
-            // Botón «Omitir» abajo a la derecha
+            let card = Rect::from_center_size(r.center(), Vec2::new(w, w * ih / iw));
+            paint_splash_art(p0, card, tex.as_ref(), Some((e, SPLASH_MSG[((e * (SPLASH_MSG.len() - 1) as f64 + 1e-4).floor() as usize).min(SPLASH_MSG.len() - 1)])));            // Botón «Omitir» abajo a la derecha
             let skip_r = Rect::from_min_size(r.max - Vec2::new(84.0, 50.0), Vec2::new(64.0, 30.0));
             let resp = ui.interact(skip_r, ui.id().with("skip"), Sense::click());
             p0.rect_stroke(skip_r, 15.0, stk(1.0, if resp.hovered() { ACCENT } else { LINE_STRONG }), EStrokeKind::Inside);
@@ -201,10 +163,21 @@ impl LeonApp {
         let mut action: Option<u8> = None;
         let mut pick_set: Option<&'static str> = None;
         let mut pick_recent: Option<PathBuf> = None;
+        // El arte del splash conserva su proporción y va FUERA del recuadro, encima de él; si la ventana es baja, se reduce
+        // para que el recuadro de listas quepa entero.
+        const LISTS_H: f32 = 330.0;
+        const GAP: f32 = 14.0;
+        let (iw, ih) = tex.as_ref().map_or((1536.0, 1024.0), |t| (t.size()[0] as f32, t.size()[1] as f32));
+        let art_w = (screen.width() * 0.6).min(760.0).min(((screen.height() * 0.97 - LISTS_H - GAP).max(140.0)) * iw / ih);
+        let art_h = art_w * ih / iw;
         let inner = egui::Area::new(egui::Id::new("home_box"))
             .order(egui::Order::Foreground)
             .anchor(Align2::CENTER_CENTER, Vec2::ZERO)
             .show(ctx, |ui| {
+                ui.spacing_mut().item_spacing = Vec2::ZERO;
+                let (ar, _) = ui.allocate_exact_size(Vec2::new(w.max(art_w), art_h), Sense::hover());
+                paint_splash_art(ui.painter(), Rect::from_center_size(ar.center(), Vec2::new(art_w, art_h)), tex.as_ref(), None);
+                ui.add_space(GAP);
                 egui::Frame::default()
                     .fill(BG2)
                     .stroke(stk(1.0, LINE_STRONG))
@@ -213,21 +186,6 @@ impl LeonApp {
                     .show(ui, |ui| {
                         ui.set_width(w);
                         ui.spacing_mut().item_spacing = Vec2::ZERO;
-                        // Arte: la ilustración recortada a 1536×700 desde arriba
-                        let ah = w * 700.0 / 1536.0;
-                        let (ar, _) = ui.allocate_exact_size(Vec2::new(w, ah), Sense::hover());
-                        let p = ui.painter();
-                        p.rect_filled(ar, egui::CornerRadius { nw: 12, ne: 12, sw: 0, se: 0 }, UI0);
-                        if let Some(t) = &tex {
-                            let (iw, ih) = (t.size()[0] as f32, t.size()[1] as f32);
-                            let vfrac = ((iw * 700.0 / 1536.0) / ih).min(1.0);
-                            p.image(t.id(), ar, Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, vfrac)), Color32::WHITE);
-                        }
-                        let tag = format!("LeonToon {} ", env!("CARGO_PKG_VERSION"));
-                        let g = p.layout_no_wrap(tag, FontId::proportional(11.0), TX);
-                        let tr = Rect::from_min_size(ar.max - g.size() - Vec2::new(16.0, 12.0), g.size() + Vec2::new(10.0, 4.0));
-                        p.rect_filled(tr, 3.0, Color32::from_black_alpha(130));
-                        p.galley(tr.min + Vec2::new(5.0, 2.0), g, TX);
                         // Dos columnas
                         ui.horizontal_top(|ui| {
                             ui.spacing_mut().item_spacing = Vec2::ZERO;
@@ -279,6 +237,7 @@ impl LeonApp {
                         });
                     });
             });
+        // Un clic fuera del recuadro de listas cierra la pantalla de inicio.
         let outside = veil.inner.clicked() && !inner.response.rect.contains(ctx.input(|i| i.pointer.interact_pos().unwrap_or_default()));
         let esc = ctx.input(|i| i.key_pressed(Key::Escape));
         if let Some(id) = pick_set {
@@ -337,6 +296,44 @@ impl LeonApp {
         self.after_load();
         self.say(format!("Nuevo archivo: {}. Las salas se crearon para ese tipo de animación.", room_set(id).name));
     }
+}
+
+/// La ilustración del splash con su franja (nombre, lema y, mientras carga, porcentaje, mensaje y barra). La usan la
+/// pantalla de bienvenida y la de inicio, para que el arte conserve siempre el mismo aspecto.
+fn paint_splash_art(p0: &egui::Painter, card: Rect, tex: Option<&egui::TextureHandle>, progress: Option<(f64, &str)>) {
+    let (w, h) = (card.width(), card.height());
+    if let Some(t) = tex {
+        p0.image(t.id(), card, Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)), Color32::WHITE);
+    } else {
+        p0.rect_filled(card, 12.0, BG3);
+    }
+    // Franja inferior con nombre, porcentaje y mensaje (como .sp-strip)
+    let strip = Rect::from_min_size(Pos2::new(card.min.x + w * 0.0768, card.min.y + h * 0.824), Vec2::new(w * 0.8464, h * 0.14));
+    let dark = Color32::from_rgb(0x3b, 0x2b, 0x1f);
+    let warm = Color32::from_rgb(0x8a, 0x5a, 0x35);
+    let pad = strip.width() * 0.034;
+    let name_size = w * 0.036;
+    let g1 = p0.layout_no_wrap("Leon".into(), FontId::proportional(name_size), dark);
+    let base = Pos2::new(strip.min.x + pad, strip.min.y + strip.height() * 0.18);
+    let lw = g1.size().x;
+    p0.galley(base, g1, dark);
+    p0.text(base + Vec2::new(lw, 0.0), Align2::LEFT_TOP, "Toon", FontId::proportional(name_size), warm);
+    p0.text(base + Vec2::new(0.0, name_size * 1.25), Align2::LEFT_TOP, "El León Solitario", FontId::proportional(w * 0.015), warm);
+    if let Some((e, msg)) = progress {
+        let right = Pos2::new(strip.max.x - pad, strip.min.y + strip.height() * 0.2);
+        p0.text(right, Align2::RIGHT_TOP, format!("{:.0} %", e * 100.0), FontId::proportional(w * 0.016), dark);
+        p0.text(right + Vec2::new(0.0, w * 0.022), Align2::RIGHT_TOP, msg, FontId::proportional(w * 0.0135), warm);
+        let bar = Rect::from_min_max(Pos2::new(strip.min.x + pad, strip.max.y - strip.height() * 0.14 - w * 0.0035), Pos2::new(strip.max.x - pad, strip.max.y - strip.height() * 0.14));
+        p0.rect_filled(bar, 2.0, Color32::from_rgba_unmultiplied(59, 43, 31, 30));
+        p0.rect_filled(Rect::from_min_size(bar.min, Vec2::new(bar.width() * e as f32, bar.height())), 2.0, ACCENT);
+    }
+    p0.text(
+        Pos2::new(card.max.x - w * 0.03, card.min.y + h * 0.02),
+        Align2::RIGHT_TOP,
+        format!("v{}", env!("CARGO_PKG_VERSION")),
+        FontId::proportional(w * 0.013),
+        Color32::from_rgba_unmultiplied(242, 232, 218, 150),
+    );
 }
 
 fn home_item(ui: &mut egui::Ui, label: &str, small: &str) -> egui::Response {
