@@ -911,6 +911,39 @@ fn guardar_dentro_de_una_precomposicion_guarda_la_composicion_principal() {
 }
 
 #[test]
+fn el_animatic_usa_los_planos_vivos_con_sus_capas_y_se_actualiza_al_cambiarlos() {
+    let sheet = |gray: u8| Arc::new(Drawing { strokes: vec![Stroke::shape(ShapeKind::Rect, [0.0, 0.0], [1280.0, 720.0], [0, 0, 0, 0], 1.0, Some([gray, gray, gray, 255]))], ..Default::default() });
+    let mut p = Project::blank(1280, 720, 24, 48);
+    p.background = [0, 0, 0, 255];
+    p.layers = vec![Layer::new("vacía")];
+    p.storyboard = vec![crate::model::Panel::new(1), crate::model::Panel::new(2)];
+    for (i, g) in [100u8, 220].into_iter().enumerate() {
+        p.storyboard[i].dur = 1.0;
+        // Cada plano se dibuja dentro de su composición, con una capa propia.
+        assert!(p.open_panel(i, 0, 0));
+        p.layers[0].keys.insert(0, sheet(g));
+        p.exit_comp().unwrap();
+    }
+    p.storyboard[1].trans = "Fundido".into();
+    let built = p.build_animatic();
+    assert!(built.layers.iter().all(|l| l.kind == LayerKind::Precomp), "cada clip es la composición de su plano");
+    p.set_animatic(built).unwrap();
+    let at = |p: &Project, f: u32| {
+        let img = crate::render::render_frame(p, f, 0.25).unwrap();
+        img.pixel(img.width() / 2, img.height() / 2).unwrap().red() as i32
+    };
+    assert_eq!(at(&p, 0), 100);
+    assert_eq!(at(&p, 11), 100);
+    assert!((at(&p, 18) - 160).abs() <= 2, "a mitad del fundido se mezclan: {}", at(&p, 18));
+    assert_eq!(at(&p, 30), 220);
+    assert_eq!(at(&p, 47), 220, "el último cuadro del plano con fundido no se corta");
+    // Si se cambia el plano, el animatic lo refleja sin volver a crearlo.
+    assert!(p.open_panel(0, 0, 0));
+    p.layers[0].keys.insert(0, sheet(50));
+    p.exit_comp().unwrap();
+    assert_eq!(at(&p, 0), 50, "el animatic usa el plano vivo");
+}
+#[test]
 fn el_animatic_muestra_cada_plano_en_su_tiempo_y_el_fundido_cruza_los_dos() {
     let sheet = |gray: u8| Arc::new(Drawing { strokes: vec![Stroke::shape(ShapeKind::Rect, [0.0, 0.0], [1280.0, 720.0], [0, 0, 0, 0], 1.0, Some([gray, gray, gray, 255]))], ..Default::default() });
     let mut sb = vec![crate::model::Panel::new(1), crate::model::Panel::new(2)];

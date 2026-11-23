@@ -1,6 +1,6 @@
 //! Sala StoryBoard: cuadrícula de planos con zoom (de miniaturas a detalle con notas). Un plano es una composición
 //! (Issue #132): con doble clic se abre en el visor, con las capas, las herramientas y las paletas del programa.
-//! También «Animatic → Xsheet».
+//! También «Crear animatic» (la composición del animatic, con un clip vivo por plano).
 
 use super::canvas::paint_thumb;
 use super::shell::{muted, panel_header, pill};
@@ -76,11 +76,11 @@ impl LeonApp {
                     self.project.set_panel_drawing(self.sb_sel, d);
                     self.say(format!("Plano {} = fotograma {}", self.sb_sel + 1, self.frame + 1));
                 }
-                if pill(ui, "Animatic > Xsheet", true)
-                    .on_hover_text("Crea una columna «Animatic» con cada plano durante su duración")
+                if pill(ui, "Crear animatic", true)
+                    .on_hover_text("Crea (o actualiza) la composición «Animatic»: un clip por plano, en el orden y con la duración de la línea de tiempo del storyboard, con sus fundidos y su cámara. Tab entra en ella")
                     .clicked()
                 {
-                    self.animatic();
+                    self.animatic_comp();
                 }
                 ui.separator();
                 muted(ui, "Miniaturas");
@@ -104,7 +104,7 @@ impl LeonApp {
             self.say("No hay planos");
             return;
         }
-        let built = crate::animatic::build(&self.project.storyboard, self.project.fps);
+        let built = self.project.build_animatic();
         let length = built.length;
         self.checkpoint();
         // Estando dentro de la composición del animatic no se puede regenerar: se sale primero.
@@ -126,25 +126,6 @@ impl LeonApp {
             None => self.say("No se puede actualizar el animatic estando dentro de su composición"),
         }
     }
-    fn animatic(&mut self) {
-        if self.project.storyboard.is_empty() {
-            self.say("No hay planos");
-            return;
-        }
-        self.checkpoint();
-        let fps = self.project.fps as f32;
-        let mut layer = Layer::new("Animatic");
-        let mut f = 0u32;
-        for p in &self.project.storyboard {
-            layer.keys.insert(f, p.drawing.clone());
-            f += ((p.dur * fps).round() as u32).max(1);
-        }
-        self.project.length = self.project.length.max(f);
-        self.project.layers.insert(0, layer);
-        self.cl = 0;
-        self.say(format!("Columna «Animatic» creada: {f} fotogramas. Mírala en la sala Xsheet o Timing."));
-    }
-
     /// La miniatura de un plano como lienzo (la usan la cuadrícula y la columna de miniaturas): con una herramienta de dibujo se
     /// dibuja encima; el número es el asa (clic abre el plano, arrastrarlo lo reordena). Devuelve por select y open lo que se pidió.
     fn panel_thumb(&mut self, ui: &mut egui::Ui, i: usize, cw: f32, select: &mut Option<usize>, open: &mut Option<usize>) {
@@ -812,14 +793,11 @@ impl LeonApp {
             self.frame = ((s * fps).round() as u32).min(self.project.length - 1);
         }
         ui.separator();
-        if pill(ui, "Animatic > línea de tiempo", true)
-            .on_hover_text("Crea (o actualiza) la composición «Animatic»: una capa-clip por plano, con su barra y sus fundidos. Se edita en la línea de tiempo de montaje")
+        if pill(ui, "Crear animatic", true)
+            .on_hover_text("Crea (o actualiza) la composición «Animatic»: un clip por plano, con su barra, sus fundidos y su cámara, usando los planos vivos. Se edita en la línea de tiempo de montaje")
             .clicked()
         {
             self.animatic_comp();
-        }
-        if pill(ui, "Animatic > Xsheet", false).on_hover_text("Crea una columna «Animatic» con cada plano durante su duración (un dibujo por exposición)").clicked() {
-            self.animatic();
         }
         muted(ui, "Fundido: el plano entra en fundido cruzado sobre el anterior (hasta medio segundo). Corte: sin transición.");
     }

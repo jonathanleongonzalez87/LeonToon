@@ -32,7 +32,7 @@ pub struct Built {
     pub length: u32,
 }
 
-/// Una capa-clip por plano. La barra de cada una va de su entrada a su salida; con fundido, la entrada se adelanta (hasta medio
+/// Una capa-clip por plano (una precomposición viva si el plano tiene composición, o su dibujo aplanado si no). La barra de cada una va de su entrada a su salida; con fundido, la entrada se adelanta (hasta medio
 /// segundo, y nunca más que la duración de los dos planos) y la opacidad sube de 0 a 1 en ese tramo. La duración total no cambia.
 pub fn build(panels: &[Panel], fps: u32) -> Built {
     let fps = fps.max(1);
@@ -43,8 +43,18 @@ pub fn build(panels: &[Panel], fps: u32) -> Built {
         let overlap = if i > 0 && is_fade(&p.trans) { fade_frames(fps).min(len).min(prev_len) } else { 0 };
         let in_f = start - overlap;
         let mut l = Layer::new(if p.title.trim().is_empty() { format!("Plano {}", i + 1) } else { p.title.clone() });
-        l.kind = LayerKind::Vector;
-        l.keys.insert(in_f, p.drawing.clone());
+        match p.comp {
+            // Un plano con composición entra como precomposición viva: sus capas, y lo que se cambie en él, se ven en el animatic.
+            Some(id) => {
+                l.kind = LayerKind::Precomp;
+                l.precomp = Some(id);
+            }
+            // Sin composición (archivos antiguos sin abrir), se usa el dibujo aplanado del plano.
+            None => {
+                l.kind = LayerKind::Vector;
+                l.keys.insert(in_f, p.drawing.clone());
+            }
+        }
         l.in_f = in_f;
         l.out_f = Some(start + len - 1);
         l.label = 1 + (i % 7) as u8;

@@ -1723,6 +1723,22 @@ impl Project {
         }
     }
 
+    /// Las capas-clip del animatic con la composición viva de cada plano: se crean las que falten y se ajusta su duración para que
+    /// cubra el plano y el fundido que lo precede (la barra del clip empieza antes cuando entra con fundido).
+    pub fn build_animatic(&mut self) -> crate::animatic::Built {
+        let fps = self.fps.max(1);
+        for i in 0..self.storyboard.len() {
+            self.ensure_panel_comp(i);
+            let frames = crate::animatic::panel_frames(&self.storyboard[i], fps) + crate::animatic::fade_frames(fps);
+            if let Some(id) = self.storyboard[i].comp {
+                if let Some(c) = self.comps.iter_mut().find(|c| c.id == id && !c.layers.is_empty()) {
+                    c.length = frames;
+                }
+            }
+        }
+        crate::animatic::build(&self.storyboard, fps)
+    }
+
     /// El proyecto tal como se guarda y se exporta: la composición principal, aunque se esté editando una precomposición.
     pub fn root_clone(&self) -> Project {
         let mut p = self.clone();

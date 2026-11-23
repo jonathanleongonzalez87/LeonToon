@@ -95,13 +95,13 @@ y alrededor las hojas de exposición y la tira de fotos.
 
 ## Storyboard y animatic
 
-El **storyboard** muestra los planos como miniaturas con nombre y duración; se reordenan arrastrando y *Animatic > Xsheet*
-los lleva a la hoja de exposición.
+El **storyboard** muestra los planos como miniaturas con nombre y duración; se reordenan arrastrando el número, y se puede dibujar directamente sobre ellas.
+La línea de tiempo del storyboard da la duración de cada plano y su cámara, y *Crear animatic* arma con ellos la composición del animatic.
 
 ![Storyboard](docs/img/21-storyboard-v2.png)
 
-El **animatic** es una composición de planos con transiciones (corte, fundido…). Cada plano es una capa de la línea de
-tiempo de montaje, y la lista de planos del panel permite cambiar la duración y la transición.
+El **animatic** es una composición con un clip vivo por plano, en el orden y con la duración de la línea de tiempo del storyboard,
+con sus transiciones (corte, fundido…) y su cámara. Si cambias un plano, el animatic lo refleja.
 
 ![El animatic como composición de planos](docs/img/16-animatic-como-composicion-v2.png)
 
