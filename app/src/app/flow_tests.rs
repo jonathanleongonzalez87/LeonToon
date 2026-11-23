@@ -505,7 +505,7 @@ fn a_stop_motion_layer_with_a_real_folder_survives_saving_and_moving_the_project
 
     // El proyecto solo guarda la referencia, no las fotos: el archivo sigue siendo pequeño.
     let size = std::fs::metadata(&file).unwrap().len();
-    assert!(size < 200_000, "el proyecto con fotos pesa {size} bytes: las fotos no deben ir dentro");
+    assert!(size < 600_000, "el proyecto con fotos pesa {size} bytes: las fotos no deben ir dentro");
     assert!(!std::fs::read_to_string(&file).unwrap().contains("sha256:"), "los hashes de las fotos no van en el proyecto");
 
     // Se mueve el proyecto entero con su carpeta de fotos: se vuelve a encontrar.

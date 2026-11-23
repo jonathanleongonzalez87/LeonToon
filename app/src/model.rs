@@ -1768,82 +1768,9 @@ impl Project {
         out
     }
 
-    /// Proyecto de ejemplo: una pelota que bota, para empezar con algo en pantalla.
+    /// Proyecto de ejemplo (ver demo.rs): una pelota que rebota en bucle, un sol que va y viene y un paisaje con paralaje.
     pub fn demo() -> Self {
-        let mut p = Project::blank(1280, 720, 24, 24);
-        let mut bg = Layer::new("Fondo");
-        let mut d = Drawing::default();
-        d.strokes.push(Stroke::shape(ShapeKind::Rect, [0.0, 0.0], [1280.0, 600.0], [207, 232, 255, 255], 0.5, Some([207, 232, 255, 255])));
-        // Planos del ejemplo para la vista 3D: fondo y sol al fondo, la pelota en el plano medio.
-        bg.is3d = true;
-        bg.plane = 0;
-        bg.depth = plane_z(0);
-        let mut sun = Layer::new("Sol");
-        sun.is3d = true;
-        sun.plane = 0;
-        sun.depth = 600.0;
-        let mut sd = Drawing::default();
-        sd.strokes.push(Stroke::shape(ShapeKind::Ellipse, [1040.0, 60.0], [1180.0, 200.0], [245, 170, 0, 255], 5.0, Some([255, 214, 64, 255])));
-        sun.keys.insert(0, Arc::new(sd));
-        sun.tracks.set(Prop::Position, 0, [0.0, 0.0], Interp::Ease);
-        sun.tracks.set(Prop::Position, 23, [-90.0, 30.0], Interp::Linear);
-        d.strokes.push(Stroke::shape(ShapeKind::Ellipse, [-200.0, 470.0], [520.0, 760.0], [104, 159, 56, 255], 0.5, Some([139, 195, 74, 255])));
-        d.strokes.push(Stroke::shape(ShapeKind::Ellipse, [700.0, 500.0], [1500.0, 760.0], [104, 159, 56, 255], 0.5, Some([124, 179, 66, 255])));
-        d.strokes.push(Stroke::shape(ShapeKind::Rect, [0.0, 600.0], [1280.0, 720.0], [93, 64, 55, 255], 0.5, Some([161, 136, 127, 255])));
-        d.strokes.push(Stroke::shape(ShapeKind::Line, [0.0, 600.0], [1280.0, 600.0], [62, 39, 35, 255], 6.0, None));
-        bg.keys.insert(0, Arc::new(d));
-
-        let mut ball = Layer::new("Pelota");
-        ball.is3d = true;
-        let floor = 597.0;
-        for i in 0..12u32 {
-            let t = i as f32 / 11.0;
-            let x = 180.0 + 920.0 * t;
-            let phase = (t * 2.0 * std::f32::consts::PI).cos().abs();
-            let h = 360.0 * (1.0 - (1.0 - phase).powi(2)) * (1.0 - t * 0.35);
-            let cy = floor - 50.0 - h;
-            let squash = cy > floor - 75.0;
-            let (rx, ry) = if squash { (62.0, 38.0) } else if h < 150.0 { (46.0, 56.0) } else { (50.0, 50.0) };
-            let cy = if squash { floor - ry } else { cy };
-            let mut d = Drawing::default();
-            d.strokes.push(Stroke::shape(
-                ShapeKind::Ellipse,
-                [x - rx, cy - ry],
-                [x + rx, cy + ry],
-                [122, 31, 31, 255],
-                5.0,
-                Some([229, 57, 53, 255]),
-            ));
-            // Brillo
-            d.strokes.push(Stroke {
-                kind: ShapeKind::Free,
-                points: vec![[x - rx * 0.55, cy - ry * 0.1], [x - rx * 0.45, cy - ry * 0.45], [x - rx * 0.15, cy - ry * 0.62]],
-                color: [255, 235, 235, 255],
-                width: 7.0,
-                closed: false,
-                fill: None,
-                pressure: Vec::new(),
-                style: None,
-                original: None, nodes: None,
-            });
-            ball.keys.insert(i * 2, Arc::new(d));
-        }
-        p.layers = vec![ball, sun, bg];
-        let texts = [
-            ("La pelota entra", "La pelota cae desde la izquierda.", "Plano general fijo"),
-            ("Primer bote", "Se aplasta al tocar el suelo.", "Plano general"),
-            ("Sale rodando", "Pierde altura en cada bote.", "Paneo suave a la derecha"),
-        ];
-        for (i, (t, a, c)) in texts.iter().enumerate() {
-            let mut pn = Panel::new(i + 1);
-            pn.title = t.to_string();
-            pn.action = a.to_string();
-            pn.camera = c.to_string();
-            pn.dur = 1.0;
-            pn.drawing = Arc::new(p.flatten([0, 8, 18][i]));
-            p.storyboard.push(pn);
-        }
-        p
+        crate::demo::build()
     }
 
     /// Repara valores imposibles tras abrir un archivo.
