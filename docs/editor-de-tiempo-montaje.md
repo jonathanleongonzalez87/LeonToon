@@ -93,12 +93,25 @@ Los modos de dibujo (Cuadros) y de fotos (Stop Motion) siguen siendo modos del m
 - **Deshacer**: el historial actual guarda instantáneas del proyecto con dibujos compartidos; las composiciones nuevas deben compartirse igual para que deshacer no copie todo.
 - **Planos 3D (BG, MG, FG)**: hay que decidir cómo se combinan con las precomposiciones (¿el plano es de la capa precompuesta o de las de dentro?).
 
-## 5. Decisiones que necesito de ti
+## 5. Decisiones tomadas
 
-1. **Colección y precomposición**: ¿te sirve la separación de 4.1 (la colección organiza, la precomposición tiene tiempo propio, y Precomponer convierte una en otra), o prefieres que toda colección tenga tiempo propio?
-2. **Pistas por propiedad (M1)**: ¿estás de acuerdo en cambiar el formato de las claves de movimiento, conservando la lectura de lo viejo?
-3. **Modos de fusión**: ¿los ocho del prototipo bastan para empezar?
-4. **Mates de seguimiento**: ¿entran en M3 o los dejamos para después?
-5. **Vídeo y audio (M8)**: ¿quieres importar clips de vídeo y audio? Si sí, hay que elegir cómo decodificarlos (afecta a las dependencias y al tamaño del programa).
-6. **Interpolación y Composición 3D**: el prototipo las deja con la misma línea de tiempo. ¿Las fusionamos en una sola sala de «Montaje»?
-7. **Orden**: ¿empiezo por M1 y M2 (lo más ligero) o prefieres que el siguiente paso visible sea M4, el modo Montaje, aunque al principio sea solo de lectura?
+Respuestas de la persona a las siete preguntas de la primera versión de este documento:
+
+1. **Colección y precomposición**: separadas. La colección organiza capas sin tiempo propio; la precomposición tiene tiempo propio; Precomponer convierte una en otra.
+2. **Pistas por propiedad (M1)**: sí, se cambia el formato conservando la lectura de los archivos viejos.
+3. **Modos de fusión**: los ocho del prototipo.
+4. **Mates de seguimiento**: después, en una fase aparte (salen de M3).
+5. **Vídeo y audio (M8)**: **sí, planificarlo ya**. Falta elegir cómo decodificar (ver Issue de estudio de decodificadores).
+6. **Salas**: una sola sala **Montaje** que reúne Interpolación y Composición 3D (el visor 2D o 3D se elige en el hueco principal).
+7. **Orden**: empezar por M1 y M2.
+
+## 6. Estado de las fases
+
+| Fase | Estado |
+|---|---|
+| M1. Pistas por propiedad | Pendiente (Issue #98) |
+| M2. Barra de capa | Pendiente (Issue #99) |
+| M3. Fusión y vínculo (sin mates) | Pendiente |
+| Mates de seguimiento | Pendiente, aparte |
+| M4 a M7 | Pendientes |
+| M8. Vídeo y audio | Planificado; primero un estudio de decodificadores (Issue #100) |
