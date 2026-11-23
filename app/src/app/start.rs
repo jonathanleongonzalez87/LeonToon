@@ -217,7 +217,10 @@ impl LeonApp {
                                     if home_item(ui, "Ejemplo: Stop Motion con plastilina", "demo").clicked() {
                                         action = Some(5);
                                     }
-                                    for r in self.recent.clone().into_iter().take(3) {
+                                    if home_item(ui, "Ejemplo: Animatic con bocetos (A y B)", "demo").clicked() {
+                                        action = Some(6);
+                                    }
+                                    for r in self.recent.clone().into_iter().take(2) {
                                         let name = r.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
                                         if home_item(ui, &name, "").on_hover_text(r.display().to_string()).clicked() {
                                             pick_recent = Some(r);
@@ -263,6 +266,7 @@ impl LeonApp {
                     self.request(ctx, Pending::Open);
                 }
                 Some(5) => self.open_stopmotion_demo(),
+                Some(6) => self.open_animatic_demo(),
                 Some(3) => {
                     self.stage = Stage::Work;
                     self.show_help = true;
@@ -299,6 +303,19 @@ impl LeonApp {
             }
             Err(e) => self.say(format!("No se pudo abrir el ejemplo: {e}")),
         }
+    }
+
+    /// Ejemplo de animatic: la historia de la pelota con bocetos en mapa de bits (Personaje A y Personaje B), con el animatic creado.
+    pub(crate) fn open_animatic_demo(&mut self) {
+        let mut p = crate::demo_animatic::build();
+        p.room_set = "animatic".into();
+        p.rooms = tabs_for_set("animatic");
+        self.project = p;
+        self.path = None;
+        self.after_load();
+        self.stage = Stage::Work;
+        self.goto_room_kind(RoomKind::Animatic);
+        self.say("Ejemplo abierto: la historia de la pelota en bocetos. El Personaje A es la pelota roja y el B la azul; Tab y Mayús+Tab entran y salen del animatic.");
     }
 
     /// Archivo nuevo del tipo elegido: escena vacía con su conjunto de salas.

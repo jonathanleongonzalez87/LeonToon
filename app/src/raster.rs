@@ -37,7 +37,7 @@ impl Raster {
         Raster { w, h, data: vec![0; (w * h * 4) as usize], ver: next_ver(), inked: false }
     }
 
-    fn from_pixmap(pm: Pixmap) -> Self {
+    pub(crate) fn from_pixmap(pm: Pixmap) -> Self {
         let (w, h) = (pm.width(), pm.height());
         let data = pm.take();
         let inked = data.chunks_exact(4).any(|p| p[3] != 0);

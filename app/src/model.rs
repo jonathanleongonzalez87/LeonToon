@@ -1655,7 +1655,7 @@ impl Project {
         let lv = self.stack.pop()?;
         // Al salir de la composición de un plano, su aspecto (miniatura y animatic) se recalcula con lo que se dibujó dentro.
         if self.comps.iter().any(|c| c.id == lv.comp_id && c.panel) {
-            let d = self.flatten(0);
+            let d = self.panel_look();
             if let Some(p) = self.storyboard.iter_mut().find(|p| p.comp == Some(lv.comp_id)) {
                 p.drawing = Arc::new(d);
             }
@@ -1670,6 +1670,18 @@ impl Project {
     }
 
     // ---------- Planos del storyboard como composiciones ----------
+
+    /// El aspecto del plano que se está editando, para su miniatura: los trazos aplanados o, si tiene capas de mapa de bits, la
+    /// composición entera ya dibujada (con los píxeles).
+    fn panel_look(&self) -> Drawing {
+        let has_bitmap = self.layers.iter().any(|l| l.kind == LayerKind::Bitmap && l.visible && l.drawing_at(0).map_or(false, |d| d.raster.as_ref().map_or(false, |r| !r.is_blank())));
+        if has_bitmap {
+            if let Some(pm) = crate::render::render_scene_opts(self, 0, 1.0, true) {
+                return Drawing { strokes: Vec::new(), raster: Some(Arc::new(crate::raster::Raster::from_pixmap(pm))) };
+            }
+        }
+        self.flatten(0)
+    }
 
     /// La composición del plano `i`; si aún no la tiene, la crea con una capa «Dibujo» que contiene lo que ya había dibujado.
     pub fn ensure_panel_comp(&mut self, i: usize) -> Option<u64> {

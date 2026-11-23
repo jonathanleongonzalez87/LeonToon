@@ -889,6 +889,18 @@ impl LeonApp {
         if std::env::var("LEONTOON_MUESTRA").as_deref() == Ok("stopmotion") {
             app.open_stopmotion_demo();
         }
+        if std::env::var("LEONTOON_MUESTRA").as_deref() == Ok("animatic") {
+            app.open_animatic_demo();
+            if let Ok(sala) = std::env::var("LEONTOON_SALA") {
+                if let Some(k) = RoomKind::ALL.into_iter().find(|r| r.def().id == sala || r.def().name.eq_ignore_ascii_case(&sala)) {
+                    app.goto_room_kind(k);
+                }
+            }
+            // Abrir un ejemplo vuelve al primer cuadro: se respeta LEONTOON_CUADRO si se pidió.
+            if let Some(n) = std::env::var("LEONTOON_CUADRO").ok().and_then(|v| v.parse::<u32>().ok()) {
+                app.frame = n.min(app.project.length.saturating_sub(1));
+            }
+        }
         // Capturas: LEONTOON_PLANO=<n> abre ese plano del storyboard (en la sala Storyboard) para dibujarlo con el visor.
         if let Some(n) = std::env::var("LEONTOON_PLANO").ok().and_then(|v| v.parse::<usize>().ok()) {
             app.open_panel(n.saturating_sub(1));
