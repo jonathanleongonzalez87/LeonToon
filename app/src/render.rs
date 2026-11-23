@@ -144,25 +144,40 @@ pub fn render_frame_opts(p: &Project, frame: u32, scale: f32, transparent: bool)
     }
     let any_solo = p.layers.iter().any(|l| l.solo);
     for (li, layer) in p.layers.iter().enumerate().rev() {
+        if p.collection_of(li).is_some() {
+            continue; // lo dibuja su colección
+        }
         if layer.kind == LayerKind::Collection {
-            // Una colección se compone aparte y se mezcla como una unidad, con su opacidad y su modo de fusión.
-            if !layer.visible || !layer.active_at(frame) {
-                continue;
-            }
-            let op = (layer.opacity * p.effective_at(li, frame).o).clamp(0.0, 1.0);
-            if op <= 0.0 {
-                continue;
-            }
-            let mut gp = Pixmap::new(w, h)?;
-            for m in p.members_of(li).into_iter().rev() {
-                draw_layer(&mut gp, p, m, frame, scale, any_solo);
-            }
-            let pp = PixmapPaint { opacity: op, blend_mode: blend_mode(layer.blend), ..Default::default() };
-            pm.draw_pixmap(0, 0, gp.as_ref(), &pp, Transform::identity(), None);
-        } else if p.collection_of(li).is_none() {
+            draw_group(&mut pm, p, li, frame, scale, any_solo)?;
+        } else {
             draw_layer(&mut pm, p, li, frame, scale, any_solo);
         }
-    }    Some(pm)
+    }
+    Some(pm)
+}
+
+/// Dibuja una colección: sus capas (y las colecciones que contiene, a cualquier profundidad) se componen aparte y el conjunto se
+/// mezcla con su opacidad y su modo de fusión.
+fn draw_group(pm: &mut Pixmap, p: &Project, ci: usize, frame: u32, scale: f32, any_solo: bool) -> Option<()> {
+    let layer = &p.layers[ci];
+    if !layer.visible || !layer.active_at(frame) {
+        return Some(());
+    }
+    let op = (layer.opacity * p.effective_at(ci, frame).o).clamp(0.0, 1.0);
+    if op <= 0.0 {
+        return Some(());
+    }
+    let mut gp = Pixmap::new(pm.width(), pm.height())?;
+    for m in p.members_of(ci).into_iter().rev() {
+        if p.layers[m].kind == LayerKind::Collection {
+            draw_group(&mut gp, p, m, frame, scale, any_solo)?;
+        } else {
+            draw_layer(&mut gp, p, m, frame, scale, any_solo);
+        }
+    }
+    let pp = PixmapPaint { opacity: op, blend_mode: blend_mode(layer.blend), ..Default::default() };
+    pm.draw_pixmap(0, 0, gp.as_ref(), &pp, Transform::identity(), None);
+    Some(())
 }
 
 /// Dibuja una capa (con su transformación, la de sus madres y la de su colección) sobre `pm`.

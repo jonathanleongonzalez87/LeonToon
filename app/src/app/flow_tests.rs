@@ -837,3 +837,26 @@ fn la_pertenencia_a_una_coleccion_se_guarda_y_se_repara() {
     q.sanitize();
     assert!(q.layers.iter().all(|l| l.group.is_none()));
 }
+
+#[test]
+fn una_coleccion_dentro_de_otra_compone_cada_nivel_como_unidad() {
+    let mut p = Project::blank(1280, 720, 24, 4);
+    p.background = [200, 100, 50, 255];
+    // Externa (50 %) > interna (50 %) > una capa gris 100: cada nivel mezcla lo de dentro con lo de debajo.
+    p.layers = vec![Layer::new("externa"), Layer::new("interna"), gray_sheet("gris", 100)];
+    p.layers[0].kind = LayerKind::Collection;
+    p.layers[0].uid = 1;
+    p.layers[1].kind = LayerKind::Collection;
+    p.layers[1].uid = 2;
+    p.layers[1].group = Some(1);
+    p.layers[2].group = Some(2);
+    p.layers[0].opacity = 0.5;
+    p.layers[1].opacity = 0.5;
+    p.normalize_groups();
+    let m = center_pixel(&p);
+    // Interna: 100 sobre transparente al 50 %; externa: eso al 50 % sobre el fondo (200) → 200·0,75 + 100·0,25 = 175.
+    assert!((m[0] as i32 - 175).abs() <= 3, "dos niveles de opacidad: {m:?}");
+    // Ocultar la externa oculta todo lo que hay dentro, a cualquier nivel.
+    p.layers[0].visible = false;
+    assert_eq!(center_pixel(&p), [200, 100, 50]);
+}

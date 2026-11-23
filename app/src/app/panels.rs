@@ -221,8 +221,11 @@ impl LeonApp {
             Leave(usize),
             Ungroup(usize),
             Fold(usize),
+            Drop(usize, crate::model::LayerDrop),
         }
         let mut lacts: Vec<LAct> = Vec::new();
+        let drag_id = ui.id().with("layer_drag");
+        let mut row_rects: Vec<(usize, Rect, bool)> = Vec::new();
         let collections: Vec<(usize, String)> = self.project.layers.iter().enumerate().filter(|(_, l)| l.kind == LayerKind::Collection).map(|(i, l)| (i, l.name.clone())).collect();
         egui::ScrollArea::vertical().id_salt("layers_list").max_height(list_h).auto_shrink([false, false]).show(ui, |ui| {
             ui.add_space(4.0);
@@ -230,15 +233,21 @@ impl LeonApp {
                 if self.hide_shy && l.shy && i != self.cl {
                     continue;
                 }
-                // Las capas de una colección plegada no salen en la lista.
-                let member_of = self.project.collection_of(i);
-                if member_of.map_or(false, |ci| self.project.layers[ci].collapsed) {
+                // Las capas de una colección plegada (a cualquier nivel) no salen en la lista.
+                if self.project.is_hidden_by_fold(i) {
                     continue;
                 }
+                let member_of = self.project.collection_of(i);
+                let depth = self.project.depth_of(i);
                 let is_col = l.kind == LayerKind::Collection;
-                let (r, resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 28.0), Sense::click());
+                let (r, resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 28.0), Sense::click_and_drag());
+                row_rects.push((i, r, is_col));
+                if resp.drag_started() {
+                    ui.data_mut(|d| d.insert_temp(drag_id, i));
+                    pick = Some(i);
+                }
                 let r = r.shrink2(Vec2::new(4.0, 1.0));
-                let r = if member_of.is_some() { Rect::from_min_max(r.min + Vec2::new(14.0, 0.0), r.max) } else { r };
+                let r = Rect::from_min_max(r.min + Vec2::new(14.0 * depth as f32, 0.0), r.max);
                 let on = i == self.cl;
                 let p = ui.painter();
                 if on {
@@ -307,13 +316,13 @@ impl LeonApp {
                 resp.context_menu(|ui| {
                     ui.label(RichText::new(&l.name).strong());
                     ui.separator();
-                    if !is_col && member_of.is_none() && ui.button("Agrupar en colección nueva   Ctrl+G").clicked() {
+                    if ui.button("Agrupar en colección nueva   Ctrl+G").clicked() {
                         lacts.push(LAct::Group(i));
                         ui.close_menu();
                     }
-                    if !is_col {
+                    {
                         for (ci, name) in &collections {
-                            if member_of != Some(*ci) && ui.button(format!("Mover a «{name}»")).clicked() {
+                            if member_of != Some(*ci) && self.project.can_drop(i, crate::model::LayerDrop::Into(*ci)) && ui.button(format!("Mover a «{name}»")).clicked() {
                                 lacts.push(LAct::MoveTo(i, *ci));
                                 ui.close_menu();
                             }
@@ -334,6 +343,37 @@ impl LeonApp {
                         }
                     }
                 });
+            }
+            // Arrastrar una capa: soltarla sobre una colección la mete dentro; entre filas, la coloca ahí.
+            if let Some(src) = ui.data(|d| d.get_temp::<usize>(drag_id)) {
+                let mut target = None;
+                if let Some(p) = ui.input(|i| i.pointer.interact_pos()) {
+                    ui.painter().text(p + Vec2::new(12.0, -2.0), Align2::LEFT_CENTER, &self.project.layers[src.min(self.project.layers.len() - 1)].name, semi(11.5), ACCENT);
+                    if let Some((ti, rect, tcol)) = row_rects.iter().find(|(_, r, _)| r.contains(p)).copied() {
+                        let dy = (p.y - rect.min.y) / rect.height();
+                        let d = if tcol {
+                            if dy < 0.28 { crate::model::LayerDrop::Before(ti) } else if dy > 0.72 { crate::model::LayerDrop::After(ti) } else { crate::model::LayerDrop::Into(ti) }
+                        } else if dy < 0.5 {
+                            crate::model::LayerDrop::Before(ti)
+                        } else {
+                            crate::model::LayerDrop::After(ti)
+                        };
+                        if self.project.can_drop(src, d) {
+                            target = Some(d);
+                            match d {
+                                crate::model::LayerDrop::Before(_) => ui.painter().hline(rect.x_range(), rect.min.y, stk(2.0, ACCENT)),
+                                crate::model::LayerDrop::After(_) => ui.painter().hline(rect.x_range(), rect.max.y, stk(2.0, ACCENT)),
+                                crate::model::LayerDrop::Into(_) => ui.painter().rect_stroke(rect.shrink(1.0), 4.0, stk(2.0, ACCENT), EStrokeKind::Inside),
+                            };
+                        }
+                    }
+                }
+                if ui.input(|i| i.pointer.any_released()) {
+                    if let Some(d) = target {
+                        lacts.push(LAct::Drop(src, d));
+                    }
+                    ui.data_mut(|d| d.remove::<usize>(drag_id));
+                }
             }
         });
         if let Some(i) = vis {
@@ -363,6 +403,12 @@ impl LeonApp {
                 LAct::Fold(i) => {
                     if let Some(l) = self.project.layers.get_mut(i) {
                         l.collapsed = !l.collapsed;
+                    }
+                }
+                LAct::Drop(src, d) => {
+                    self.checkpoint();
+                    if let Some(n) = self.project.move_layer_tree(src, d) {
+                        self.cl = n;
                     }
                 }
             }

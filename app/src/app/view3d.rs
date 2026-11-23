@@ -294,6 +294,50 @@ impl LeonApp {
         }
     }
 
+    /// Dibuja el cubo de cada colección visible: abarca el encuadre de sus capas y su profundidad, con las aristas punteadas.
+    fn paint_collection_cubes(&self, painter: &egui::Painter, v: &Proj, f: u32) {
+        let (pw, ph) = (v.pw, v.ph);
+        let n = self.project.layers.len();
+        let any_solo = self.project.layers.iter().any(|l| l.solo);
+        for ci in 0..n {
+            let c = &self.project.layers[ci];
+            if c.kind != LayerKind::Collection || !c.visible || !c.active_at(f) {
+                continue;
+            }
+            let members: Vec<usize> = (0..n)
+                .filter(|&m| self.project.shows(m, f, any_solo) && !matches!(self.project.layers[m].kind, LayerKind::Camera | LayerKind::Light) && self.project.ancestors(m).contains(&ci))
+                .collect();
+            if members.is_empty() {
+                continue;
+            }
+            let zs: Vec<f32> = members.iter().map(|&m| self.project.layers[m].z()).collect();
+            let (zmin, zmax) = (zs.iter().cloned().fold(f32::MAX, f32::min), zs.iter().cloned().fold(f32::MIN, f32::max));
+            // Cuántos niveles de colecciones hay dentro de esta: cada nivel hace el cubo un poco más grande que el de dentro.
+            let base = self.project.depth_of(ci);
+            let inner = (0..n).filter(|&d| self.project.layers[d].kind == LayerKind::Collection && self.project.ancestors(d).contains(&ci)).map(|d| self.project.depth_of(d) - base).max().unwrap_or(0) as f32;
+            let (mxy, mz) = (40.0 + 28.0 * inner, 70.0 + 50.0 * inner);
+            let (z0, z1) = (zmin - mz, zmax + mz);
+            let tg = self.project.effective_at(ci, f);
+            let pt = |x: f32, y: f32, z: f32| {
+                let q = tg.apply(pw, ph, [x, y]);
+                v.p(q[0], q[1], z).0
+            };
+            let xy = [(-mxy, -mxy), (pw + mxy, -mxy), (pw + mxy, ph + mxy), (-mxy, ph + mxy)];
+            let front: Vec<Pos2> = xy.iter().map(|(x, y)| pt(*x, *y, z0)).collect();
+            let back: Vec<Pos2> = xy.iter().map(|(x, y)| pt(*x, *y, z1)).collect();
+            let col = if ci == self.cl { ACCENT } else { with_alpha(c32(c.kind.tint()), 0.85) };
+            let st = stk(if ci == self.cl { 1.6 } else { 1.3 }, col);
+            for ring in [&front, &back] {
+                let mut pts = ring.clone();
+                pts.push(ring[0]);
+                painter.add(Shape::dashed_line(&pts, st, 6.0, 4.0));
+            }
+            for k in 0..4 {
+                painter.add(Shape::dashed_line(&[front[k], back[k]], st, 6.0, 4.0));
+            }
+            painter.text(front[0] + Vec2::new(4.0, -8.0), Align2::LEFT_BOTTOM, format!("▢ {}", c.name), semi(10.0), col);
+        }
+    }
     fn paint_3d(&mut self, ui: &mut egui::Ui, rect: Rect, n_w: f32) {
         let painter = ui.painter_at(rect);
         let v = self.proj3(rect, n_w);
@@ -355,7 +399,8 @@ impl LeonApp {
             let sel = *i == self.cl;
             let z = l.z();
             let ls = if l.is3d { (CAM_DIST + z) / CAM_DIST } else { 1.0 };
-            let t = l.transform_at(f);
+            // La transformación incluye la de sus madres y la de sus colecciones.
+            let t = self.project.effective_at(*i, f);
             let c = (pw / 2.0 + t.x, ph / 2.0 + t.y);
             if l.kind == LayerKind::Null {
                 let q = v.p(c.0, c.1, z).0;
@@ -414,6 +459,11 @@ impl LeonApp {
         let painter = painter_all;
         if v.cam_view {
             painter.rect_stroke(frame_rect, 0.0, stk(1.0, Color32::from_black_alpha(160)), EStrokeKind::Outside);
+        }
+        // Colecciones: un cubo de lados punteados que envuelve a las capas que contiene (y, dentro de él, los de las colecciones
+        // que contiene a su vez, un poco más pequeños).
+        if !v.cam_view {
+            self.paint_collection_cubes(&painter, &v, f);
         }
         // Cámaras y luces como objetos en la escena
         if !v.cam_view {

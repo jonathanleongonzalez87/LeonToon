@@ -177,16 +177,8 @@ impl LeonApp {
         }
     }
 
-    /// Mete la capa actual en una colección nueva (Ctrl+G).
+    /// Mete la capa actual en una colección nueva (Ctrl+G), dentro de la misma colección que ella si estaba en una.
     pub(super) fn group_current(&mut self) {
-        if self.project.collection_of(self.cl).is_some() {
-            self.say("La capa ya está en una colección: sácala antes (menú de la capa) o desagrupa");
-            return;
-        }
-        if self.layer().kind == LayerKind::Collection {
-            self.say("Las colecciones no se meten dentro de otras colecciones");
-            return;
-        }
         self.checkpoint();
         if let Some(ci) = self.project.group_layer(self.cl) {
             self.cl = ci + 1;

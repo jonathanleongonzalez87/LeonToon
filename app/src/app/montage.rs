@@ -88,6 +88,7 @@ enum Act {
     MoveTo(usize, usize),
     Leave(usize),
     Ungroup(usize),
+    Drop(usize, crate::model::LayerDrop),
 }
 
 /// Lo que se necesita saber de una capa para dibujar su fila sin tener el proyecto prestado.
@@ -106,7 +107,8 @@ struct Info {
     animated: [bool; 5],
     key_frames: Vec<u32>,
     is_col: bool,
-    member: bool,
+    /// Cuántas colecciones envuelven a la capa (sangrado).
+    depth: usize,
     collapsed: bool,
 }
 
@@ -194,7 +196,7 @@ impl LeonApp {
         self.mt.open.resize(n, false);
         let shy: Vec<bool> = self.project.layers.iter().map(|l| l.shy).collect();
         let animated: Vec<[bool; 5]> = self.project.layers.iter().map(|l| Prop::ALL.map(|p| l.tracks.has(p))).collect();
-        let hidden: Vec<bool> = (0..n).map(|li| self.project.collection_of(li).map_or(false, |ci| self.project.layers[ci].collapsed)).collect();
+        let hidden: Vec<bool> = (0..n).map(|li| self.project.is_hidden_by_fold(li)).collect();
         build_rows(&shy, &hidden, &animated, self.cl, self.hide_shy, &self.mt.open, &self.mt.reveal)
     }
 
@@ -290,7 +292,7 @@ impl LeonApp {
                     animated: Prop::ALL.map(|p| l.tracks.has(p)),
                     key_frames: l.tracks.frames().into_iter().collect(),
                     is_col: l.kind == LayerKind::Collection,
-                    member: self.project.collection_of(li).is_some(),
+                    depth: self.project.depth_of(li),
                     collapsed: l.collapsed,
                 }
             })
@@ -510,7 +512,7 @@ impl LeonApp {
                     // colección pliega sus capas y la de las demás despliega sus propiedades.
                     let r = cellr(W_NAME);
                     let open = has_props[li];
-                    let ind = if inf.member { 14.0 } else { 0.0 };
+                    let ind = 14.0 * inf.depth as f32;
                     let arrow = Rect::from_min_size(r.min + Vec2::new(ind, 0.0), Vec2::new(16.0, ROW_H));
                     let c = arrow.center();
                     let down = if inf.is_col { !inf.collapsed } else { open };
@@ -525,26 +527,30 @@ impl LeonApp {
                     painter.text(Pos2::new(r.min.x + ind + 20.0, y + ROW_H / 2.0), Align2::LEFT_CENTER, inf.kind.badge(), FontId::proportional(9.5), c32(inf.kind.tint()));
                     let name_r = Rect::from_min_max(Pos2::new(r.min.x + ind + 32.0, y), r.max);
                     painter.with_clip_rect(name_r).text(Pos2::new(name_r.min.x, y + ROW_H / 2.0), Align2::LEFT_CENTER, &inf.name, semi(11.5), if inf.visible { TX } else { INK3 });
-                    let name_resp = ui.interact(Rect::from_min_max(r.min + Vec2::new(ind + 16.0, 0.0), r.max), ui.id().with(("mt_name", li)), Sense::click());
+                    let name_resp = ui.interact(Rect::from_min_max(r.min + Vec2::new(ind + 16.0, 0.0), r.max), ui.id().with(("mt_name", li)), Sense::click_and_drag());
                     if name_resp.clicked() {
                         acts.push(Act::Select(li));
+                    }
+                    if name_resp.drag_started() {
+                        acts.push(Act::Select(li));
+                        ui.data_mut(|d| d.insert_temp(ui.id().with("mt_layer_drag"), li));
                     }
                     name_resp.context_menu(|ui| {
                         ui.label(RichText::new(&inf.name).strong());
                         ui.separator();
-                        if !inf.is_col && !inf.member && ui.button("Agrupar en colección nueva   Ctrl+G").clicked() {
+                        if ui.button("Agrupar en colección nueva   Ctrl+G").clicked() {
                             acts.push(Act::Group(li));
                             ui.close_menu();
                         }
-                        if !inf.is_col {
+                        {
                             for (ci, other) in infos.iter().enumerate().filter(|(_, o)| o.is_col) {
-                                if self.project.collection_of(li) != Some(ci) && ui.button(format!("Mover a «{}»", other.name)).clicked() {
+                                if self.project.collection_of(li) != Some(ci) && self.project.can_drop(li, crate::model::LayerDrop::Into(ci)) && ui.button(format!("Mover a «{}»", other.name)).clicked() {
                                     acts.push(Act::MoveTo(li, ci));
                                     ui.close_menu();
                                 }
                             }
                         }
-                        if inf.member && ui.button("Sacar de la colección").clicked() {
+                        if inf.depth > 0 && ui.button("Sacar de la colección").clicked() {
                             acts.push(Act::Leave(li));
                             ui.close_menu();
                         }
@@ -665,6 +671,48 @@ impl LeonApp {
                 }
             }
             painter.hline(lx..=(lx + left_w), y + ROW_H, stk(1.0, Color32::from_black_alpha(90)));
+        }
+        // Arrastrar una capa por su nombre: sobre una colección la mete dentro; entre filas, la coloca ahí.
+        let ldrag_id = ui.id().with("mt_layer_drag");
+        if let Some(src) = ui.data(|d| d.get_temp::<usize>(ldrag_id)) {
+            let mut target = None;
+            if let Some(p) = ui.input(|i| i.pointer.interact_pos()) {
+                painter.text(p + Vec2::new(12.0, -2.0), Align2::LEFT_CENTER, &infos[src.min(n.saturating_sub(1))].name, semi(11.5), ACCENT);
+                let ri = ((p.y - o.y - HEAD_H) / ROW_H).floor();
+                if ri >= 0.0 && (ri as usize) < rows.len() {
+                    let ri = ri as usize;
+                    let (li, is_layer_row) = match rows[ri] {
+                        Row::Layer(l) => (l, true),
+                        Row::Group(l) | Row::Prop(l, _) => (l, false),
+                    };
+                    let y0 = row_y(ri);
+                    let dy = (p.y - y0) / ROW_H;
+                    let d = if !is_layer_row {
+                        crate::model::LayerDrop::After(li)
+                    } else if infos[li].is_col {
+                        if dy < 0.28 { crate::model::LayerDrop::Before(li) } else if dy > 0.72 { crate::model::LayerDrop::After(li) } else { crate::model::LayerDrop::Into(li) }
+                    } else if dy < 0.5 {
+                        crate::model::LayerDrop::Before(li)
+                    } else {
+                        crate::model::LayerDrop::After(li)
+                    };
+                    if self.project.can_drop(src, d) {
+                        target = Some(d);
+                        let band = Rect::from_min_size(Pos2::new(lx, y0), Vec2::new(left_w + len as f32 * cell, ROW_H));
+                        match d {
+                            crate::model::LayerDrop::Before(_) => painter.hline(band.x_range(), y0, stk(2.0, ACCENT)),
+                            crate::model::LayerDrop::After(_) => painter.hline(band.x_range(), y0 + ROW_H, stk(2.0, ACCENT)),
+                            crate::model::LayerDrop::Into(_) => painter.rect_stroke(band.shrink(1.0), 3.0, stk(2.0, ACCENT), EStrokeKind::Inside),
+                        };
+                    }
+                }
+            }
+            if ui.input(|i| i.pointer.any_released()) {
+                if let Some(d) = target {
+                    acts.push(Act::Drop(src, d));
+                }
+                ui.data_mut(|d| d.remove::<usize>(ldrag_id));
+            }
         }
         // ---- cabecera y regla (pegajosas) ----
         let head = Rect::from_min_size(Pos2::new(lx, sy), Vec2::new(left_w, HEAD_H));
@@ -796,6 +844,12 @@ impl LeonApp {
             }
             Act::MoveTo(li, ci) => self.move_to_collection(li, ci),
             Act::Leave(li) => self.leave_collection(li),
+            Act::Drop(src, d) => {
+                self.checkpoint();
+                if let Some(nn) = self.project.move_layer_tree(src, d) {
+                    self.cl = nn;
+                }
+            }
             Act::Ungroup(ci) => {
                 self.cl = ci.min(n.saturating_sub(1));
                 self.ungroup_current();

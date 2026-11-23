@@ -552,6 +552,10 @@ impl LeonApp {
         if std::env::var("LEONTOON_COLECCION").is_ok() && project.layers.len() >= 3 {
             if let Some(ci) = project.group_layer(1) {
                 project.move_to_collection(0, ci);
+                // Con LEONTOON_COLECCION=2, además, esa colección se mete en otra (anidado).
+                if std::env::var("LEONTOON_COLECCION").as_deref() == Ok("2") {
+                    project.group_layer(ci);
+                }
             }
         }
         // Para capturas de los modos de fusión y los vínculos: LEONTOON_FUSION=1 pone la capa de arriba en Multiplicar y la vincula a la segunda.
