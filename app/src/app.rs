@@ -174,7 +174,7 @@ struct Meta {
     size: (u32, u32, u32, u32),
     bg: Rgba,
     palettes: Vec<crate::model::NamedPalette>,
-    layers: Vec<(String, bool, bool, f32, crate::tracks::Tracks)>,
+    layers: Vec<(String, bool, bool, f32, crate::tracks::Tracks, (u32, Option<u32>, bool, bool, u8))>,
     sb: Vec<[String; 6]>,
     durs: Vec<u32>,
     range: Option<(u32, u32)>,
@@ -185,7 +185,7 @@ fn meta_of(p: &Project) -> Meta {
         size: (p.width, p.height, p.fps, p.length),
         bg: p.background,
         palettes: p.palettes.clone(),
-        layers: p.layers.iter().map(|l| (l.name.clone(), l.visible, l.locked, l.opacity, l.tracks.clone())).collect(),
+        layers: p.layers.iter().map(|l| (l.name.clone(), l.visible, l.locked, l.opacity, l.tracks.clone(), (l.in_f, l.out_f, l.solo, l.shy, l.label))).collect(),
         sb: p
             .storyboard
             .iter()
@@ -201,12 +201,13 @@ fn apply_meta(p: &mut Project, m: &Meta) {
     p.background = m.bg;
     p.palettes = m.palettes.clone();
     p.range = m.range;
-    for (l, (n, v, lk, o, x)) in p.layers.iter_mut().zip(&m.layers) {
+    for (l, (n, v, lk, o, x, bar)) in p.layers.iter_mut().zip(&m.layers) {
         l.name = n.clone();
         l.visible = *v;
         l.locked = *lk;
         l.opacity = *o;
         l.tracks = x.clone();
+        (l.in_f, l.out_f, l.solo, l.shy, l.label) = *bar;
     }
     for ((s, t), d) in p.storyboard.iter_mut().zip(&m.sb).zip(&m.durs) {
         [s.title, s.action, s.dialogue, s.camera, s.trans, s.notes] = t.clone();
@@ -352,6 +353,8 @@ pub struct LeonApp {
     loop_play: bool,
     /// Sala Stop Motion: reproducir solo un tramo (por ejemplo, las últimas fotos). Se borra al parar.
     sm_play_range: Option<(u32, u32)>,
+    /// Botón maestro «Ocultar tímidas»: las capas tímidas no salen en las listas (el dibujo no cambia).
+    hide_shy: bool,
     /// Selección de celdas en el Xsheet: (capa, desde, hasta).
     sel: Option<(usize, u32, u32)>,
     xs_horizontal: bool,
@@ -686,6 +689,7 @@ impl LeonApp {
             play_accum: 0.0,
             loop_play: false,
             sm_play_range: None,
+            hide_shy: false,
             sel: None,
             xs_horizontal: false,
             onion: true,

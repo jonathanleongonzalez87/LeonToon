@@ -127,10 +127,11 @@ pub fn render_frame_opts(p: &Project, frame: u32, scale: f32, transparent: bool)
         let b = p.background;
         pm.fill(Color::from_rgba8(b[0], b[1], b[2], b[3]));
     }
+    let any_solo = p.layers.iter().any(|l| l.solo);
     for layer in p.layers.iter().rev() {
         let t = layer.transform_at(frame);
         let op = (layer.opacity * t.o).clamp(0.0, 1.0);
-        if !layer.visible || op <= 0.0 {
+        if !layer.shows_at(frame, any_solo) || op <= 0.0 {
             continue;
         }
         if layer.kind == LayerKind::StopMotion {

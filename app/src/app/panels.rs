@@ -3,6 +3,7 @@
 
 use super::shell::{muted, panel_header, pill};
 use super::*;
+use crate::model::LABELS;
 
 impl LeonApp {
     // ---------- Herramientas y modos ----------
@@ -195,7 +196,7 @@ impl LeonApp {
     /// Devuelve la posición vertical donde termina la lista de capas (el borde que se arrastra para repartir la columna).
     pub(super) fn right_column(&mut self, ui: &mut egui::Ui, rect: Rect) -> f32 {
         let rows = self.project.layers.len() as f32;
-        let auto = (28.0 + 8.0 + rows * 28.0 + 40.0).min(rect.height() * 0.45).max(150.0);
+        let auto = (28.0 + 8.0 + rows * 28.0 + 64.0).min(rect.height() * 0.45).max(150.0);
         // La persona puede fijar el alto de la lista de capas; las propiedades se quedan con al menos 120 px.
         let lh = if self.sz.layers > 0.0 { self.sz.layers.min((rect.height() - 120.0).max(panelsize::PanelSizes::LAYERS_MIN)) } else { auto };
         let lr = Rect::from_min_size(rect.min, Vec2::new(rect.width(), lh));
@@ -207,7 +208,7 @@ impl LeonApp {
 
     /// La lista de capas con sus botones (sin cabecera: sirve para el área de capas y para el editor «Capas»).
     fn layers_body(&mut self, ui: &mut egui::Ui) {
-        let foot_h = 30.0;
+        let foot_h = 54.0;
         let list_h = (ui.available_height() - foot_h).max(30.0);
         let mut pick = None;
         let mut vis = None;
@@ -216,6 +217,9 @@ impl LeonApp {
         egui::ScrollArea::vertical().id_salt("layers_list").max_height(list_h).auto_shrink([false, false]).show(ui, |ui| {
             ui.add_space(4.0);
             for (i, l) in self.project.layers.iter().enumerate() {
+                if self.hide_shy && l.shy && i != self.cl {
+                    continue;
+                }
                 let (r, resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 28.0), Sense::click());
                 let r = r.shrink2(Vec2::new(4.0, 1.0));
                 let on = i == self.cl;
@@ -227,6 +231,12 @@ impl LeonApp {
                     p.rect_filled(r, 4.0, BG3);
                 }
                 let kt = if l.kind == LayerKind::Vector { if on { ACCENT } else { ACCENT2 } } else { c32(l.kind.tint()) };
+                if l.label != 0 {
+                    p.rect_filled(Rect::from_min_size(r.min + Vec2::new(0.0, 2.0), Vec2::new(3.0, r.height() - 4.0)), 1.0, c32(LABELS[(l.label as usize).min(LABELS.len() - 1)]));
+                }
+                if l.solo {
+                    p.text(r.left_center() + Vec2::new(r.width() - 126.0, 0.0), Align2::CENTER_CENTER, "S", semi(9.5), KEY_GOLD);
+                }
                 p.text(r.left_center() + Vec2::new(10.0, 0.0), Align2::LEFT_CENTER, l.kind.badge(), FontId::proportional(10.0), kt);
                 p.text(r.left_center() + Vec2::new(26.0, 0.0), Align2::LEFT_CENTER, &l.name, FontId::proportional(12.5), if l.visible { TX } else { INK3 });
                 if !l.tracks.is_empty() {
@@ -293,6 +303,10 @@ impl LeonApp {
                     self.delete_layer();
                 }
             });
+        });
+        ui.horizontal(|ui| {
+            ui.add_space(6.0);
+            ui.checkbox(&mut self.hide_shy, "Ocultar tímidas").on_hover_text("Las capas marcadas como tímidas salen de las listas; se siguen viendo en el dibujo");
         });
     }
 
@@ -485,6 +499,8 @@ impl LeonApp {
     }
     pub(super) fn column_panel(&mut self, ui: &mut egui::Ui) {
         let cl = self.cl;
+        let len = self.project.length;
+        let mut shift = 0i32;
         let layer = &mut self.project.layers[cl];
         ui.horizontal(|ui| {
             ui.label(RichText::new("Nombre").color(MU));
@@ -495,11 +511,68 @@ impl LeonApp {
             ui.checkbox(&mut layer.locked, "Bloqueada");
         });
         ui.horizontal(|ui| {
+            ui.checkbox(&mut layer.solo, "Solo").on_hover_text("Si alguna capa está en solo, únicamente se ven las que lo están");
+            ui.checkbox(&mut layer.shy, "Tímida").on_hover_text("Se puede ocultar de las listas con «Ocultar tímidas»");
+        });
+        ui.horizontal(|ui| {
             ui.label(RichText::new("Opacidad").color(MU));
             ui.add(egui::Slider::new(&mut layer.opacity, 0.0..=1.0).custom_formatter(|v, _| format!("{:.0} %", v * 100.0)));
         });
+        // Etiqueta de color
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("Etiqueta").color(MU));
+            ui.spacing_mut().item_spacing.x = 3.0;
+            for (i, c) in LABELS.iter().enumerate() {
+                let (r, resp) = ui.allocate_exact_size(Vec2::splat(14.0), Sense::click());
+                ui.painter().rect_filled(r, 3.0, if i == 0 { BG4 } else { c32(*c) });
+                if i == 0 {
+                    ui.painter().line_segment([r.left_bottom() + Vec2::new(2.0, -2.0), r.right_top() + Vec2::new(-2.0, 2.0)], stk(1.0, MU));
+                }
+                if layer.label as usize == i {
+                    ui.painter().rect_stroke(r.expand(1.5), 3.0, stk(1.5, Color32::WHITE), EStrokeKind::Outside);
+                }
+                if resp.on_hover_text(if i == 0 { "Sin etiqueta" } else { "Etiqueta de color" }).clicked() {
+                    layer.label = i as u8;
+                }
+            }
+        });
+        // Barra de la capa: entrada, salida y desplazamiento en el tiempo.
+        ui.add_space(2.0);
+        ui.label(RichText::new("Barra de la capa").color(MU));
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("Entrada").color(MU));
+            let mut a = layer.in_f + 1;
+            if ui.add(egui::DragValue::new(&mut a).range(1..=len.max(1))).changed() {
+                layer.in_f = (a - 1).min(layer.out_frame(len));
+            }
+            ui.label(RichText::new("Salida").color(MU));
+            let mut to_end = layer.out_f.is_none();
+            if ui.checkbox(&mut to_end, "al final").on_hover_text("La capa se ve hasta el último cuadro del proyecto").changed() {
+                layer.out_f = if to_end { None } else { Some(layer.out_frame(len)) };
+            }
+        });
+        if let Some(o) = layer.out_f {
+            ui.horizontal(|ui| {
+                ui.add_space(52.0);
+                let mut b = o + 1;
+                if ui.add(egui::DragValue::new(&mut b).range((layer.in_f + 1)..=len.max(1))).changed() {
+                    layer.out_f = Some(b - 1);
+                }
+            });
+        }
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("Desplazar").color(MU));
+            for (t, d) in [("◀ 10", -10), ("◀ 1", -1), ("1 ▶", 1), ("10 ▶", 10)] {
+                if ui.small_button(t).on_hover_text("Mueve la capa entera en el tiempo, con sus dibujos y claves").clicked() {
+                    shift = d;
+                }
+            }
+        });
+        if shift != 0 {
+            self.checkpoint();
+            self.project.layers[cl].shift_time(shift);
+        }
     }
-
     pub(super) fn preview_panel(&mut self, ui: &mut egui::Ui) {
         let w = ui.available_width();
         let h = w * self.project.height as f32 / self.project.width as f32;

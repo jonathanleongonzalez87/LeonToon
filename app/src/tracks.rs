@@ -251,6 +251,19 @@ impl Tracks {
         }
     }
 
+    /// Primer cuadro con clave de cualquier propiedad.
+    pub fn first_frame(&self) -> Option<u32> {
+        self.frames().iter().next().copied()
+    }
+
+    /// Mueve todas las claves `d` cuadros (positivo: más tarde). El llamador se asegura de que ninguna quede antes del cuadro 0.
+    pub fn shift_all(&mut self, d: i32) {
+        for p in Prop::ALL {
+            let m = self.map_mut(p);
+            *m = std::mem::take(m).into_iter().map(|(k, x)| ((k as i64 + d as i64).max(0) as u32, x)).collect();
+        }
+    }
+
     /// Al quitar el fotograma `f`: una clave que quedaría pegada a la siguiente se descarta.
     pub fn remove_frame_keys(&mut self, f: u32) {
         for p in Prop::ALL {

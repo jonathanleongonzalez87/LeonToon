@@ -619,7 +619,25 @@ pub struct Layer {
     /// Referencia a la carpeta de la secuencia (solo en capas Stop Motion).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stopmotion: Option<crate::stopmotion::SmRef>,
+    /// Barra de la capa: primer cuadro en que se ve (entrada).
+    #[serde(default)]
+    pub in_f: u32,
+    /// Último cuadro en que se ve (salida); sin valor, hasta el final del proyecto.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub out_f: Option<u32>,
+    /// Solo: si alguna capa está en solo, únicamente se ven las que lo están.
+    #[serde(default)]
+    pub solo: bool,
+    /// Tímida: se puede ocultar de las listas con el botón maestro (no afecta al dibujo).
+    #[serde(default)]
+    pub shy: bool,
+    /// Etiqueta de color (índice en LABELS; 0 = sin etiqueta).
+    #[serde(default)]
+    pub label: u8,
 }
+
+/// Colores de etiqueta de las capas (el primero es «sin etiqueta»).
+pub const LABELS: [Rgba; 8] = [[138, 138, 138, 255], [253, 103, 36, 255], [242, 210, 122, 255], [143, 179, 207, 255], [168, 207, 143, 255], [183, 162, 230, 255], [233, 160, 122, 255], [197, 143, 94, 255]];
 
 impl Layer {
     pub fn new(name: impl Into<String>) -> Self {
@@ -637,6 +655,11 @@ impl Layer {
             tracks: Tracks::default(),
             legacy_xform: BTreeMap::new(),
             stopmotion: None,
+            in_f: 0,
+            out_f: None,
+            solo: false,
+            shy: false,
+            label: 0,
         }
     }
 
@@ -652,6 +675,54 @@ impl Layer {
     /// Transformación de la capa en el fotograma `f`, interpolada entre claves.
     pub fn transform_at(&self, f: u32) -> XKey {
         self.tracks.eval(f)
+    }
+
+    /// ¿La barra de la capa cubre el cuadro `f`?
+    pub fn active_at(&self, f: u32) -> bool {
+        f >= self.in_f && self.out_f.map_or(true, |o| f <= o)
+    }
+
+    /// ¿Se dibuja la capa en el cuadro `f`? Visible, dentro de su barra y, si hay capas en solo, que esté en solo.
+    pub fn shows_at(&self, f: u32, any_solo: bool) -> bool {
+        self.visible && self.active_at(f) && (!any_solo || self.solo)
+    }
+
+    /// Último cuadro de la barra dentro de un proyecto de `len` cuadros.
+    pub fn out_frame(&self, len: u32) -> u32 {
+        let last = len.saturating_sub(1);
+        self.out_f.map_or(last, |o| o.min(last))
+    }
+
+    /// Primer cuadro que usa la capa (dibujos, claves, entrada o secuencia).
+    fn first_used_frame(&self) -> u32 {
+        let mut m = self.in_f;
+        if let Some(k) = self.keys.keys().next() {
+            m = m.min(*k);
+        }
+        if let Some(k) = self.tracks.first_frame() {
+            m = m.min(k);
+        }
+        if let Some(r) = &self.stopmotion {
+            m = m.min(r.start);
+        }
+        m
+    }
+
+    /// Mueve toda la capa en el tiempo `d` cuadros (la barra con sus dibujos y claves). No pasa del cuadro 0. Devuelve lo que se movió de verdad.
+    pub fn shift_time(&mut self, d: i32) -> i32 {
+        let d = d.max(-(self.first_used_frame() as i32));
+        if d == 0 {
+            return 0;
+        }
+        let mv = |k: u32| (k as i64 + d as i64).max(0) as u32;
+        self.keys = std::mem::take(&mut self.keys).into_iter().map(|(k, x)| (mv(k), x)).collect();
+        self.tracks.shift_all(d);
+        self.in_f = mv(self.in_f);
+        self.out_f = self.out_f.map(mv);
+        if let Some(r) = self.stopmotion.as_mut() {
+            r.start = mv(r.start);
+        }
+        d
     }
 
     /// Convierte las claves de proyectos anteriores (una sola pista) en pistas por propiedad.
@@ -927,8 +998,9 @@ impl Project {
     pub fn flatten(&self, f: u32) -> Drawing {
         let (w, h) = (self.width as f32, self.height as f32);
         let mut out = Drawing::default();
+        let any_solo = self.layers.iter().any(|l| l.solo);
         for l in self.layers.iter().rev() {
-            if !l.visible {
+            if !l.shows_at(f, any_solo) {
                 continue;
             }
             let t = l.transform_at(f);
@@ -1198,6 +1270,50 @@ mod tests {
         assert!(!out.contains("\"xform\""), "la pista antigua no se vuelve a guardar");
         let back: Layer = serde_json::from_str(&out).unwrap();
         assert_eq!(back.tracks, l.tracks);
+    }
+
+    #[test]
+    fn la_barra_de_la_capa_decide_cuando_se_ve_y_solo_oculta_las_demas() {
+        let mut l = Layer::new("a");
+        assert!(l.shows_at(0, false) && l.shows_at(999, false), "por defecto dura todo el proyecto");
+        l.in_f = 4;
+        l.out_f = Some(9);
+        assert!(!l.shows_at(3, false) && l.shows_at(4, false) && l.shows_at(9, false) && !l.shows_at(10, false));
+        assert_eq!(l.out_frame(24), 9);
+        l.out_f = None;
+        assert_eq!(l.out_frame(24), 23);
+        l.visible = false;
+        assert!(!l.shows_at(5, false), "oculta sigue siendo oculta");
+        l.visible = true;
+        // Con una capa en solo, las que no lo están no se ven.
+        assert!(!l.shows_at(5, true));
+        l.solo = true;
+        assert!(l.shows_at(5, true));
+    }
+
+    #[test]
+    fn mover_la_capa_en_el_tiempo_arrastra_dibujos_claves_y_barra() {
+        let mut l = Layer::new("a");
+        l.keys.insert(2, Arc::default());
+        l.keys.insert(6, Arc::default());
+        l.tracks.set(Prop::Position, 4, [10.0, 0.0], Interp::Linear);
+        l.in_f = 2;
+        l.out_f = Some(8);
+        assert_eq!(l.shift_time(3), 3);
+        assert_eq!(l.keys.keys().copied().collect::<Vec<_>>(), vec![5, 9]);
+        assert_eq!(l.tracks.frames().into_iter().collect::<Vec<_>>(), vec![7]);
+        assert_eq!((l.in_f, l.out_f), (5, Some(11)));
+        // Hacia atrás no pasa del cuadro 0: lo primero que usa la capa es el cuadro 5.
+        assert_eq!(l.shift_time(-20), -5);
+        assert_eq!(l.keys.keys().copied().collect::<Vec<_>>(), vec![0, 4]);
+        assert_eq!(l.in_f, 0);
+    }
+
+    #[test]
+    fn una_capa_guardada_antes_de_la_barra_se_abre_dura_todo_el_proyecto() {
+        let l: Layer = serde_json::from_str(r#"{"name":"a","visible":true,"locked":false,"opacity":1.0,"keys":{}}"#).unwrap();
+        assert_eq!((l.in_f, l.out_f, l.solo, l.shy, l.label), (0, None, false, false, 0));
+        assert!(l.shows_at(500, false));
     }
     #[test]
     fn xsheet_operations() {

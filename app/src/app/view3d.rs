@@ -323,10 +323,11 @@ impl LeonApp {
         }
 
         // Capas visibles, de la más lejana a la más cercana
+        let any_solo = self.project.layers.iter().any(|l| l.solo);
         let mut order: Vec<(usize, f32)> = (0..self.project.layers.len())
             .filter(|&i| {
                 let l = &self.project.layers[i];
-                l.visible && !matches!(l.kind, LayerKind::Camera | LayerKind::Light)
+                l.shows_at(f, any_solo) && !matches!(l.kind, LayerKind::Camera | LayerKind::Light)
             })
             .map(|i| (i, v.p(pw / 2.0, ph / 2.0, self.project.layers[i].z()).2))
             .collect();

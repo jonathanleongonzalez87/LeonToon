@@ -199,8 +199,9 @@ impl LeonApp {
                 glow(painter, cam.center(), 10.0, w * z * 0.7, with_alpha(light_color(self.light_temp), a));
             }
         }
+        let any_solo = self.project.layers.iter().any(|l| l.solo);
         for (li, layer) in self.project.layers.iter().enumerate().rev() {
-            if !layer.visible {
+            if !layer.shows_at(f, any_solo) {
                 continue;
             }
             let t = layer.transform_at(f);

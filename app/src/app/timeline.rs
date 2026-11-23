@@ -2,6 +2,7 @@
 //! (o al revés, con «Columnas»). Celdas: número de dibujo donde empieza, «│» mientras se mantiene.
 
 use super::*;
+use crate::model::LABELS;
 
 const NUM_W: f32 = 40.0;
 const COL_W: f32 = 90.0;
@@ -16,6 +17,8 @@ enum Hit {
     Frame(u32),
     Header(usize, u8),
     Cell(usize, u32),
+    /// La barra de una capa: 0 = su entrada, 1 = el cuerpo (mueve la capa), 2 = su salida.
+    Bar(usize, u8),
     None,
 }
 
@@ -97,10 +100,11 @@ impl LeonApp {
     /// Orden de dibujo de las columnas: en vertical, la de más atrás a la izquierda.
     fn col_order(&self) -> Vec<usize> {
         let n = self.project.layers.len();
+        let show = |i: &usize| !(self.hide_shy && self.project.layers[*i].shy && *i != self.cl);
         if self.xs_horizontal {
-            (0..n).collect()
+            (0..n).filter(show).collect()
         } else {
-            (0..n).rev().collect()
+            (0..n).rev().filter(show).collect()
         }
     }
 
@@ -161,6 +165,9 @@ impl LeonApp {
                     bg = CELL_SEL;
                 }
                 painter.rect_filled(r, 0.0, bg);
+                if !layer.active_at(f) {
+                    painter.rect_filled(r, 0.0, Color32::from_black_alpha(130));
+                }
                 let (edge_a, edge_b) = if horiz { (r.right_top(), r.right_bottom()) } else { (r.left_bottom(), r.right_bottom()) };
                 painter.line_segment([edge_a, edge_b], stk(1.0, Color32::from_black_alpha(80)));
                 if f % fps == 0 && f != 0 {
@@ -185,6 +192,21 @@ impl LeonApp {
                 if f == self.frame {
                     painter.rect_stroke(r, 0.0, stk(1.0, ACCENT), EStrokeKind::Inside);
                 }
+            }
+            // Barra de la capa: de su entrada a su salida, del color de su etiqueta.
+            {
+                let (bi, bo) = (layer.in_f, layer.out_frame(len));
+                let col = if layer.label == 0 { with_alpha(MU, 0.7) } else { c32(LABELS[(layer.label as usize).min(LABELS.len() - 1)]) };
+                let br = if horiz {
+                    let (x0, x1) = (o.x + NAME_W + bi as f32 * cell_w, o.x + NAME_W + (bo + 1) as f32 * cell_w);
+                    let y = o.y + HEAD_H + c as f32 * LANE_H + LANE_H - 5.0;
+                    Rect::from_min_max(Pos2::new(x0, y), Pos2::new(x1, y + 3.0))
+                } else {
+                    let (y0, y1) = (o.y + HEAD_H + bi as f32 * row_h, o.y + HEAD_H + (bo + 1) as f32 * row_h);
+                    let x = o.x + NUM_W + c as f32 * COL_W;
+                    Rect::from_min_max(Pos2::new(x + 1.0, y0), Pos2::new(x + 4.0, y1))
+                };
+                painter.rect_filled(br, 1.0, col);
             }
             // Separador de columna
             let a = cell_rect(c, f0);
@@ -241,9 +263,23 @@ impl LeonApp {
         }
 
         // ---- interacción ----
+        // Barras de las capas (entrada, salida) para reconocer dónde se pulsa.
+        let bars: Vec<(u32, u32)> = self.project.layers.iter().map(|l| (l.in_f, l.out_frame(len))).collect();
         let hit = |p: Pos2| -> Hit {
             if corner.contains(p) {
                 return Hit::Corner;
+            }
+            if horiz && p.y >= o.y + HEAD_H && p.x >= o.x + NAME_W {
+                let c = ((p.y - o.y - HEAD_H) / LANE_H).floor();
+                if c >= 0.0 && (c as usize) < nl && (p.y - o.y - HEAD_H) - c * LANE_H >= LANE_H - 8.0 {
+                    let li = order[c as usize];
+                    let (bi, bo) = bars[li];
+                    let (x0, x1) = (o.x + NAME_W + bi as f32 * cell_w, o.x + NAME_W + (bo + 1) as f32 * cell_w);
+                    if p.x >= x0 - 4.0 && p.x <= x1 + 4.0 {
+                        let part = if p.x < x0 + 6.0 { 0 } else if p.x > x1 - 6.0 { 2 } else { 1 };
+                        return Hit::Bar(li, part);
+                    }
+                }
             }
             for (c, &li) in order.iter().enumerate() {
                 let r = header_rect(horiz, c, o, sx, sy);
@@ -270,8 +306,45 @@ impl LeonApp {
         };
         let ptr = resp.interact_pointer_pos();
         let hp = ptr.map(hit).unwrap_or(Hit::None);
-        let drag_id = ui.id().with("xs_drag_col");
+        // Arrastrar la barra de una capa: los extremos recortan, el cuerpo mueve la capa entera en el tiempo.
+        let bar_id = ui.id().with("xs_bar");
         if resp.drag_started() {
+            if let (Hit::Bar(li, part), Some(p)) = (hp, ptr) {
+                self.checkpoint();
+                self.cl = li;
+                let f0 = ((p.x - o.x - NAME_W) / cell_w).floor() as i64;
+                let (bi, bo) = bars[li];
+                ui.data_mut(|d| d.insert_temp(bar_id, (li, part, f0, 0i32, bi, bo)));
+            }
+        }
+        let bar_drag: Option<(usize, u8, i64, i32, u32, u32)> = ui.data(|d| d.get_temp(bar_id));
+        if let (Some((li, part, f0, applied, bi0, bo0)), Some(p)) = (bar_drag, ptr) {
+            if resp.dragged() {
+                let d = (((p.x - o.x - NAME_W) / cell_w).floor() as i64 - f0) as i32;
+                let last = len.saturating_sub(1);
+                let l = &mut self.project.layers[li];
+                match part {
+                    0 => l.in_f = (bi0 as i64 + d as i64).clamp(0, l.out_frame(len) as i64) as u32,
+                    2 => {
+                        let o2 = (bo0 as i64 + d as i64).clamp(l.in_f as i64, last as i64) as u32;
+                        l.out_f = if o2 >= last { None } else { Some(o2) };
+                    }
+                    _ => {
+                        let diff = d - applied;
+                        if diff != 0 {
+                            let real = l.shift_time(diff);
+                            ui.data_mut(|dd| dd.insert_temp(bar_id, (li, part, f0, applied + real, bi0, bo0)));
+                        }
+                    }
+                }
+                self.changed = true;
+            }
+            if resp.drag_stopped() {
+                ui.data_mut(|dd| dd.remove::<(usize, u8, i64, i32, u32, u32)>(bar_id));
+            }
+        }
+        let drag_id = ui.id().with("xs_drag_col");
+        if resp.drag_started() && bar_drag.is_none() {
             if let Hit::Header(li, 0) = hp {
                 ui.data_mut(|d| d.insert_temp(drag_id, li));
             }
@@ -287,7 +360,7 @@ impl LeonApp {
                     self.move_layer_to(from, to);
                 }
             }
-        } else if resp.is_pointer_button_down_on() && ui.input(|i| i.pointer.primary_down()) {
+        } else if bar_drag.is_none() && resp.is_pointer_button_down_on() && ui.input(|i| i.pointer.primary_down()) {
             let pressed = ui.input(|i| i.pointer.primary_pressed());
             let shift = ui.input(|i| i.modifiers.shift);
             match hp {
@@ -338,6 +411,10 @@ impl LeonApp {
                 }
                 _ => {}
             }
+        }
+        if let Some(Hit::Bar(_, part)) = resp.hover_pos().map(hit) {
+            ui.ctx().set_cursor_icon(if part == 1 { egui::CursorIcon::Grab } else { egui::CursorIcon::ResizeHorizontal });
+            resp.clone().on_hover_text(["Arrastra para cambiar la entrada de la capa", "Arrastra para mover la capa en el tiempo (con sus dibujos y claves)", "Arrastra para cambiar la salida de la capa"][part as usize]);
         }
         if let Some(Hit::Header(_, part)) = resp.hover_pos().map(hit) {
             let tip = ["Clic: elegir · doble clic: renombrar · arrastrar: reordenar", "Visible", "Bloquear"][part as usize];
