@@ -329,6 +329,7 @@ impl LeonApp {
             Editor::Camera => self.sm_cam_panel(ui),
             Editor::Viewer => self.viewer(ui),
             Editor::Timeline => self.timeline_area(ui),
+            Editor::Montage => self.montage_area(ui),
             Editor::Storyboard => self.storyboard_room(ui),
             Editor::SmStage => self.sm_stage_editor(ui),
             Editor::SmStrip => self.sm_bottom(ui),
@@ -501,28 +502,6 @@ impl LeonApp {
         let cl = self.cl;
         let len = self.project.length;
         let mut shift = 0i32;
-        let mut new_parent: Option<Option<usize>> = None;
-        {
-            // Vínculo: la capa hereda la posición, el giro y la escala de su madre.
-            let names: Vec<(usize, String, bool)> = (0..self.project.layers.len()).filter(|&i| i != cl).map(|i| (i, self.project.layers[i].name.clone(), self.project.would_cycle(cl, i))).collect();
-            let cur = self.project.layers[cl].parent.and_then(|u| self.project.index_of_uid(u));
-            ui.horizontal(|ui| {
-                ui.label(RichText::new("Vínculo").color(MU));
-                egui::ComboBox::from_id_salt("parent_layer").selected_text(cur.map_or("Ninguno".to_string(), |i| self.project.layers[i].name.clone())).width(120.0).show_ui(ui, |ui| {
-                    if ui.selectable_label(cur.is_none(), "Ninguno").clicked() {
-                        new_parent = Some(None);
-                    }
-                    for (i, n, cyc) in &names {
-                        let r = ui.add_enabled(!*cyc, egui::SelectableLabel::new(cur == Some(*i), n));
-                        if *cyc {
-                            r.on_disabled_hover_text("Crearía un ciclo: esa capa ya depende de esta");
-                        } else if r.clicked() {
-                            new_parent = Some(Some(*i));
-                        }
-                    }
-                });
-            });
-        }
         let layer = &mut self.project.layers[cl];
         ui.horizontal(|ui| {
             ui.label(RichText::new("Nombre").color(MU));
@@ -539,15 +518,6 @@ impl LeonApp {
         ui.horizontal(|ui| {
             ui.label(RichText::new("Opacidad").color(MU));
             ui.add(egui::Slider::new(&mut layer.opacity, 0.0..=1.0).custom_formatter(|v, _| format!("{:.0} %", v * 100.0)));
-        });
-        // Modo de fusión y vínculo con otra capa (madre).
-        ui.horizontal(|ui| {
-            ui.label(RichText::new("Fusión").color(MU));
-            egui::ComboBox::from_id_salt("blend_mode").selected_text(layer.blend.label()).width(120.0).show_ui(ui, |ui| {
-                for b in crate::model::Blend::ALL {
-                    ui.selectable_value(&mut layer.blend, b, b.label());
-                }
-            });
         });
         // Etiqueta de color
         ui.horizontal(|ui| {
@@ -569,6 +539,7 @@ impl LeonApp {
         });
         // Barra de la capa: entrada, salida y desplazamiento en el tiempo.
         ui.add_space(2.0);
+        muted(ui, "La fusión y el vínculo se cambian en la línea de tiempo de montaje (columnas Modo y Primario).");
         ui.label(RichText::new("Barra de la capa").color(MU));
         ui.horizontal(|ui| {
             ui.label(RichText::new("Entrada").color(MU));
@@ -602,10 +573,6 @@ impl LeonApp {
         if shift != 0 {
             self.checkpoint();
             self.project.layers[cl].shift_time(shift);
-        }
-        if let Some(p) = new_parent {
-            self.checkpoint();
-            self.project.set_parent(cl, p);
         }
     }
     pub(super) fn preview_panel(&mut self, ui: &mut egui::Ui) {

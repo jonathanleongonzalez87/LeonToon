@@ -179,7 +179,7 @@ impl LeonApp {
             let _ = p;
             match ed {
                 Editor::Viewer | Editor::SmStage => self.hover_area = 1,
-                Editor::Timeline | Editor::SmStrip | Editor::SmXSheet => self.hover_area = 2,
+                Editor::Timeline | Editor::Montage | Editor::SmStrip | Editor::SmXSheet => self.hover_area = 2,
                 _ => {}
             }
         }
@@ -232,6 +232,10 @@ mod tests {
             assert!(room.slots().contains(&Slot::Layers) && room.slots().contains(&Slot::Props));
         }
         assert_eq!(RoomKind::StopMotion.default_editor(Slot::SmStage), Editor::SmStage);
+        // Las salas de motion graphics traen la línea de tiempo de montaje; las demás, la de siempre.
+        assert_eq!(RoomKind::Interp.default_editor(Slot::Time), Editor::Montage);
+        assert_eq!(RoomKind::Comp.default_editor(Slot::Time), Editor::Montage);
+        assert_eq!(RoomKind::Layout.default_editor(Slot::Time), Editor::Timeline);
         assert!(!RoomKind::StopMotion.slots().contains(&Slot::Main));
     }
 

@@ -225,6 +225,21 @@ impl Tracks {
         self.map_mut(p).remove(&f).is_some()
     }
 
+    /// Mueve la clave de una propiedad de un cuadro a otro (si en el destino había otra, se sustituye). Devuelve true si se movió.
+    pub fn move_key(&mut self, p: Prop, from: u32, to: u32) -> bool {
+        if from == to {
+            return false;
+        }
+        let m = self.map_mut(p);
+        match m.remove(&from) {
+            Some(k) => {
+                m.insert(to, k);
+                true
+            }
+            None => false,
+        }
+    }
+
     /// Deja una propiedad sin animar (apaga su cronómetro).
     pub fn clear_prop(&mut self, p: Prop) {
         self.map_mut(p).clear();
@@ -437,6 +452,18 @@ mod tests {
         assert!(t.remove_at(4) && !t.remove_at(4));
         t.clear_prop(Prop::Opacity);
         assert!(t.is_empty());
+    }
+
+    #[test]
+    fn mover_una_clave_la_cambia_de_cuadro_y_sustituye_la_del_destino() {
+        let mut t = Tracks::default();
+        t.set(Prop::Position, 2, [1.0, 0.0], Interp::Linear);
+        t.set(Prop::Position, 6, [9.0, 0.0], Interp::Linear);
+        assert!(t.move_key(Prop::Position, 2, 6));
+        assert_eq!(t.prop_frames(Prop::Position), vec![6]);
+        assert_eq!(t.eval(6).x, 1.0, "la clave movida sustituye a la que estaba");
+        assert!(!t.move_key(Prop::Position, 2, 4), "no hay clave en el cuadro de origen");
+        assert!(!t.move_key(Prop::Position, 6, 6));
     }
 
     #[test]

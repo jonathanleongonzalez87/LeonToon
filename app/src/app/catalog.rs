@@ -370,6 +370,8 @@ pub(crate) enum Editor {
     Viewer,
     /// La línea de tiempo (o la hoja de exposición, según la orientación de la sala).
     Timeline,
+    /// La línea de tiempo de capas para motion graphics: columnas de interruptores y modos, barras y propiedades con claves.
+    Montage,
     Storyboard,
     /// El escenario de Stop Motion: Live View o visor, con la barra de transporte y captura.
     SmStage,
@@ -378,11 +380,12 @@ pub(crate) enum Editor {
 }
 
 impl Editor {
-    pub(crate) const ALL: [Editor; 15] = [
+    pub(crate) const ALL: [Editor; 16] = [
         Editor::Viewer,
         Editor::SmStage,
         Editor::Preview,
         Editor::Timeline,
+        Editor::Montage,
         Editor::SmStrip,
         Editor::SmXSheet,
         Editor::Curves,
@@ -409,6 +412,7 @@ impl Editor {
             Editor::Camera => "Cámara y captura",
             Editor::Viewer => "Visor",
             Editor::Timeline => "Línea de tiempo",
+            Editor::Montage => "Línea de tiempo de montaje",
             Editor::Storyboard => "Storyboard",
             Editor::SmStage => "Escenario de Stop Motion",
             Editor::SmStrip => "Tira de fotos",
@@ -429,6 +433,7 @@ impl Editor {
             Editor::Camera => "camera",
             Editor::Viewer => "viewer",
             Editor::Timeline => "timeline",
+            Editor::Montage => "montage",
             Editor::Storyboard => "storyboard",
             Editor::SmStage => "sm_stage",
             Editor::SmStrip => "sm_strip",
@@ -440,14 +445,14 @@ impl Editor {
     pub(crate) fn group(self) -> EditorGroup {
         match self {
             Editor::Viewer | Editor::SmStage | Editor::Preview => EditorGroup::Visores,
-            Editor::Timeline | Editor::SmStrip | Editor::SmXSheet | Editor::Curves => EditorGroup::Tiempo,
+            Editor::Timeline | Editor::Montage | Editor::SmStrip | Editor::SmXSheet | Editor::Curves => EditorGroup::Tiempo,
             Editor::Layers | Editor::RoomProps | Editor::Schematic | Editor::Explorer | Editor::Palettes | Editor::Substitution => EditorGroup::Datos,
             Editor::Storyboard | Editor::Camera => EditorGroup::Produccion,
         }
     }
     /// Editores que traen su propia cabecera: ellos mismos piden el selector de editor (`slot_head`).
     pub(crate) fn own_header(self) -> bool {
-        matches!(self, Editor::Timeline | Editor::Layers | Editor::SmStrip)
+        matches!(self, Editor::Timeline | Editor::Montage | Editor::Layers | Editor::SmStrip)
     }
     /// Editores que reparten su espacio y su desplazamiento ellos mismos: no van dentro del marco con margen del hueco.
     pub(crate) fn scrolls_itself(self) -> bool {
@@ -515,6 +520,8 @@ impl RoomKind {
                     Editor::Viewer
                 }
             }
+            // Interpolación y Composición 3D son de motion graphics: su tiempo es la línea de tiempo de montaje.
+            Slot::Time if matches!(self, RoomKind::Interp | RoomKind::Comp) => Editor::Montage,
             Slot::Time => Editor::Timeline,
             Slot::Layers => Editor::Layers,
             Slot::Props => Editor::RoomProps,
@@ -557,7 +564,7 @@ mod editor_tests {
         }
         // Un editor que se añada a la enumeración pero no a ALL no saldría en el menú: esta comprobación lo detecta.
         let sample = |e: Editor| match e {
-            Editor::RoomProps | Editor::Palettes | Editor::Curves | Editor::Explorer | Editor::Schematic | Editor::Substitution | Editor::Preview | Editor::Layers | Editor::SmXSheet | Editor::Camera | Editor::Viewer | Editor::Timeline | Editor::Storyboard | Editor::SmStage | Editor::SmStrip => true,
+            Editor::RoomProps | Editor::Palettes | Editor::Curves | Editor::Explorer | Editor::Schematic | Editor::Substitution | Editor::Preview | Editor::Layers | Editor::SmXSheet | Editor::Camera | Editor::Viewer | Editor::Timeline | Editor::Montage | Editor::Storyboard | Editor::SmStage | Editor::SmStrip => true,
         };
         assert!(Editor::ALL.iter().all(|e| sample(*e)));
     }

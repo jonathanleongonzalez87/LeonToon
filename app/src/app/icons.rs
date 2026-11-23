@@ -464,6 +464,14 @@ pub(super) fn draw_editor_icon(e: Editor, p: &egui::Painter, r: Rect, c: Color32
             boxr(s(0.3, 0.22), s(0.46, 0.42));
             p.line_segment([s(0.62, 0.15), s(0.62, 0.85)], stk(1.8, Color32::from_rgb(0xfd, 0x67, 0x24)));
         }
+        Editor::Montage => {
+            for (y, x0, x1) in [(0.2f32, 0.1f32, 0.7f32), (0.46, 0.3, 0.9), (0.72, 0.18, 0.62)] {
+                let bar = Rect::from_min_max(s(x0, y), s(x1, y + 0.16));
+                p.rect_filled(bar, 2.0, soft);
+                p.rect_stroke(bar, 2.0, st, EStrokeKind::Middle);
+            }
+            p.line_segment([s(0.52, 0.08), s(0.52, 0.94)], stk(1.8, Color32::from_rgb(0xfd, 0x67, 0x24)));
+        }
         Editor::SmStrip => {
             for i in 0..3 {
                 let x = 0.04 + i as f32 * 0.32;

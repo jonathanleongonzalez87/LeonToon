@@ -23,6 +23,7 @@ mod flow_tests;
 mod papers;
 mod panelsize;
 mod context;
+mod montage;
 mod smcap;
 mod smdragon;
 mod slots;
@@ -355,6 +356,8 @@ pub struct LeonApp {
     sm_play_range: Option<(u32, u32)>,
     /// Botón maestro «Ocultar tímidas»: las capas tímidas no salen en las listas (el dibujo no cambia).
     hide_shy: bool,
+    /// Línea de tiempo de montaje (columnas, filas desplegadas, zoom).
+    mt: montage::MtState,
     /// Selección de celdas en el Xsheet: (capa, desde, hasta).
     sel: Option<(usize, u32, u32)>,
     xs_horizontal: bool,
@@ -697,6 +700,7 @@ impl LeonApp {
             loop_play: false,
             sm_play_range: None,
             hide_shy: false,
+            mt: Default::default(),
             sel: None,
             xs_horizontal: false,
             onion: true,

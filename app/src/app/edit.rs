@@ -766,6 +766,10 @@ impl LeonApp {
         if self.sm_room_keys(ctx) {
             return;
         }
+        // Línea de tiempo de montaje: A, P, S, R, T, U y F4 con el puntero encima.
+        if self.mt_keys(ctx) {
+            return;
+        }
         // Pluma con una curva en curso: Intro termina, Esc cancela, Retroceso quita el último nodo.
         if self.pen_keys(ctx) {
             return;

@@ -113,5 +113,5 @@ Respuestas de la persona a las siete preguntas de la primera versión de este do
 | M2. Barra de capa | Hecha en el Issue #99: entrada, salida y desplazamiento por capa (campos en el panel «Capa» y barra arrastrable en la línea de tiempo horizontal), solo, tímida con botón maestro y etiqueta de color. Los interruptores en columnas y la barra en la hoja vertical llegan con el modo Montaje (M4) |
 | M3. Fusión y vínculo (sin mates) | Hecha en el Issue #104: los ocho modos de fusión en la exportación y en el visor, y vínculo madre e hija (hereda posición, giro y escala) con selectores en el panel «Capa». La vista 3D aún no aplica el vínculo |
 | Mates de seguimiento | Pendiente, aparte |
-| M4 a M7 | Pendientes |
+| M4. Línea de tiempo de montaje | Hecha en el Issue #106: editor propio («Línea de tiempo de montaje») con columnas de interruptores y modos (fusión y vínculo en la propia fila), barras de entrada y salida, propiedades con cronómetro, valor y claves en el tiempo, y las teclas A, P, S, R, T, U y F4. Es el tiempo por defecto de las salas Interpolación y Composición 3D |`r`n| M5 a M7 | Pendientes |
 | M8. Vídeo y audio | Planificado; primero un estudio de decodificadores (Issue #100) |
