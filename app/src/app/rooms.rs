@@ -1,4 +1,4 @@
-﻿//! Salas sin visor: Esquema (columnas → salida), Explorador (resumen y escena) y Render (exportar).
+//! Salas sin visor: Esquema (columnas → salida), Explorador (resumen y escena) y Render (exportar).
 
 use super::shell::{muted, pill};
 use super::*;
@@ -63,7 +63,7 @@ impl LeonApp {
                 let on = i == self.cl;
                 p.rect_filled(r, 6.0, BG3);
                 p.rect_stroke(r, 6.0, if on { stk(2.0, ACCENT) } else { stk(1.0, Color32::BLACK) }, EStrokeKind::Inside);
-                let extra = if l.xform.is_empty() { String::new() } else { format!(" · {} claves", l.xform.len()) };
+                let extra = if l.tracks.is_empty() { String::new() } else { format!(" · {} claves", l.tracks.count()) };
                 let col = if l.visible { TX } else { MU };
                 p.text(r.left_center() + Vec2::new(12.0, 0.0), Align2::LEFT_CENTER, format!("{}  ·  {} dibujos{}", l.name, l.keys.len(), extra), FontId::proportional(12.0), col);
                 let resp = ui.interact(r, ui.id().with(("node", i)), Sense::click());
@@ -141,7 +141,7 @@ impl LeonApp {
                         "• {} — {} dibujos{}{}{}",
                         l.name,
                         l.keys.len(),
-                        if l.xform.is_empty() { String::new() } else { format!(" · {} claves de animación", l.xform.len()) },
+                        if l.tracks.is_empty() { String::new() } else { format!(" · {} claves de animación", l.tracks.count()) },
                         if l.visible { "" } else { " · oculta" },
                         if l.locked { " · bloqueada" } else { "" }
                     ));

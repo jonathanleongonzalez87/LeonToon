@@ -179,7 +179,7 @@ impl LeonApp {
                     };
                     painter.line_segment([a, b], stk(1.0, Color32::from_gray(0x77)));
                 }
-                if layer.xform.contains_key(&f) {
+                if layer.tracks.has_key_at(f) {
                     painter.rect_stroke(r.shrink(1.0), 0.0, stk(2.0, KEY_GOLD), EStrokeKind::Inside);
                 }
                 if f == self.frame {

@@ -109,7 +109,7 @@ Respuestas de la persona a las siete preguntas de la primera versión de este do
 
 | Fase | Estado |
 |---|---|
-| M1. Pistas por propiedad | Pendiente (Issue #98) |
+| M1. Pistas por propiedad | Hecha en el Issue #98: una pista por propiedad (anclaje, posición, escala, rotación y opacidad), cronómetro en el panel de claves y conversión de los archivos antiguos al abrirlos. Falta ver los cronómetros y las claves por propiedad en la línea de tiempo (modo Montaje, M4) |
 | M2. Barra de capa | Pendiente (Issue #99) |
 | M3. Fusión y vínculo (sin mates) | Pendiente |
 | Mates de seguimiento | Pendiente, aparte |

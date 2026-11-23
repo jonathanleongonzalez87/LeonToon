@@ -154,7 +154,7 @@ impl LeonApp {
             LayerKind::Light => {
                 l.is3d = true;
                 l.depth = -600.0;
-                l.xform.insert(0, XKey { y: -300.0, ..XKey::default() });
+                l.tracks.set(Prop::Position, 0, [0.0, -300.0], Interp::Linear);
             }
             _ => {}
         }
@@ -216,34 +216,54 @@ impl LeonApp {
 
     // ---------- Claves de animación ----------
 
-    /// Fija una clave en el fotograma actual: con `t`, esos valores; sin él, los que se ven ahora.
+    /// Fija claves en el fotograma actual. Con `t`, solo en las propiedades que cambian respecto a lo que se ve ahora (así
+    /// mover una capa anima solo la posición); sin él, en todas las propiedades con los valores de ahora.
     pub(super) fn set_xkey(&mut self, t: Option<XKey>) {
         if self.locked() {
             return;
         }
         let f = self.frame;
-        let had = self.layer().xform.contains_key(&f);
-        let t = t.unwrap_or_else(|| self.layer().transform_at(f));
-        self.project.layers[self.cl].xform.insert(f, t);
+        let had = self.layer().tracks.has_key_at(f);
+        let now = self.layer().transform_at(f);
+        match t {
+            Some(t) => self.project.layers[self.cl].tracks.set_changed(f, &t, &now),
+            None => self.project.layers[self.cl].tracks.set_all(f, &now),
+        }
         if !had {
             self.say(format!("Clave de animación en el fotograma {}", f + 1));
         }
     }
 
+    /// Cronómetro de una propiedad: si está animada la deja sin animar; si no, la anima con una clave en el cuadro actual.
+    pub(super) fn toggle_stopwatch(&mut self, p: Prop) {
+        if self.locked() {
+            return;
+        }
+        let f = self.frame;
+        let now = self.layer().transform_at(f);
+        let l = &mut self.project.layers[self.cl];
+        if l.tracks.has(p) {
+            l.tracks.clear_prop(p);
+            self.say(format!("{}: sin animar", p.name()));
+        } else {
+            l.tracks.set(p, f, p.of(&now), now.i);
+            self.say(format!("{}: animada desde el fotograma {}", p.name(), f + 1));
+        }
+    }
+
     pub(super) fn delete_xkey(&mut self) {
         let f = self.frame;
-        if self.project.layers[self.cl].xform.remove(&f).is_some() {
+        if self.project.layers[self.cl].tracks.remove_at(f) {
             self.say("Clave borrada");
         } else {
             self.say("No hay clave en este fotograma");
         }
     }
-
     pub(super) fn jump_xkey(&mut self, next: bool) {
         let f = self.frame;
         let l = self.layer();
-        let k = if next { l.xform.range(f + 1..).next() } else { l.xform.range(..f).next_back() };
-        match k.map(|(k, _)| *k) {
+        let k = if next { l.tracks.next_frame(f) } else { l.tracks.prev_frame(f) };
+        match k {
             Some(k) => {
                 self.playing = false;
                 self.frame = k.min(self.project.length - 1);
@@ -627,7 +647,7 @@ impl LeonApp {
                     }
                 }
                 if t != base {
-                    self.project.layers[self.cl].xform.insert(self.frame, t);
+                    self.project.layers[self.cl].tracks.set_changed(self.frame, &t, &base);
                     self.changed = true;
                 }
                 self.gesture = Some(Gesture::Animate { start, base, mode });

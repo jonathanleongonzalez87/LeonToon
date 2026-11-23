@@ -182,9 +182,10 @@ impl LeonApp {
     /// Mueve la cámara en X en el fotograma actual (control «Cámara X»).
     fn set_camera_x(&mut self, x: f32) {
         if let Some(i) = self.project.layers.iter().position(|l| l.kind == LayerKind::Camera && l.visible) {
-            let mut t = self.project.layers[i].transform_at(self.frame);
+            let old = self.project.layers[i].transform_at(self.frame);
+            let mut t = old;
             t.x = x;
-            self.project.layers[i].xform.insert(self.frame, t);
+            self.project.layers[i].tracks.set_changed(self.frame, &t, &old);
         }
     }
 
@@ -249,7 +250,7 @@ impl LeonApp {
                     let f = self.frame;
                     let cl = self.cl;
                     let l = &mut self.project.layers[cl];
-                    l.xform.insert(f, xk);
+                    l.tracks.set_changed(f, &xk, &gd.xk);
                     if gd.axis == 1 {
                         l.depth = depth;
                     }

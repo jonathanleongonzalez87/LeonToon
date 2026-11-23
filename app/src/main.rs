@@ -11,6 +11,7 @@ mod raster;
 mod vector;
 mod render;
 mod stopmotion;
+mod tracks;
 
 use std::path::PathBuf;
 

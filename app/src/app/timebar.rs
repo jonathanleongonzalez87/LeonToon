@@ -199,7 +199,7 @@ impl LeonApp {
             }
         }
         // claves de animación
-        for k in layer.xform.keys() {
+        for k in layer.tracks.frames().iter() {
             if *k < f0 || *k >= f1 {
                 continue;
             }

@@ -1,5 +1,6 @@
 //! Datos del proyecto: escena, capas, fotogramas clave y trazos vectoriales.
 
+use crate::tracks::{Prop, Tracks};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -427,30 +428,37 @@ pub struct XKey {
     pub o: f32,
     #[serde(default)]
     pub i: Interp,
+    /// Punto de anclaje: desplazamiento del centro de giro y escala respecto al centro de la cámara.
+    #[serde(default)]
+    pub ax: f32,
+    #[serde(default)]
+    pub ay: f32,
 }
 
 impl Default for XKey {
     fn default() -> Self {
-        XKey { x: 0.0, y: 0.0, r: 0.0, s: 1.0, o: 1.0, i: Interp::Linear }
+        XKey { x: 0.0, y: 0.0, r: 0.0, s: 1.0, o: 1.0, i: Interp::Linear, ax: 0.0, ay: 0.0 }
     }
 }
 
 impl XKey {
     pub fn is_identity(&self) -> bool {
-        self.x == 0.0 && self.y == 0.0 && self.r == 0.0 && self.s == 1.0 && self.o == 1.0
+        self.x == 0.0 && self.y == 0.0 && self.r == 0.0 && self.s == 1.0 && self.o == 1.0 && self.ax == 0.0 && self.ay == 0.0
     }
-    /// Punto del dibujo → punto de la escena (giro y escala alrededor del centro de la cámara).
+    /// Punto del dibujo → punto de la escena (giro y escala alrededor del punto de anclaje, que por defecto es el centro de la cámara).
     pub fn apply(&self, w: f32, h: f32, p: [f32; 2]) -> [f32; 2] {
-        let (x, y) = ((p[0] - w / 2.0) * self.s, (p[1] - h / 2.0) * self.s);
+        let (cx, cy) = (w / 2.0 + self.ax, h / 2.0 + self.ay);
+        let (x, y) = ((p[0] - cx) * self.s, (p[1] - cy) * self.s);
         let (sn, cs) = self.r.to_radians().sin_cos();
-        [x * cs - y * sn + w / 2.0 + self.x, x * sn + y * cs + h / 2.0 + self.y]
+        [x * cs - y * sn + cx + self.x, x * sn + y * cs + cy + self.y]
     }
     /// Punto de la escena → punto del dibujo (lo contrario de `apply`).
     pub fn invert(&self, w: f32, h: f32, p: [f32; 2]) -> [f32; 2] {
-        let (x, y) = (p[0] - w / 2.0 - self.x, p[1] - h / 2.0 - self.y);
+        let (cx, cy) = (w / 2.0 + self.ax, h / 2.0 + self.ay);
+        let (x, y) = (p[0] - cx - self.x, p[1] - cy - self.y);
         let (sn, cs) = (-self.r).to_radians().sin_cos();
         let s = if self.s.abs() < 1e-4 { 1e-4 } else { self.s };
-        [(x * cs - y * sn) / s + w / 2.0, (x * sn + y * cs) / s + h / 2.0]
+        [(x * cs - y * sn) / s + cx, (x * sn + y * cs) / s + cy]
     }
 }
 
@@ -602,9 +610,12 @@ pub struct Layer {
     /// Fotogramas clave: cada dibujo se mantiene hasta la siguiente clave.
     /// Los dibujos se comparten (Arc) para que deshacer no copie todo el proyecto.
     pub keys: BTreeMap<u32, Arc<Drawing>>,
-    /// Claves de animación (mover, girar, escalar, opacidad).
-    #[serde(default)]
-    pub xform: BTreeMap<u32, XKey>,
+    /// Pistas de animación: una por propiedad (punto de anclaje, posición, escala, rotación y opacidad).
+    #[serde(default, skip_serializing_if = "Tracks::is_empty")]
+    pub tracks: Tracks,
+    /// Solo para leer proyectos anteriores, que guardaban una sola pista con todo junto. Al abrir se convierte en 	racks.
+    #[serde(default, rename = "xform", skip_serializing)]
+    legacy_xform: BTreeMap<u32, XKey>,
     /// Referencia a la carpeta de la secuencia (solo en capas Stop Motion).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stopmotion: Option<crate::stopmotion::SmRef>,
@@ -623,7 +634,8 @@ impl Layer {
             plane: 1,
             depth: 0.0,
             keys: BTreeMap::new(),
-            xform: BTreeMap::new(),
+            tracks: Tracks::default(),
+            legacy_xform: BTreeMap::new(),
             stopmotion: None,
         }
     }
@@ -639,24 +651,16 @@ impl Layer {
 
     /// Transformación de la capa en el fotograma `f`, interpolada entre claves.
     pub fn transform_at(&self, f: u32) -> XKey {
-        let a = self.xform.range(..=f).next_back();
-        let b = self.xform.range(f..).next();
-        match (a, b) {
-            (None, None) => XKey::default(),
-            (None, Some((_, k))) | (Some((_, k)), None) => *k,
-            (Some((ka, a)), Some((kb, b))) => {
-                if ka == kb {
-                    return *a;
-                }
-                let mut t = (f - ka) as f32 / (kb - ka) as f32;
-                match a.i {
-                    Interp::Step => t = 0.0,
-                    Interp::Ease => t = ease(t),
-                    Interp::Linear => {}
-                }
-                let l = |p: f32, q: f32| p + (q - p) * t;
-                XKey { x: l(a.x, b.x), y: l(a.y, b.y), r: l(a.r, b.r), s: l(a.s, b.s), o: l(a.o, b.o), i: a.i }
+        self.tracks.eval(f)
+    }
+
+    /// Convierte las claves de proyectos anteriores (una sola pista) en pistas por propiedad.
+    pub fn migrate_legacy(&mut self) {
+        if !self.legacy_xform.is_empty() {
+            if self.tracks.is_empty() {
+                self.tracks = Tracks::from_legacy(&self.legacy_xform);
             }
+            self.legacy_xform.clear();
         }
     }
 
@@ -665,10 +669,7 @@ impl Layer {
         for (k, d) in moved {
             self.keys.insert(if up { k + 1 } else { k.saturating_sub(1) }, d);
         }
-        let moved: Vec<(u32, XKey)> = self.xform.split_off(&f).into_iter().collect();
-        for (k, x) in moved {
-            self.xform.insert(if up { k + 1 } else { k.saturating_sub(1) }, x);
-        }
+        self.tracks.shift_from(f, up);
     }
 
     pub fn key_at_or_before(&self, f: u32) -> Option<u32> {
@@ -693,9 +694,7 @@ impl Layer {
         if self.keys.contains_key(&f) && self.keys.contains_key(&(f + 1)) {
             self.keys.remove(&f);
         }
-        if self.xform.contains_key(&f) && self.xform.contains_key(&(f + 1)) {
-            self.xform.remove(&f);
-        }
+        self.tracks.remove_frame_keys(f);
         self.shift_from(f + 1, false);
     }
 
@@ -725,7 +724,7 @@ impl Layer {
     /// Duplica la duración de cada dibujo (×2).
     pub fn double_timing(&mut self) {
         self.keys = std::mem::take(&mut self.keys).into_iter().map(|(k, d)| (k * 2, d)).collect();
-        self.xform = std::mem::take(&mut self.xform).into_iter().map(|(k, x)| (k * 2, x)).collect();
+        self.tracks.double();
     }
 
     /// Invierte el orden de los dibujos entre a y b, conservando cuándo empieza cada uno.
@@ -966,8 +965,8 @@ impl Project {
         let mut sd = Drawing::default();
         sd.strokes.push(Stroke::shape(ShapeKind::Ellipse, [1040.0, 60.0], [1180.0, 200.0], [245, 170, 0, 255], 5.0, Some([255, 214, 64, 255])));
         sun.keys.insert(0, Arc::new(sd));
-        sun.xform.insert(0, XKey { i: Interp::Ease, ..XKey::default() });
-        sun.xform.insert(23, XKey { x: -90.0, y: 30.0, ..XKey::default() });
+        sun.tracks.set(Prop::Position, 0, [0.0, 0.0], Interp::Ease);
+        sun.tracks.set(Prop::Position, 23, [-90.0, 30.0], Interp::Linear);
         d.strokes.push(Stroke::shape(ShapeKind::Ellipse, [-200.0, 470.0], [520.0, 760.0], [104, 159, 56, 255], 0.5, Some([139, 195, 74, 255])));
         d.strokes.push(Stroke::shape(ShapeKind::Ellipse, [700.0, 500.0], [1500.0, 760.0], [104, 159, 56, 255], 0.5, Some([124, 179, 66, 255])));
         d.strokes.push(Stroke::shape(ShapeKind::Rect, [0.0, 600.0], [1280.0, 720.0], [93, 64, 55, 255], 0.5, Some([161, 136, 127, 255])));
@@ -1083,13 +1082,8 @@ impl Project {
             }
         }
         for l in &mut self.layers {
-            l.xform.retain(|k, x| {
-                *k < 1_000_000 && [x.x, x.y, x.r, x.s, x.o].iter().all(|v| v.is_finite())
-            });
-            for x in l.xform.values_mut() {
-                x.o = x.o.clamp(0.0, 1.0);
-                x.s = x.s.clamp(-50.0, 50.0);
-            }
+            l.migrate_legacy();
+            l.tracks.sanitize();
         }
         for pn in &mut self.storyboard {
             if !pn.dur.is_finite() {
@@ -1162,17 +1156,49 @@ mod tests {
     #[test]
     fn transform_interpolates_and_inverts() {
         let mut l = Layer::new("a");
-        l.xform.insert(0, XKey::default());
-        l.xform.insert(10, XKey { x: 100.0, r: 90.0, s: 2.0, ..XKey::default() });
+        l.tracks.set_all(0, &XKey::default());
+        l.tracks.set_all(10, &XKey { x: 100.0, r: 90.0, s: 2.0, ..XKey::default() });
         let t = l.transform_at(5);
         assert!((t.x - 50.0).abs() < 1e-3 && (t.s - 1.5).abs() < 1e-3);
         let p = [300.0, 200.0];
         let q = t.invert(1280.0, 720.0, t.apply(1280.0, 720.0, p));
         assert!((q[0] - p[0]).abs() < 1e-2 && (q[1] - p[1]).abs() < 1e-2);
-        l.xform.get_mut(&0).unwrap().i = Interp::Step;
+        l.tracks.set(Prop::Position, 0, [0.0, 0.0], Interp::Step);
         assert_eq!(l.transform_at(5).x, 0.0);
     }
 
+    #[test]
+    fn el_punto_de_anclaje_mueve_el_centro_de_giro_y_se_puede_invertir() {
+        let mut k = XKey { r: 90.0, ..XKey::default() };
+        let (w, h) = (1280.0, 720.0);
+        // Sin anclaje, el centro de la cámara no se mueve al girar.
+        let c = k.apply(w, h, [w / 2.0, h / 2.0]);
+        assert!((c[0] - w / 2.0).abs() < 1e-3 && (c[1] - h / 2.0).abs() < 1e-3);
+        // Con el anclaje desplazado, el punto de anclaje es el que se queda quieto.
+        k.ax = 100.0;
+        k.ay = -50.0;
+        let a = k.apply(w, h, [w / 2.0 + 100.0, h / 2.0 - 50.0]);
+        assert!((a[0] - (w / 2.0 + 100.0)).abs() < 1e-3 && (a[1] - (h / 2.0 - 50.0)).abs() < 1e-3);
+        let p = [300.0, 200.0];
+        let q = k.invert(w, h, k.apply(w, h, p));
+        assert!((q[0] - p[0]).abs() < 1e-2 && (q[1] - p[1]).abs() < 1e-2);
+    }
+
+    #[test]
+    fn una_capa_guardada_con_la_pista_antigua_se_abre_con_pistas_por_propiedad() {
+        let json = r#"{"name":"a","visible":true,"locked":false,"opacity":1.0,"keys":{},
+            "xform":{"0":{"x":0.0,"y":0.0,"r":0.0,"s":1.0,"o":1.0},"8":{"x":30.0,"y":0.0,"r":12.0,"s":1.1,"o":0.5,"i":"Ease"}}}"#;
+        let mut l: Layer = serde_json::from_str(json).unwrap();
+        l.migrate_legacy();
+        assert_eq!(l.tracks.count(), 2);
+        let t = l.transform_at(8);
+        assert_eq!((t.x, t.r, t.o), (30.0, 12.0, 0.5));
+        // Al guardar, ya no se escribe la pista antigua y se lee igual.
+        let out = serde_json::to_string(&l).unwrap();
+        assert!(!out.contains("\"xform\""), "la pista antigua no se vuelve a guardar");
+        let back: Layer = serde_json::from_str(&out).unwrap();
+        assert_eq!(back.tracks, l.tracks);
+    }
     #[test]
     fn xsheet_operations() {
         let mut l = Layer::new("a");

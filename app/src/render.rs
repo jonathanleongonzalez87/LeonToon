@@ -43,10 +43,11 @@ fn paint(c: Rgba) -> Paint<'static> {
 
 /// Transformación de una capa (giro y escala alrededor del centro de la cámara) y luego la escala de salida.
 pub fn layer_transform(t: &XKey, w: f32, h: f32, scale: f32) -> Transform {
-    Transform::from_translate(-w / 2.0, -h / 2.0)
+    let (cx, cy) = (w / 2.0 + t.ax, h / 2.0 + t.ay);
+    Transform::from_translate(-cx, -cy)
         .post_scale(t.s, t.s)
         .post_rotate(t.r)
-        .post_translate(w / 2.0 + t.x, h / 2.0 + t.y)
+        .post_translate(cx + t.x, cy + t.y)
         .post_scale(scale, scale)
 }
 

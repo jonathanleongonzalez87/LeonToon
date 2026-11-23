@@ -71,8 +71,8 @@ fn rich_project() -> Project {
     let d = Arc::new(Drawing { strokes: vec![pressured, open, closed], raster: None });
     vec_layer.keys.insert(0, d.clone());
     vec_layer.keys.insert(6, d);
-    vec_layer.xform.insert(0, XKey::default());
-    vec_layer.xform.insert(8, XKey { x: 30.0, r: 12.0, s: 1.1, ..XKey::default() });
+    vec_layer.tracks.set_all(0, &XKey::default());
+    vec_layer.tracks.set_all(8, &XKey { x: 30.0, r: 12.0, s: 1.1, ..XKey::default() });
     p.layers.push(vec_layer);
 
     let mut bitmap = Layer::new("Píxeles");
@@ -203,7 +203,7 @@ fn projects_saved_by_v0_1_0_open_without_losing_anything() {
         for (new, old) in p.layers.iter().zip(old["layers"].as_array().unwrap()) {
             assert_eq!(new.name, old["name"].as_str().unwrap());
             assert_eq!(new.keys.len(), old["keys"].as_object().unwrap().len(), "{name}: claves de {}", new.name);
-            assert_eq!(new.xform.len(), old["xform"].as_object().map_or(0, |o| o.len()), "{name}: claves de animación de {}", new.name);
+            assert_eq!(new.tracks.count(), old["xform"].as_object().map_or(0, |o| o.len()), "{name}: claves de animación de {}", new.name);
             // Los datos de 3D y el tipo de capa guardados en 0.1.0 se conservan tal cual.
             assert_eq!(new.is3d, old["is3d"].as_bool().unwrap_or(false));
             assert_eq!(new.depth, old["depth"].as_f64().unwrap_or(0.0) as f32);

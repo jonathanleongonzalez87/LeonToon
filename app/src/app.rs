@@ -37,6 +37,7 @@ mod timeline;
 pub use safety::install_panic_hook;
 
 use crate::model::{Drawing, Interp, Layer, LayerKind, Project, Rgba, ShapeKind, Stroke, XKey};
+use crate::tracks::Prop;
 use crate::render;
 use eframe::egui::{
     self, Align2, Color32, FontId, Key, Modifiers, Pos2, Rect, RichText, Sense, Shape, Stroke as EStroke,
@@ -44,7 +45,6 @@ use eframe::egui::{
 };
 use catalog::*;
 use icons::*;
-use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 // ---------- Colores de la interfaz (prototipo de interfaz v0.3 de LeonToon) ----------
@@ -174,7 +174,7 @@ struct Meta {
     size: (u32, u32, u32, u32),
     bg: Rgba,
     palettes: Vec<crate::model::NamedPalette>,
-    layers: Vec<(String, bool, bool, f32, BTreeMap<u32, XKey>)>,
+    layers: Vec<(String, bool, bool, f32, crate::tracks::Tracks)>,
     sb: Vec<[String; 6]>,
     durs: Vec<u32>,
     range: Option<(u32, u32)>,
@@ -185,7 +185,7 @@ fn meta_of(p: &Project) -> Meta {
         size: (p.width, p.height, p.fps, p.length),
         bg: p.background,
         palettes: p.palettes.clone(),
-        layers: p.layers.iter().map(|l| (l.name.clone(), l.visible, l.locked, l.opacity, l.xform.clone())).collect(),
+        layers: p.layers.iter().map(|l| (l.name.clone(), l.visible, l.locked, l.opacity, l.tracks.clone())).collect(),
         sb: p
             .storyboard
             .iter()
@@ -206,7 +206,7 @@ fn apply_meta(p: &mut Project, m: &Meta) {
         l.visible = *v;
         l.locked = *lk;
         l.opacity = *o;
-        l.xform = x.clone();
+        l.tracks = x.clone();
     }
     for ((s, t), d) in p.storyboard.iter_mut().zip(&m.sb).zip(&m.durs) {
         [s.title, s.action, s.dialogue, s.camera, s.trans, s.notes] = t.clone();

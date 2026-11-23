@@ -115,7 +115,7 @@ pub(super) fn gap_of(need: Need, f: &Facts) -> Option<Gap> {
 
 impl LeonApp {
     fn context_facts(&mut self, need: Need) -> Facts {
-        let layers = self.project.layers.iter().map(|l| LayerFact { name: l.name.clone(), kind: l.kind, has_seq: l.stopmotion.is_some(), has_keys: !l.xform.is_empty() }).collect();
+        let layers = self.project.layers.iter().map(|l| LayerFact { name: l.name.clone(), kind: l.kind, has_seq: l.stopmotion.is_some(), has_keys: !l.tracks.is_empty() }).collect();
         let sm_layer = self.sm_room_layer();
         let missing = if need == Need::StopMotionSequence {
             sm_layer.and_then(|li| self.project.layers[li].stopmotion.clone()).and_then(|r| match self.sm_state(&r) {

@@ -162,7 +162,7 @@ impl LeonApp {
             if (t == Tool::Select && self.obj_mode) || t == Tool::RotateObj {
                 let tr = self.layer().transform_at(self.frame);
                 ui.label(RichText::new(format!("x {:.0}  y {:.0}  giro {:.0}°  escala {:.0} %", tr.x, tr.y, tr.r, tr.s * 100.0)).color(MU));
-                if pill(ui, "+ Clave", self.layer().xform.contains_key(&self.frame)).on_hover_text("Insertar clave (K)").clicked() {
+                if pill(ui, "+ Clave", self.layer().tracks.has_key_at(self.frame)).on_hover_text("Insertar clave (K)").clicked() {
                     self.set_xkey(None);
                 }
             }
@@ -229,7 +229,7 @@ impl LeonApp {
                 let kt = if l.kind == LayerKind::Vector { if on { ACCENT } else { ACCENT2 } } else { c32(l.kind.tint()) };
                 p.text(r.left_center() + Vec2::new(10.0, 0.0), Align2::LEFT_CENTER, l.kind.badge(), FontId::proportional(10.0), kt);
                 p.text(r.left_center() + Vec2::new(26.0, 0.0), Align2::LEFT_CENTER, &l.name, FontId::proportional(12.5), if l.visible { TX } else { INK3 });
-                if !l.xform.is_empty() {
+                if !l.tracks.is_empty() {
                     let br = Rect::from_center_size(Pos2::new(r.max.x - 66.0, r.center().y), Vec2::new(22.0, 14.0));
                     p.rect_filled(br, 3.0, BG4);
                     p.text(br.center(), Align2::CENTER_CENTER, "KF", FontId::proportional(9.0), KEY_GOLD);
@@ -363,7 +363,7 @@ impl LeonApp {
         let n = self.project.length.max(2);
         let xs: Vec<f32> = (0..n).map(|f| l.transform_at(f).x).collect();
         let ys: Vec<f32> = (0..n).map(|f| l.transform_at(f).y).collect();
-        let keys: Vec<u32> = l.xform.keys().copied().collect();
+        let keys: Vec<u32> = l.tracks.frames().into_iter().collect();
         let (mn, mx) = xs.iter().chain(ys.iter()).fold((f32::MAX, f32::MIN), |a, v| (a.0.min(*v), a.1.max(*v)));
         let (mn, mx) = if mx - mn < 1.0 { (mn - 10.0, mx + 10.0) } else { (mn - 10.0, mx + 10.0) };
         let (r, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 170.0), Sense::hover());
@@ -396,31 +396,69 @@ impl LeonApp {
         muted(ui, "Edición de tiradores Bézier: pendiente. Cambia la interpolación de cada clave en la sala Interpolación.");
     }
 
+    /// Propiedades animables de la capa, cada una con su cronómetro (activa o desactiva su animación), su valor en este
+    /// cuadro y un rombo si tiene clave aquí. Cambiar un valor pone clave solo en esa propiedad.
     pub(super) fn anim_panel(&mut self, ui: &mut egui::Ui) {
         let f = self.frame;
         let layer = self.layer();
-        let is_key = layer.xform.contains_key(&f);
+        let is_key = layer.tracks.has_key_at(f);
         let mut t = layer.transform_at(f);
+        let animated: Vec<bool> = Prop::ALL.iter().map(|p| layer.tracks.has(*p)).collect();
+        let keyed: Vec<bool> = Prop::ALL.iter().map(|p| layer.tracks.has_prop_key_at(*p, f)).collect();
         muted(ui, format!("Capa «{}» · cuadro {}{}", layer.name, f + 1, if is_key { " · CLAVE" } else { "" }));
         let before = t;
-        egui::Grid::new("anim_grid").num_columns(2).spacing([8.0, 5.0]).show(ui, |ui| {
-            let row = |ui: &mut egui::Ui, label: &str, v: &mut f32, speed: f64| {
-                ui.label(RichText::new(label).color(MU));
-                ui.add(egui::DragValue::new(v).speed(speed).max_decimals(2));
+        let mut toggle: Option<Prop> = None;
+        egui::Grid::new("anim_grid").num_columns(3).spacing([6.0, 5.0]).show(ui, |ui| {
+            for (n, p) in Prop::ALL.iter().enumerate() {
+                // Cronómetro: naranja si la propiedad está animada.
+                let (r, resp) = ui.allocate_exact_size(Vec2::splat(18.0), Sense::click());
+                let col = if animated[n] { ACCENT } else if resp.hovered() { TX } else { MU };
+                let c = r.center() + Vec2::new(0.0, 1.0);
+                ui.painter().circle_stroke(c, 5.5, stk(1.5, col));
+                ui.painter().line_segment([c, c + Vec2::new(2.5, -2.5)], stk(1.5, col));
+                ui.painter().line_segment([c + Vec2::new(-1.5, -7.0), c + Vec2::new(1.5, -7.0)], stk(1.5, col));
+                if resp.on_hover_text(if animated[n] { "Cronómetro activo: pulsa para dejar de animar esta propiedad (borra sus claves)" } else { "Pulsa para animar esta propiedad desde este cuadro" }).clicked() {
+                    toggle = Some(*p);
+                }
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 3.0;
+                    ui.label(RichText::new(if *p == Prop::Anchor { "Anclaje" } else { p.name() }).color(MU));
+                    if keyed[n] {
+                        ui.label(RichText::new("◆").size(10.0).color(KEY_GOLD));
+                    }
+                });
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 3.0;
+                    match p {
+                        Prop::Anchor => {
+                            ui.add(egui::DragValue::new(&mut t.ax).speed(1.0).max_decimals(1).prefix("x "));
+                            ui.add(egui::DragValue::new(&mut t.ay).speed(1.0).max_decimals(1).prefix("y "));
+                        }
+                        Prop::Position => {
+                            ui.add(egui::DragValue::new(&mut t.x).speed(1.0).max_decimals(1).prefix("x "));
+                            ui.add(egui::DragValue::new(&mut t.y).speed(1.0).max_decimals(1).prefix("y "));
+                        }
+                        Prop::Scale => {
+                            ui.add(egui::DragValue::new(&mut t.s).speed(0.01).max_decimals(2));
+                        }
+                        Prop::Rotation => {
+                            ui.add(egui::DragValue::new(&mut t.r).speed(1.0).max_decimals(1).suffix("°"));
+                        }
+                        Prop::Opacity => {
+                            ui.add(egui::DragValue::new(&mut t.o).speed(0.01).max_decimals(2));
+                        }
+                    }
+                });
                 ui.end_row();
-            };
-            row(ui, "Posición X", &mut t.x, 1.0);
-            row(ui, "Posición Y", &mut t.y, 1.0);
-            row(ui, "Rotación °", &mut t.r, 1.0);
-            row(ui, "Escala", &mut t.s, 0.01);
-            row(ui, "Opacidad", &mut t.o, 0.01);
+            }
+            ui.label("");
             ui.label(RichText::new("Interpolación").color(MU));
             let names = |i: Interp| match i {
                 Interp::Linear => "Lineal",
                 Interp::Ease => "Suave",
                 Interp::Step => "Escalón",
             };
-            egui::ComboBox::from_id_salt("interp").selected_text(names(t.i)).show_ui(ui, |ui| {
+            egui::ComboBox::from_id_salt("interp").selected_text(names(t.i)).width(100.0).show_ui(ui, |ui| {
                 for i in [Interp::Linear, Interp::Ease, Interp::Step] {
                     ui.selectable_value(&mut t.i, i, names(i));
                 }
@@ -431,18 +469,20 @@ impl LeonApp {
         if t != before {
             self.set_xkey(Some(t));
         }
+        if let Some(p) = toggle {
+            self.toggle_stopwatch(p);
+        }
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 4.0;
-            if pill(ui, "+ Clave", is_key).on_hover_text("Insertar clave en este cuadro (K)").clicked() {
+            if pill(ui, "+ Clave", is_key).on_hover_text("Insertar clave en todas las propiedades en este cuadro (K)").clicked() {
                 self.set_xkey(None);
             }
             if pill(ui, "Borrar clave", false).clicked() {
                 self.delete_xkey();
             }
         });
-        muted(ui, "En modo objeto (Tab), Seleccionar (V) mueve la capa y Rotación (W) la gira; cada cambio crea una clave.");
+        muted(ui, "En modo objeto (Tab), Seleccionar (V) mueve la capa y Rotación (W) la gira; cada cambio crea clave solo en la propiedad que cambia.");
     }
-
     pub(super) fn column_panel(&mut self, ui: &mut egui::Ui) {
         let cl = self.cl;
         let layer = &mut self.project.layers[cl];
