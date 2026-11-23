@@ -93,6 +93,9 @@ enum Act {
     Leave(usize),
     Ungroup(usize),
     Drop(usize, crate::model::LayerDrop),
+    Enter(usize),
+    Precompose(usize),
+    Unprecompose(usize),
 }
 
 /// Lo que se necesita saber de una capa para dibujar su fila sin tener el proyecto prestado.
@@ -111,6 +114,7 @@ struct Info {
     animated: [bool; 6],
     key_frames: Vec<u32>,
     is_col: bool,
+    is_precomp: bool,
     is3d: bool,
     /// Cuántas colecciones envuelven a la capa (sangrado).
     depth: usize,
@@ -250,6 +254,8 @@ impl LeonApp {
         if pill(&mut h, cols, false).on_hover_text("Alterna las columnas (F4 con el puntero encima)").clicked() {
             self.mt.cols = (self.mt.cols + 1) % 3;
         }
+        // Dentro de una precomposición: la ruta de navegación y el botón para salir.
+        self.breadcrumb_ui(&mut h);
         h.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.spacing_mut().item_spacing.x = 4.0;
             ui.label(RichText::new(format!("{} / {}", self.frame + 1, self.project.length)).size(11.5).color(TX).strong());
@@ -301,6 +307,7 @@ impl LeonApp {
                     animated: Prop::ALL.map(|p| l.tracks.has(p)),
                     key_frames: l.tracks.frames().into_iter().collect(),
                     is_col: l.kind == LayerKind::Collection,
+                    is_precomp: l.kind == LayerKind::Precomp,
                     is3d: l.is3d || l.kind == LayerKind::Camera,
                     depth: self.project.depth_of(li),
                     collapsed: l.collapsed,
@@ -543,6 +550,9 @@ impl LeonApp {
                         let (ctrl, shift) = ui.input(|i| (i.modifiers.command, i.modifiers.shift));
                         acts.push(Act::Click(li, ctrl, shift));
                     }
+                    if name_resp.double_clicked() && inf.is_precomp {
+                        acts.push(Act::Enter(li));
+                    }
                     if name_resp.drag_started() {
                         acts.push(Act::Select(li));
                         ui.data_mut(|d| d.insert_temp(ui.id().with("mt_layer_drag"), li));
@@ -560,6 +570,20 @@ impl LeonApp {
                                     acts.push(Act::MoveTo(li, ci));
                                     ui.close_menu();
                                 }
+                            }
+                        }
+                        if !inf.is_col && inf.kind != LayerKind::Camera && ui.button("Precomponer   Ctrl+Mayús+C").clicked() {
+                            acts.push(Act::Precompose(li));
+                            ui.close_menu();
+                        }
+                        if inf.is_precomp {
+                            if ui.button("Entrar en la precomposición   Tab").clicked() {
+                                acts.push(Act::Enter(li));
+                                ui.close_menu();
+                            }
+                            if ui.button("Deshacer precomposición").clicked() {
+                                acts.push(Act::Unprecompose(li));
+                                ui.close_menu();
                             }
                         }
                         if inf.depth > 0 && ui.button("Sacar de la colección").clicked() {
@@ -858,6 +882,17 @@ impl LeonApp {
             Act::BarShift(li, d) => {
                 self.project.layers[li].shift_time(d);
             }
+            Act::Enter(li) => {
+                self.cl = li.min(n.saturating_sub(1));
+                self.enter_precomp(li);
+            }
+            Act::Precompose(li) => {
+                if !self.selected_layers().contains(&li) {
+                    self.click_layer(li.min(n.saturating_sub(1)), false, false, &[]);
+                }
+                self.precompose_current();
+            }
+            Act::Unprecompose(li) => self.unprecompose_layer(li),
             Act::Click(li, ctrl, shift) => {
                 let order: Vec<usize> = self.mt_rows().iter().filter_map(|r| if let Row::Layer(l) = r { Some(*l) } else { None }).collect();
                 self.click_layer(li, ctrl, shift, &order);

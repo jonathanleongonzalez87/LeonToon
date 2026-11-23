@@ -588,6 +588,19 @@ impl LeonApp {
             if item(ui, "Eliminar capa", "") {
                 self.delete_layer();
             }
+            if item(ui, "Precomponer", "Ctrl+Mayús+C") {
+                self.precompose_current();
+            }
+            if item(ui, "Entrar en la capa", "Tab") {
+                self.enter_precomp(self.cl);
+            }
+            if item(ui, "Salir de la precomposición", "Mayús+Tab") {
+                self.exit_precomp();
+            }
+            if item(ui, "Deshacer precomposición", "") {
+                self.unprecompose_layer(self.cl);
+            }
+            ui.separator();
             if item(ui, "Agrupar en colección", "Ctrl+G") {
                 self.group_current();
             }

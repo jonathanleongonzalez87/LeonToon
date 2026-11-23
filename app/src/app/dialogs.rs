@@ -30,7 +30,8 @@ impl LeonApp {
                     ui.set_width(230.0);
                     ui.label(RichText::new("Agregar capa").size(11.5).color(INK3));
                     ui.add_space(2.0);
-                    for kind in LayerKind::ALL {
+                    // La precomposición no se agrega vacía: se crea con «Precomponer» sobre las capas elegidas.
+                    for kind in LayerKind::ALL.into_iter().filter(|k| *k != LayerKind::Precomp) {
                         let (r, resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 28.0), Sense::click());
                         if resp.hovered() {
                             ui.painter().rect_filled(r, 5.0, BG4);

@@ -84,6 +84,14 @@ pub fn install_panic_hook() {
 /// Escribe el proyecto de forma segura: archivo temporal, comprobación, copia de la
 /// versión anterior (.bak) y sustitución final. Si algo falla, el archivo anterior queda intacto.
 pub fn write_project(p: &Project, path: &Path, backup: bool) -> Result<(), String> {
+    // Siempre se guarda la composición principal, aunque se esté editando una precomposición.
+    let root;
+    let p = if p.in_comp() {
+        root = p.root_clone();
+        &root
+    } else {
+        p
+    };
     let json = serde_json::to_vec(p).map_err(|e| e.to_string())?;
     if let Some(dir) = path.parent() {
         if !dir.as_os_str().is_empty() {

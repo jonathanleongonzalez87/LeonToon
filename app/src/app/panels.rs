@@ -208,6 +208,8 @@ impl LeonApp {
 
     /// La lista de capas con sus botones (sin cabecera: sirve para el área de capas y para el editor «Capas»).
     fn layers_body(&mut self, ui: &mut egui::Ui) {
+        // Dentro de una precomposición: la ruta de navegación y el botón para salir.
+        self.breadcrumb_ui(ui);
         let foot_h = 54.0;
         let list_h = (ui.available_height() - foot_h).max(30.0);
         let mut pick = None;
@@ -222,6 +224,9 @@ impl LeonApp {
             Ungroup(usize),
             Fold(usize),
             Drop(usize, crate::model::LayerDrop),
+            Enter(usize),
+            Precompose(usize),
+            Unprecompose(usize),
         }
         let mut lacts: Vec<LAct> = Vec::new();
         // Selección múltiple: Ctrl + clic suma o quita; Mayús + clic elige el rango, en el orden en que se ve la lista.
@@ -318,7 +323,11 @@ impl LeonApp {
                     }
                 }
                 if resp.double_clicked() {
-                    self.renaming = None;
+                    if l.kind == LayerKind::Precomp {
+                        lacts.push(LAct::Enter(i));
+                    } else {
+                        self.renaming = None;
+                    }
                 }
                 resp.context_menu(|ui| {
                     ui.label(RichText::new(&l.name).strong());
@@ -333,6 +342,20 @@ impl LeonApp {
                                 lacts.push(LAct::MoveTo(i, *ci));
                                 ui.close_menu();
                             }
+                        }
+                    }
+                    if l.kind != LayerKind::Camera && l.kind != LayerKind::Collection && ui.button("Precomponer   Ctrl+Mayús+C").clicked() {
+                        lacts.push(LAct::Precompose(i));
+                        ui.close_menu();
+                    }
+                    if l.kind == LayerKind::Precomp {
+                        if ui.button("Entrar en la precomposición   Tab").clicked() {
+                            lacts.push(LAct::Enter(i));
+                            ui.close_menu();
+                        }
+                        if ui.button("Deshacer precomposición").clicked() {
+                            lacts.push(LAct::Unprecompose(i));
+                            ui.close_menu();
                         }
                     }
                     if member_of.is_some() && ui.button("Sacar de la colección").clicked() {
@@ -418,6 +441,17 @@ impl LeonApp {
                         l.collapsed = !l.collapsed;
                     }
                 }
+                LAct::Enter(i) => {
+                    self.cl = i;
+                    self.enter_precomp(i);
+                }
+                LAct::Precompose(i) => {
+                    if !self.selected_layers().contains(&i) {
+                        self.click_layer(i, false, false, &[]);
+                    }
+                    self.precompose_current();
+                }
+                LAct::Unprecompose(i) => self.unprecompose_layer(i),
                 LAct::Drop(src, d) => {
                     self.checkpoint();
                     self.lsel.clear();

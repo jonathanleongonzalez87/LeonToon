@@ -117,8 +117,9 @@ impl LeonApp {
         self.paint_pen_overlay(&painter, origin, z);
 
         // Rótulo (como «Modo edición | Pelota | 1» del prototipo)
+        let path = if self.project.in_comp() { format!("{}  |  ", self.project.comp_path().join(" › ")) } else { String::new() };
         let hud = format!(
-            "{}  |  {}  |  {}{}",
+            "{path}{}  |  {}  |  {}{}",
             if self.obj_mode { "Modo objeto" } else { "Modo edición" },
             self.layer().name,
             self.frame + 1,
@@ -205,7 +206,7 @@ impl LeonApp {
         let blended = self.project.has_blend_at(f);
         if blended {
             let scale = (z * painter.ctx().pixels_per_point()).clamp(0.05, 3.0);
-            if let Some(pm) = crate::render::render_frame_opts(&self.project, f, scale, true) {
+            if let Some(pm) = crate::render::render_scene_opts(&self.project, f, scale, true) {
                 let img = egui::ColorImage::from_rgba_premultiplied([pm.width() as usize, pm.height() as usize], pm.data());
                 let tex = painter.ctx().load_texture("escena_fusionada", img, egui::TextureOptions::LINEAR);
                 painter.image(tex.id(), cam, Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)), Color32::WHITE.gamma_multiply(op));

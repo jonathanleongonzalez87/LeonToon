@@ -133,7 +133,20 @@ fn blend_mode(b: crate::model::Blend) -> BlendMode {
     }
 }
 
+/// La composición **principal** del proyecto, aunque se esté editando una precomposición (es lo que se exporta).
 pub fn render_frame_opts(p: &Project, frame: u32, scale: f32, transparent: bool) -> Option<Pixmap> {
+    if p.in_comp() {
+        return render_scene_opts(&p.root_clone(), frame, scale, transparent);
+    }
+    render_scene_opts(p, frame, scale, transparent)
+}
+
+/// La composición que se está editando ahora (la del visor): la principal o la precomposición abierta.
+pub fn render_scene_opts(p: &Project, frame: u32, scale: f32, transparent: bool) -> Option<Pixmap> {
+    render_scene_depth(p, frame, scale, transparent, 0)
+}
+
+fn render_scene_depth(p: &Project, frame: u32, scale: f32, transparent: bool, depth: u8) -> Option<Pixmap> {
     let (fw, fh) = (p.width as f32, p.height as f32);
     let w = ((fw * scale).round() as u32).max(1);
     let h = ((fh * scale).round() as u32).max(1);
@@ -148,9 +161,9 @@ pub fn render_frame_opts(p: &Project, frame: u32, scale: f32, transparent: bool)
             continue; // lo dibuja su colección
         }
         if layer.kind == LayerKind::Collection {
-            draw_group(&mut pm, p, li, frame, scale, any_solo)?;
+            draw_group(&mut pm, p, li, frame, scale, any_solo, depth)?;
         } else {
-            draw_layer(&mut pm, p, li, frame, scale, any_solo);
+            draw_layer(&mut pm, p, li, frame, scale, any_solo, depth);
         }
     }
     Some(pm)
@@ -158,7 +171,7 @@ pub fn render_frame_opts(p: &Project, frame: u32, scale: f32, transparent: bool)
 
 /// Dibuja una colección: sus capas (y las colecciones que contiene, a cualquier profundidad) se componen aparte y el conjunto se
 /// mezcla con su opacidad y su modo de fusión.
-fn draw_group(pm: &mut Pixmap, p: &Project, ci: usize, frame: u32, scale: f32, any_solo: bool) -> Option<()> {
+fn draw_group(pm: &mut Pixmap, p: &Project, ci: usize, frame: u32, scale: f32, any_solo: bool, depth: u8) -> Option<()> {
     let layer = &p.layers[ci];
     if !layer.visible || !layer.active_at(frame) {
         return Some(());
@@ -170,9 +183,9 @@ fn draw_group(pm: &mut Pixmap, p: &Project, ci: usize, frame: u32, scale: f32, a
     let mut gp = Pixmap::new(pm.width(), pm.height())?;
     for m in p.members_of(ci).into_iter().rev() {
         if p.layers[m].kind == LayerKind::Collection {
-            draw_group(&mut gp, p, m, frame, scale, any_solo)?;
+            draw_group(&mut gp, p, m, frame, scale, any_solo, depth)?;
         } else {
-            draw_layer(&mut gp, p, m, frame, scale, any_solo);
+            draw_layer(&mut gp, p, m, frame, scale, any_solo, depth);
         }
     }
     let pp = PixmapPaint { opacity: op, blend_mode: blend_mode(layer.blend), ..Default::default() };
@@ -180,9 +193,40 @@ fn draw_group(pm: &mut Pixmap, p: &Project, ci: usize, frame: u32, scale: f32, a
     Some(())
 }
 
-/// Dibuja una capa (con su transformación, la de sus madres y la de su colección) sobre `pm`.
-fn draw_layer(pm: &mut Pixmap, p: &Project, li: usize, frame: u32, scale: f32, any_solo: bool) -> Option<()> {
+/// Dibuja una precomposición: su contenido se compone aparte, en su propio tiempo (el cuadro de fuera menos la entrada de su
+/// barra), y se mezcla con la transformación, la opacidad y el modo de fusión de la capa. Con un tope de niveles por si un archivo
+/// roto trae una precomposición que se contiene a sí misma.
+fn draw_precomp(pm: &mut Pixmap, p: &Project, li: usize, frame: u32, scale: f32, any_solo: bool, depth: u8) -> Option<()> {
     let layer = &p.layers[li];
+    let t = p.effective_at(li, frame);
+    let op = (layer.opacity * t.o).clamp(0.0, 1.0);
+    if !p.shows(li, frame, any_solo) || op <= 0.0 || depth >= 8 {
+        return Some(());
+    }
+    let Some(comp) = layer.precomp.and_then(|id| p.comp(id)) else { return Some(()) };
+    let local = frame.saturating_sub(layer.in_f);
+    if local >= comp.length {
+        return Some(());
+    }
+    let mut sub = p.shell();
+    sub.layers = comp.layers.clone();
+    sub.length = comp.length;
+    sub.comps = p.comps.clone();
+    let inner = render_scene_depth(&sub, local, scale, true, depth + 1)?;
+    let (fw, fh) = (p.width as f32, p.height as f32);
+    // El contenido ya está en píxeles: la transformación de la capa va de píxeles a escena y otra vez a píxeles.
+    let tr = if t.is_identity() { Transform::identity() } else { layer_transform(&t, fw, fh, scale).pre_scale(1.0 / scale, 1.0 / scale) };
+    let pp = PixmapPaint { opacity: op, blend_mode: blend_mode(layer.blend), quality: FilterQuality::Bilinear, ..Default::default() };
+    pm.draw_pixmap(0, 0, inner.as_ref(), &pp, tr, None);
+    Some(())
+}
+
+/// Dibuja una capa (con su transformación, la de sus madres y la de su colección) sobre `pm`.
+fn draw_layer(pm: &mut Pixmap, p: &Project, li: usize, frame: u32, scale: f32, any_solo: bool, depth: u8) -> Option<()> {
+    let layer = &p.layers[li];
+    if layer.kind == LayerKind::Precomp {
+        return draw_precomp(pm, p, li, frame, scale, any_solo, depth);
+    }
     let (fw, fh) = (p.width as f32, p.height as f32);
     let (w, h) = (pm.width(), pm.height());
     let t = p.effective_at(li, frame);

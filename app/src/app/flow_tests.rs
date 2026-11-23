@@ -82,7 +82,7 @@ fn rich_project() -> Project {
     bitmap.keys.insert(0, Arc::new(Drawing { strokes: Vec::new(), raster: Some(Arc::new(r)) }));
     p.layers.push(bitmap);
 
-    for (i, k) in [LayerKind::Solid, LayerKind::Null, LayerKind::Text, LayerKind::Light, LayerKind::Camera, LayerKind::StopMotion, LayerKind::Collection].into_iter().enumerate() {
+    for (i, k) in [LayerKind::Solid, LayerKind::Null, LayerKind::Text, LayerKind::Light, LayerKind::Camera, LayerKind::StopMotion, LayerKind::Collection, LayerKind::Precomp].into_iter().enumerate() {
         let mut l = Layer::new(format!("Capa {k:?}"));
         l.kind = k;
         if k == LayerKind::StopMotion {
@@ -227,8 +227,8 @@ fn old_projects_keep_their_details_and_render() {
     let p = open_bytes(V010_COMPLETO, "detalles");
     assert_eq!(p.range, Some((2, 18)));
     let kinds: Vec<LayerKind> = p.layers.iter().map(|l| l.kind).collect();
-    // Las capas Stop Motion y las colecciones no existían en 0.1.0: el resto de clases sí están.
-    for k in LayerKind::ALL.into_iter().filter(|k| !matches!(k, LayerKind::StopMotion | LayerKind::Collection)) {
+    // Las capas Stop Motion, las colecciones y las precomposiciones no existían en 0.1.0: el resto de clases sí están.
+    for k in LayerKind::ALL.into_iter().filter(|k| !matches!(k, LayerKind::StopMotion | LayerKind::Collection | LayerKind::Precomp)) {
         assert!(kinds.contains(&k), "falta una capa {k:?} del proyecto viejo");
     }
     assert!(p.layers.iter().all(|l| l.stopmotion.is_none()), "un proyecto viejo no trae secuencias Stop Motion");
@@ -859,4 +859,53 @@ fn una_coleccion_dentro_de_otra_compone_cada_nivel_como_unidad() {
     // Ocultar la externa oculta todo lo que hay dentro, a cualquier nivel.
     p.layers[0].visible = false;
     assert_eq!(center_pixel(&p), [200, 100, 50]);
+}
+
+#[test]
+fn precomponer_no_cambia_lo_que_se_ve_y_la_barra_mueve_el_contenido_en_el_tiempo() {
+    let mut p = Project::blank(1280, 720, 24, 8);
+    p.background = [200, 100, 50, 255];
+    p.layers = vec![gray_sheet("clara", 220), gray_sheet("gris", 100)];
+    p.layers[0].opacity = 0.5;
+    let antes = center_pixel(&p);
+    let pi = p.precompose(&[0, 1]).unwrap();
+    assert_eq!(center_pixel(&p), antes, "precomponer deja la imagen igual");
+    // Con la opacidad de la capa de precomposición se mezcla el conjunto con el fondo.
+    p.layers[pi].opacity = 0.5;
+    let m = center_pixel(&p);
+    assert!((m[0] as i32 - ((antes[0] as i32 + 200) / 2)).abs() <= 2, "opacidad de la precomposición: {m:?}");
+    p.layers[pi].opacity = 1.0;
+    // La barra decide cuándo empieza el contenido: antes del cuadro 3 no hay nada.
+    p.layers[pi].in_f = 3;
+    let pm = |f| {
+        let img = crate::render::render_frame(&p, f, 0.25).unwrap();
+        let px = img.pixel(img.width() / 2, img.height() / 2).unwrap();
+        [px.red(), px.green(), px.blue()]
+    };
+    assert_eq!(pm(2), [200, 100, 50]);
+    assert_eq!(pm(3), antes);
+}
+
+#[test]
+fn guardar_dentro_de_una_precomposicion_guarda_la_composicion_principal() {
+    let mut p = Project::blank(1280, 720, 24, 8);
+    p.layers = vec![gray_sheet("a", 10), gray_sheet("b", 20), gray_sheet("c", 30)];
+    let pi = p.precompose(&[1, 2]).unwrap();
+    assert!(p.enter_comp(pi, 0, 0));
+    p.layers[0].name = "editada dentro".into();
+    let dir = temp_dir("precomp_guardado");
+    let path = dir.join("p.ltoon");
+    write_project(&p, &path, false).unwrap();
+    let back = read_project(&path).unwrap();
+    assert!(!back.in_comp());
+    assert_eq!(back.layers.iter().map(|l| l.name.as_str()).collect::<Vec<_>>(), vec!["a", "Precomp 1"]);
+    assert_eq!(back.comps.len(), 1);
+    assert_eq!(back.comps[0].layers[0].name, "editada dentro", "lo editado dentro también se guarda");
+    // El proyecto en memoria sigue dentro: guardar no te saca.
+    assert!(p.in_comp());
+    // La exportación también es la de la composición principal.
+    let root = crate::render::render_frame(&p, 0, 0.25).unwrap();
+    let again = crate::render::render_frame(&back, 0, 0.25).unwrap();
+    assert_eq!(root.data(), again.data());
+    finish(&dir);
 }

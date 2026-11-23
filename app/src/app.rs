@@ -25,6 +25,7 @@ mod panelsize;
 mod context;
 mod layersel;
 mod montage;
+mod precomp;
 mod smcap;
 mod smdragon;
 mod slots;
@@ -559,6 +560,16 @@ impl LeonApp {
                 // Con LEONTOON_COLECCION=2, además, esa colección se mete en otra (anidado).
                 if std::env::var("LEONTOON_COLECCION").as_deref() == Ok("2") {
                     project.group_layer(ci);
+                }
+            }
+        }
+        // Para capturas de las precomposiciones: LEONTOON_PRECOMP=1 precompone las dos capas de arriba; con `dentro`, además entra.
+        if let Ok(mode) = std::env::var("LEONTOON_PRECOMP") {
+            if project.layers.len() >= 3 {
+                if let Some(pi) = project.precompose(&[0, 1]) {
+                    if mode == "dentro" {
+                        project.enter_comp(pi, 0, 0);
+                    }
                 }
             }
         }

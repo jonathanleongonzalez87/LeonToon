@@ -583,10 +583,12 @@ pub enum LayerKind {
     StopMotion,
     /// Colección (grupo o carpeta): organiza capas de una misma composición, sin tiempo propio (ver `Layer::group`).
     Collection,
+    /// Precomposición: su contenido es otra composición (ver `Layer::precomp`), con sus propias capas y su duración.
+    Precomp,
 }
 
 impl LayerKind {
-    pub const ALL: [LayerKind; 9] = [
+    pub const ALL: [LayerKind; 10] = [
         LayerKind::Vector,
         LayerKind::Bitmap,
         LayerKind::Solid,
@@ -596,6 +598,7 @@ impl LayerKind {
         LayerKind::Camera,
         LayerKind::StopMotion,
         LayerKind::Collection,
+        LayerKind::Precomp,
     ];
     pub fn label(self) -> &'static str {
         match self {
@@ -608,6 +611,7 @@ impl LayerKind {
             LayerKind::Camera => "Cámara",
             LayerKind::StopMotion => "Stop Motion",
             LayerKind::Collection => "Colección",
+            LayerKind::Precomp => "Precomposición",
         }
     }
     /// Letra de la etiqueta en la lista de capas.
@@ -622,6 +626,7 @@ impl LayerKind {
             LayerKind::Camera => "C",
             LayerKind::StopMotion => "M",
             LayerKind::Collection => "G",
+            LayerKind::Precomp => "P",
         }
     }
     /// Color de etiqueta del prototipo.
@@ -635,6 +640,7 @@ impl LayerKind {
             LayerKind::Light => [0xf2, 0xd2, 0x7a, 255],
             LayerKind::StopMotion => [0x7a, 0xc9, 0xa4, 255],
             LayerKind::Collection => [0xa8, 0xcf, 0x8f, 255],
+            LayerKind::Precomp => [0xf0, 0xb0, 0x80, 255],
         }
     }
     /// Se crean y se guardan, pero aún no se dibujan ni actúan en la escena (necesitan 3D o texto).
@@ -703,6 +709,9 @@ pub struct Layer {
     /// Colección plegada en las listas (sus capas se siguen dibujando).
     #[serde(default, skip_serializing_if = "is_false")]
     pub collapsed: bool,
+    /// Composición que contiene una capa de tipo Precomposición (su `id`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub precomp: Option<u64>,
 }
 
 fn is_false(v: &bool) -> bool {
@@ -742,6 +751,7 @@ impl Layer {
             parent: None,
             group: None,
             collapsed: false,
+            precomp: None,
         }
     }
 
@@ -996,6 +1006,34 @@ pub struct Project {
     /// Caché de las secuencias Stop Motion abiertas (no se guarda).
     #[serde(skip)]
     pub sm: crate::stopmotion::SmCache,
+    /// Composiciones de las precomposiciones (la principal es `layers`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub comps: Vec<Composition>,
+    /// Precomposiciones abiertas para editarlas, de fuera adentro (no se guarda).
+    #[serde(skip)]
+    pub stack: Vec<Level>,
+}
+
+/// Una composición guardada: las capas de una precomposición y su duración (mismo tamaño y velocidad que el proyecto).
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[serde(default)]
+pub struct Composition {
+    pub id: u64,
+    pub name: String,
+    pub layers: Vec<Layer>,
+    pub length: u32,
+}
+
+/// Un nivel de la pila de «entrar en la capa»: lo que había fuera de la composición que se está editando. Mientras se edita una
+/// precomposición, sus capas ocupan `Project::layers` y las de fuera esperan aquí (no se guarda: se guarda siempre la principal).
+#[derive(Clone, Debug)]
+pub struct Level {
+    pub comp_id: u64,
+    pub layers: Vec<Layer>,
+    pub length: u32,
+    /// Capa y cuadro que había elegidos fuera, para volver a ellos al salir.
+    pub cl: usize,
+    pub frame: u32,
 }
 
 /// Una pestaña de sala guardada en el proyecto.
@@ -1092,8 +1130,36 @@ impl Project {
             brush_state: None,
             base_dir: None,
             sm: Default::default(),
+            comps: Vec::new(),
+            stack: Vec::new(),
         }
     }
+
+    /// Una copia con los mismos ajustes (tamaño, velocidad, fondo y caché de Stop Motion) pero sin capas ni composiciones.
+    pub fn shell(&self) -> Project {
+        Project {
+            width: self.width,
+            height: self.height,
+            fps: self.fps,
+            length: self.length,
+            background: self.background,
+            layers: Vec::new(),
+            palette: Vec::new(),
+            storyboard: Vec::new(),
+            range: None,
+            palettes: Vec::new(),
+            room_set: String::new(),
+            rooms: Vec::new(),
+            brush_presets: Vec::new(),
+            brush_images: Vec::new(),
+            brush_state: None,
+            base_dir: self.base_dir.clone(),
+            sm: self.sm.clone(),
+            comps: Vec::new(),
+            stack: Vec::new(),
+        }
+    }
+
 
     /// Índice de la capa con ese uid.
     pub fn index_of_uid(&self, uid: u64) -> Option<usize> {
@@ -1256,7 +1322,8 @@ impl Project {
     pub fn has_blend_at(&self, f: u32) -> bool {
         let any_solo = self.layers.iter().any(|l| l.solo);
         let shown: Vec<usize> = (0..self.layers.len()).filter(|&i| self.shows(i, f, any_solo)).collect();
-        if shown.iter().any(|&i| self.layers[i].blend != Blend::Normal) {
+        // Una precomposición se dibuja componiendo su contenido aparte, igual que las colecciones con fusión.
+        if shown.iter().any(|&i| self.layers[i].blend != Blend::Normal || self.layers[i].kind == LayerKind::Precomp) {
             return true;
         }
         (0..self.layers.len()).any(|c| {
@@ -1475,6 +1542,179 @@ impl Project {
         self.layers = order.iter().map(|&i| old_layers[i].clone()).collect();
         map
     }
+    // ---------- Precomposiciones ----------
+
+    /// La composición guardada con ese id (no está si es una que se está editando ahora mismo).
+    pub fn comp(&self, id: u64) -> Option<&Composition> {
+        self.comps.iter().find(|c| c.id == id)
+    }
+
+    fn next_comp_id(&self) -> u64 {
+        self.comps.iter().map(|c| c.id).chain(self.stack.iter().map(|l| l.comp_id)).max().unwrap_or(0) + 1
+    }
+
+    /// ¿Se está editando una precomposición (y no la composición principal)?
+    pub fn in_comp(&self) -> bool {
+        !self.stack.is_empty()
+    }
+
+    /// El camino hasta lo que se está editando: «Escena» y cada precomposición abierta.
+    pub fn comp_path(&self) -> Vec<String> {
+        let mut v = vec!["Escena".to_string()];
+        for lv in &self.stack {
+            v.push(self.comp(lv.comp_id).map_or_else(|| self.open_comp_name(lv.comp_id), |c| c.name.clone()));
+        }
+        v
+    }
+
+    /// El nombre de una composición abierta: su capa en la composición de fuera.
+    fn open_comp_name(&self, id: u64) -> String {
+        for (k, lv) in self.stack.iter().enumerate() {
+            if let Some(l) = lv.layers.iter().find(|l| l.precomp == Some(id)) {
+                let _ = k;
+                return l.name.clone();
+            }
+        }
+        for l in &self.layers {
+            if l.precomp == Some(id) {
+                return l.name.clone();
+            }
+        }
+        "Precomposición".into()
+    }
+
+    /// Entra a editar la precomposición de la capa li: sus capas pasan a ser ``layers`` y las de fuera esperan en la pila.
+    /// ``cl`` y ``frame`` son lo que había elegido fuera, para volver a ello. Devuelve false si la capa no es una
+    /// precomposición que se pueda abrir.
+    pub fn enter_comp(&mut self, li: usize, cl: usize, frame: u32) -> bool {
+        let Some(id) = self.layers.get(li).filter(|l| l.kind == LayerKind::Precomp).and_then(|l| l.precomp) else { return false };
+        let Some(ci) = self.comps.iter().position(|c| c.id == id) else { return false };
+        if self.stack.iter().any(|l| l.comp_id == id) {
+            return false;
+        }
+        let inner = std::mem::take(&mut self.comps[ci].layers);
+        let len = self.comps[ci].length.max(1);
+        let outer = std::mem::replace(&mut self.layers, inner);
+        self.stack.push(Level { comp_id: id, layers: outer, length: self.length, cl, frame });
+        self.length = len;
+        if self.layers.is_empty() {
+            self.layers.push(Layer::new("Capa 1"));
+        }
+        true
+    }
+
+    /// Sale de la precomposición que se edita: lo hecho dentro se guarda en su composición y vuelven las capas de fuera.
+    /// Devuelve la capa y el cuadro que había elegidos fuera.
+    pub fn exit_comp(&mut self) -> Option<(usize, u32)> {
+        let lv = self.stack.pop()?;
+        let inner = std::mem::replace(&mut self.layers, lv.layers);
+        if let Some(c) = self.comps.iter_mut().find(|c| c.id == lv.comp_id) {
+            c.layers = inner;
+            c.length = self.length;
+        }
+        self.length = lv.length;
+        Some((lv.cl, lv.frame))
+    }
+
+    /// El proyecto tal como se guarda y se exporta: la composición principal, aunque se esté editando una precomposición.
+    pub fn root_clone(&self) -> Project {
+        let mut p = self.clone();
+        while p.exit_comp().is_some() {}
+        p
+    }
+
+    /// Convierte las capas elegidas (o una colección con su contenido) en una precomposición nueva, en el sitio de la de más
+    /// arriba y con el mismo aspecto que antes. Devuelve el índice de la capa de precomposición, o ``None`` si hay una cámara.
+    pub fn precompose(&mut self, idx: &[usize]) -> Option<usize> {
+        let n = self.layers.len();
+        let mut sel: Vec<usize> = idx.iter().copied().filter(|&i| i < n).collect();
+        sel.sort_unstable();
+        sel.dedup();
+        if sel.is_empty() || sel.iter().any(|&i| self.layers[i].kind == LayerKind::Camera) {
+            return None;
+        }
+        let roots: Vec<usize> = sel.iter().copied().filter(|&i| !self.ancestors(i).iter().any(|a| sel.contains(a))).collect();
+        let first = roots[0];
+        let id = self.next_comp_id();
+        let name = format!("Precomp {}", self.comps.len() + self.stack.len() + 1);
+        let group = self.collection_of(first).map(|ci| self.layers[ci].uid);
+        let mut trees: Vec<Vec<Layer>> = Vec::new();
+        for &r in roots.iter().rev() {
+            let len = self.subtree_len(r);
+            trees.push(self.layers.drain(r..r + len).collect());
+        }
+        trees.reverse();
+        for t in &mut trees {
+            t[0].group = None; // ya no está en la colección de fuera
+        }
+        let mut inner: Vec<Layer> = trees.into_iter().flatten().collect();
+        // Los vínculos que cruzan el límite de la composición se sueltan en los dos sentidos.
+        let moved: std::collections::HashSet<u64> = inner.iter().filter(|l| l.uid != 0).map(|l| l.uid).collect();
+        for l in &mut inner {
+            if l.parent.map_or(false, |p| !moved.contains(&p)) {
+                l.parent = None;
+            }
+        }
+        for l in &mut self.layers {
+            if l.parent.map_or(false, |p| moved.contains(&p)) {
+                l.parent = None;
+            }
+        }
+        self.comps.push(Composition { id, name: name.clone(), layers: inner, length: self.length });
+        let mut pl = Layer::new(name);
+        pl.kind = LayerKind::Precomp;
+        pl.precomp = Some(id);
+        pl.group = group;
+        pl.uid = self.next_uid();
+        self.layers.insert(first, pl);
+        let map = self.normalize_groups();
+        Some(map[first])
+    }
+
+    /// Deshace la precomposición de la capa li: sus capas vuelven a la composición de fuera, en su sitio y en su tiempo (se
+    /// pierden los ajustes propios de la capa de precomposición, como su opacidad o su fusión). Devuelve el índice de la primera.
+    pub fn unprecompose(&mut self, li: usize) -> Option<usize> {
+        let l = self.layers.get(li).filter(|l| l.kind == LayerKind::Precomp)?;
+        let id = l.precomp?;
+        let (group, shift) = (l.group, l.in_f as i32);
+        let comp = self.comps.iter().find(|c| c.id == id)?.clone();
+        if self.stack.iter().any(|lv| lv.comp_id == id) {
+            return None;
+        }
+        // La composición se borra si ninguna otra capa la usa (una precomposición duplicada la comparte).
+        let shared = self.layers.iter().enumerate().any(|(i, o)| i != li && o.precomp == Some(id)) || self.comps.iter().any(|c| c.layers.iter().any(|o| o.precomp == Some(id)));
+        if !shared {
+            self.comps.retain(|c| c.id != id);
+        }
+        // Los identificadores de las capas de dentro no pueden chocar con los de fuera.
+        let mut base = self.next_uid();
+        let mut remap: std::collections::HashMap<u64, u64> = std::collections::HashMap::new();
+        let mut inner = comp.layers;
+        for l in &mut inner {
+            if l.uid != 0 {
+                remap.insert(l.uid, base);
+                l.uid = base;
+                base += 1;
+            }
+        }
+        for l in &mut inner {
+            l.group = l.group.and_then(|g| remap.get(&g).copied());
+            l.parent = l.parent.and_then(|p| remap.get(&p).copied());
+            l.shift_time(shift);
+        }
+        for l in &mut inner {
+            if l.group.is_none() {
+                l.group = group;
+            }
+        }
+        self.layers.remove(li);
+        for (k, l) in inner.into_iter().enumerate() {
+            self.layers.insert(li + k, l);
+        }
+        let map = self.normalize_groups();
+        Some(map[li])
+    }
+
     /// Dibujo con todo lo visible en el fotograma `f` (para los planos del StoryBoard).
     pub fn flatten(&self, f: u32) -> Drawing {
         let (w, h) = (self.width as f32, self.height as f32);
@@ -1640,6 +1880,20 @@ impl Project {
         }
         self.fix_links();
         self.normalize_groups();
+        // Las composiciones de las precomposiciones se reparan igual que la principal.
+        for ci in 0..self.comps.len() {
+            self.comps[ci].length = self.comps[ci].length.clamp(1, 100_000);
+            for l in &mut self.comps[ci].layers {
+                l.opacity = if l.opacity.is_finite() { l.opacity.clamp(0.0, 1.0) } else { 1.0 };
+                l.keys.retain(|k, _| *k < 1_000_000);
+                l.migrate_legacy();
+                l.tracks.sanitize();
+            }
+            std::mem::swap(&mut self.layers, &mut self.comps[ci].layers);
+            self.fix_links();
+            self.normalize_groups();
+            std::mem::swap(&mut self.layers, &mut self.comps[ci].layers);
+        }
         for pn in &mut self.storyboard {
             if !pn.dur.is_finite() {
                 pn.dur = 2.0;
@@ -2101,6 +2355,113 @@ mod tests {
         assert_eq!(p.depth_of(d), 3, "«d» está en la colección 2, dentro de la nueva, dentro de la 1");
         // El sitio de la nueva colección es el de «a», dentro de Col1.
         assert_eq!(p.collection_of(g), p.layers.iter().position(|l| l.name == "Colección 1"));
+    }
+
+    fn names(p: &Project) -> Vec<String> {
+        p.layers.iter().map(|l| l.name.clone()).collect()
+    }
+
+    #[test]
+    fn precomponer_mete_las_capas_en_una_composicion_y_deja_una_capa_de_precomposicion() {
+        let mut p = layers_named(&["a", "b", "c", "d"]);
+        let pi = p.precompose(&[2, 1]).unwrap();
+        assert_eq!(names(&p), vec!["a", "Precomp 1", "d"]);
+        assert_eq!((pi, p.layers[pi].kind), (1, LayerKind::Precomp));
+        let id = p.layers[pi].precomp.unwrap();
+        let comp = p.comp(id).unwrap();
+        assert_eq!(comp.layers.iter().map(|l| l.name.as_str()).collect::<Vec<_>>(), vec!["b", "c"], "con el orden que tenían");
+        assert_eq!(comp.length, p.length);
+        // Una cámara no se precompone.
+        p.layers[0].kind = LayerKind::Camera;
+        assert!(p.precompose(&[0]).is_none());
+        assert_eq!(p.layers.len(), 3, "no se tocó nada");
+    }
+
+    #[test]
+    fn entrar_y_salir_de_la_precomposicion_conserva_lo_editado_dentro() {
+        let mut p = layers_named(&["a", "b", "c"]);
+        let pi = p.precompose(&[1, 2]).unwrap();
+        assert!(!p.in_comp());
+        assert!(p.enter_comp(pi, 0, 7));
+        assert!(p.in_comp());
+        assert_eq!(names(&p), vec!["b", "c"]);
+        assert_eq!(p.comp_path(), vec!["Escena".to_string(), "Precomp 1".to_string()]);
+        // Se edita dentro: otro nombre y otra duración.
+        p.layers[0].name = "b2".into();
+        p.length = 50;
+        // La capa de fuera no se puede abrir otra vez estando dentro.
+        assert!(!p.enter_comp(0, 0, 0));
+        assert_eq!(p.exit_comp(), Some((0, 7)), "vuelve la capa y el cuadro que había fuera");
+        assert!(!p.in_comp());
+        assert_eq!(names(&p), vec!["a", "Precomp 1"]);
+        let comp = p.comp(p.layers[pi].precomp.unwrap()).unwrap();
+        assert_eq!(comp.layers[0].name, "b2");
+        assert_eq!(comp.length, 50);
+        assert_eq!(p.length, 10, "la duración de fuera no cambia");
+        // Salir sin estar dentro no hace nada.
+        assert!(p.exit_comp().is_none());
+    }
+
+    #[test]
+    fn las_precomposiciones_se_anidan_y_la_raiz_es_siempre_la_principal() {
+        let mut p = layers_named(&["a", "b", "c"]);
+        let pi = p.precompose(&[1, 2]).unwrap(); // [a, Precomp 1]
+        assert!(p.enter_comp(pi, 1, 0)); // dentro: [b, c]
+        let inner = p.precompose(&[0]).unwrap(); // dentro: [Precomp 2, c]
+        assert!(p.enter_comp(inner, 0, 0)); // dentro de la segunda: [b]
+        assert_eq!(p.comp_path().len(), 3);
+        assert_eq!(names(&p), vec!["b"]);
+        let root = p.root_clone();
+        assert!(!root.in_comp());
+        assert_eq!(names(&root), vec!["a", "Precomp 1"]);
+        assert_eq!(root.comps.len(), 2);
+        // El original sigue dentro (la copia es otra cosa).
+        assert!(p.in_comp() && p.stack.len() == 2);
+        // Salir dos veces deja las cosas como estaban.
+        p.exit_comp();
+        p.exit_comp();
+        assert_eq!(names(&p), vec!["a", "Precomp 1"]);
+        assert_eq!(p.comp(p.layers[1].precomp.unwrap()).unwrap().layers.len(), 2);
+    }
+
+    #[test]
+    fn deshacer_la_precomposicion_devuelve_las_capas_en_su_tiempo_y_sin_chocar() {
+        let mut p = layers_named(&["a", "b", "c"]);
+        p.layers[1].uid = 5;
+        p.layers[2].uid = 6;
+        p.layers[2].parent = Some(5);
+        let pi = p.precompose(&[1, 2]).unwrap();
+        assert!(p.layers.iter().all(|l| l.parent.is_none()), "el vínculo dentro de la composición se conserva dentro");
+        p.layers[pi].in_f = 3;
+        p.layers[0].uid = 5; // choca con el uid de una capa de dentro
+        let first = p.unprecompose(pi).unwrap();
+        assert_eq!(names(&p), vec!["a", "b", "c"]);
+        assert_eq!(first, 1);
+        assert!(p.comps.is_empty(), "la composición ya no la usa nadie");
+        let mut uids: Vec<u64> = p.layers.iter().map(|l| l.uid).filter(|u| *u != 0).collect();
+        let n = uids.len();
+        uids.sort_unstable();
+        uids.dedup();
+        assert_eq!(uids.len(), n, "sin identificadores repetidos");
+        assert_eq!(p.layers[1].in_f, 3, "recuperan su sitio en el tiempo: la precomposición empezaba en el cuadro 4");
+        // Una precomposición duplicada comparte la composición: deshacer una no borra la otra.
+        let mut q = layers_named(&["a", "b"]);
+        let pj = q.precompose(&[0]).unwrap();
+        let copy = q.layers[pj].clone();
+        q.layers.insert(pj, copy);
+        q.unprecompose(pj).unwrap();
+        assert_eq!(q.comps.len(), 1);
+    }
+
+    #[test]
+    fn los_vinculos_que_cruzan_el_limite_de_la_precomposicion_se_sueltan() {
+        let mut p = layers_named(&["fuera", "dentro"]);
+        p.layers[0].uid = 1;
+        p.layers[1].uid = 2;
+        p.layers[1].parent = Some(1); // «dentro» cuelga de «fuera»
+        let pi = p.precompose(&[1]).unwrap();
+        let comp = p.comp(p.layers[pi].precomp.unwrap()).unwrap();
+        assert!(comp.layers[0].parent.is_none());
     }
     #[test]
     fn xsheet_operations() {

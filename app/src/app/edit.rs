@@ -857,6 +857,9 @@ impl LeonApp {
         let none = Modifiers::NONE;
         let sh = Modifiers::SHIFT;
         let cmd = Modifiers::COMMAND;
+        if k(cs, Key::C) {
+            self.precompose_current();
+        }
         if k(cs, Key::G) {
             self.ungroup_current();
         } else if k(cmd, Key::G) {
@@ -975,8 +978,15 @@ impl LeonApp {
         if story {
             return;
         }
-        if k(none, Key::Tab) {
-            self.toggle_mode();
+        // Mayús+Tab sale de la precomposición. Tab entra si la capa actual es una; si no, cambia entre modo objeto y edición.
+        if self.project.in_comp() && k(Modifiers::SHIFT, Key::Tab) {
+            self.exit_precomp();
+        } else if k(none, Key::Tab) {
+            if self.layer().kind == LayerKind::Precomp {
+                self.enter_precomp(self.cl);
+            } else {
+                self.toggle_mode();
+            }
         }
         if k(none, Key::T) {
             self.show_toolbar = !self.show_toolbar;
