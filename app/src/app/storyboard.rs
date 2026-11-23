@@ -1,11 +1,11 @@
-//! Sala StoryBoard: cuadrícula de planos con zoom (de miniaturas a detalle con notas),
-//! editor de detalle con pincel y borrador, tira de planos y «Animatic → Xsheet».
+//! Sala StoryBoard: cuadrícula de planos con zoom (de miniaturas a detalle con notas). Un plano es una composición
+//! (Issue #132): con doble clic se abre en el visor, con las capas, las herramientas y las paletas del programa.
+//! También «Animatic → Xsheet».
 
-use super::canvas::{paint_drawing, paint_stroke, paint_thumb};
-use super::shell::{muted, pill};
+use super::canvas::paint_thumb;
+use super::shell::{muted, panel_header, pill};
 use super::*;
 use crate::model::Panel;
-use std::sync::Arc;
 
 const FIELDS: [&str; 5] = ["Acción", "Diálogo", "Cámara", "Transición", "Notas"];
 
@@ -25,12 +25,17 @@ impl LeonApp {
         if self.project.storyboard.is_empty() {
             self.sb_detail = false;
         }
-        self.sb_bar(ui);
-        if self.sb_detail {
-            self.sb_detail_view(ui);
-        } else {
-            self.sb_grid(ui);
+        // Si se salió del plano por otro lado (la ruta de navegación, deshacer), se vuelve a la cuadrícula.
+        if self.sb_detail && !self.panel_canvas() {
+            self.sb_detail = false;
         }
+        if self.sb_detail {
+            self.sb_panel_bar(ui);
+            self.viewer(ui);
+            return;
+        }
+        self.sb_bar(ui);
+        self.sb_grid(ui);
     }
 
     fn sb_bar(&mut self, ui: &mut egui::Ui) {
@@ -38,9 +43,6 @@ impl LeonApp {
             ui.set_width(ui.available_width());
             ui.horizontal_wrapped(|ui| {
                 ui.spacing_mut().item_spacing.x = 6.0;
-                if self.sb_detail && pill(ui, "< Cuadrícula", false).clicked() {
-                    self.sb_detail = false;
-                }
                 if pill(ui, "+ Plano", false).clicked() {
                     self.checkpoint();
                     let at = (self.sb_sel + 1).min(self.project.storyboard.len());
@@ -51,15 +53,15 @@ impl LeonApp {
                 let has = !self.project.storyboard.is_empty();
                 if pill(ui, "Duplicar", false).clicked() && has {
                     self.checkpoint();
-                    let mut p = self.project.storyboard[self.sb_sel].clone();
-                    p.title = format!("{} copia", p.title);
-                    self.project.storyboard.insert(self.sb_sel + 1, p);
-                    self.sb_sel += 1;
+                    if let Some(j) = self.project.duplicate_panel(self.sb_sel) {
+                        self.sb_sel = j;
+                    }
                 }
                 if pill(ui, "Eliminar", false).clicked() && has {
                     self.checkpoint();
-                    self.project.storyboard.remove(self.sb_sel);
-                    self.sb_sel = self.sb_sel.saturating_sub(1);
+                    if self.project.remove_panel(self.sb_sel) {
+                        self.sb_sel = self.sb_sel.saturating_sub(1);
+                    }
                 }
                 if pill(ui, "Usar fotograma actual", false)
                     .on_hover_text("Copia lo que se ve en el fotograma actual de la escena dentro del plano")
@@ -68,7 +70,7 @@ impl LeonApp {
                 {
                     self.checkpoint();
                     let d = self.project.flatten(self.frame);
-                    self.project.storyboard[self.sb_sel].drawing = Arc::new(d);
+                    self.project.set_panel_drawing(self.sb_sel, d);
                     self.say(format!("Plano {} = fotograma {}", self.sb_sel + 1, self.frame + 1));
                 }
                 if pill(ui, "Animatic > Xsheet", true)
@@ -204,7 +206,7 @@ impl LeonApp {
                 });
                 ui.add_space(12.0);
                 }
-                ui.label(RichText::new("Doble clic en un plano para editarlo en detalle · arrastra la imagen sobre otro plano para reordenar · mueve el deslizador para pasar de miniaturas a detalle con notas.").size(11.5).color(MU));
+                ui.label(RichText::new("Doble clic en un plano para dibujarlo con el visor y las capas · arrastra la imagen sobre otro plano para reordenar · mueve el deslizador para pasar de miniaturas a detalle con notas.").size(11.5).color(MU));
             });
         });
         if let (Some(from), Some(to)) = (self.sb_drag, drop_on) {
@@ -222,148 +224,72 @@ impl LeonApp {
             self.sb_sel = i;
         }
         if let Some(i) = open {
-            self.sb_sel = i;
-            self.sb_detail = true;
+            self.open_panel(i);
         }
         if self.project.storyboard.is_empty() {
             ui.label(RichText::new("No hay planos todavía: pulsa «+ Plano».").color(MU));
         }
     }
 
-    fn sb_detail_view(&mut self, ui: &mut egui::Ui) {
-        let i = self.sb_sel;
-        let (w, h) = (self.project.width as f32, self.project.height as f32);
-        // Tira de planos abajo
-        egui::TopBottomPanel::bottom("sb_strip")
-            .frame(egui::Frame::default().fill(BG2).inner_margin(egui::Margin::same(6)))
-            .show_inside(ui, |ui| {
-                egui::ScrollArea::horizontal().show(ui, |ui| {
-                    ui.horizontal(|ui| {
-                        for j in 0..self.project.storyboard.len() {
-                            let (r, resp) = ui.allocate_exact_size(Vec2::new(96.0, 96.0 * h / w), Sense::click());
-                            paint_thumb(ui.painter(), r, &self.project.storyboard[j].drawing, w, h, Color32::WHITE);
-                            ui.painter().rect_stroke(r, 2.0, if j == i { stk(2.0, ACCENT) } else { stk(1.0, Color32::BLACK) }, EStrokeKind::Outside);
-                            if resp.clicked() {
-                                self.sb_sel = j;
-                            }
-                        }
-                    });
-                });
-            });
-        // Datos del plano a la derecha
-        egui::SidePanel::right("sb_side")
-            .exact_width(260.0)
-            .resizable(false)
-            .frame(egui::Frame::default().fill(BG2).inner_margin(egui::Margin::same(8)))
-            .show_inside(ui, |ui| {
-                let p = &mut self.project.storyboard[i];
-                ui.label(RichText::new(format!("Plano {}", i + 1)).strong().color(ACCENT2));
-                ui.add(egui::TextEdit::singleline(&mut p.title).desired_width(f32::INFINITY));
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new("Duración (s)").color(MU));
-                    ui.add(egui::DragValue::new(&mut p.dur).range(0.1..=600.0).speed(0.05).max_decimals(1));
-                });
-                for (k, name) in FIELDS.iter().enumerate() {
-                    ui.label(RichText::new(*name).color(MU));
-                    ui.add(egui::TextEdit::multiline(field_mut(p, k)).desired_rows(2).desired_width(f32::INFINITY));
-                }
-                ui.separator();
-                ui.horizontal(|ui| {
-                    if pill(ui, "Pincel", !self.sb_erase).clicked() {
-                        self.sb_erase = false;
-                    }
-                    if pill(ui, "Borrador", self.sb_erase).clicked() {
-                        self.sb_erase = true;
-                    }
-                    egui::color_picker::color_edit_button_srgba(ui, &mut self.color, egui::color_picker::Alpha::OnlyBlend);
-                });
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new("Tamaño").color(MU));
-                    ui.add(egui::Slider::new(&mut self.brush_size, 1.0..=120.0).logarithmic(true).max_decimals(0));
-                });
-                ui.checkbox(&mut self.sb_onion, "Ver el plano anterior en transparencia");
-                if pill(ui, "Vaciar dibujo", false).clicked() {
-                    self.checkpoint();
-                    self.project.storyboard[i].drawing = Arc::new(Drawing::default());
-                }
-            });
-        // Lienzo del plano
-        egui::CentralPanel::default().frame(egui::Frame::default().fill(VIEWER_BG)).show_inside(ui, |ui| {
-            let rect = ui.available_rect_before_wrap();
-            let resp = ui.allocate_rect(rect, Sense::click_and_drag());
-            let z = ((rect.width() - 40.0) / w).min((rect.height() - 40.0) / h).max(0.05);
-            let origin = rect.center() - Vec2::new(w, h) * z * 0.5;
-            let cam = Rect::from_min_size(origin, Vec2::new(w, h) * z);
-            let painter = ui.painter_at(rect);
-            painter.rect_filled(cam, 0.0, Color32::WHITE);
-            let map = |p: [f32; 2]| Pos2::new(origin.x + p[0] * z, origin.y + p[1] * z);
-            let clip = painter.with_clip_rect(cam);
-            if self.sb_onion && i > 0 {
-                paint_drawing(&clip, &self.project.storyboard[i - 1].drawing.clone(), &map, z, None, 0.25);
-            }
-            paint_drawing(&clip, &self.project.storyboard[i].drawing.clone(), &map, z, None, 1.0);
-            if let Some(s) = &self.sb_stroke {
-                paint_stroke(&clip, s, &map, z, None, 1.0);
-            }
-            painter.rect_stroke(cam, 0.0, stk(1.0, Color32::BLACK), EStrokeKind::Outside);
-            let to_scene = |p: Pos2| [(p.x - origin.x) / z, (p.y - origin.y) / z];
-            let down = resp.is_pointer_button_down_on() && ui.input(|i| i.pointer.primary_down());
-            if down {
-                if let Some(pp) = resp.interact_pointer_pos() {
-                    let q = to_scene(pp);
-                    if self.pre.is_none() {
-                        self.pre = Some(self.project.clone());
-                        self.changed = false;
-                    }
-                    if self.sb_erase {
-                        let last = self.sb_last.unwrap_or(q);
-                        let r = self.eraser_size.max(self.brush_size) * 0.5;
-                        let d = Arc::make_mut(&mut self.project.storyboard[i].drawing);
-                        for t in 0..=4 {
-                            let t = t as f32 / 4.0;
-                            if d.erase([last[0] + (q[0] - last[0]) * t, last[1] + (q[1] - last[1]) * t], r) {
-                                self.changed = true;
-                            }
-                        }
-                    } else {
-                        let s = self.sb_stroke.get_or_insert_with(|| Stroke {
-                            kind: ShapeKind::Free,
-                            points: vec![],
-                            color: rgba(self.color),
-                            width: self.brush_size,
-                            closed: false,
-                            fill: None,
-                            pressure: Vec::new(),
-                            style: None,
-                            original: None, nodes: None,
-                        });
-                        if s.points.last().map_or(true, |l| (l[0] - q[0]).abs() + (l[1] - q[1]).abs() > 0.8 / z) {
-                            s.points.push(q);
-                        }
-                    }
-                    self.sb_last = Some(q);
-                }
-            } else if self.pre.is_some() {
-                if let Some(mut s) = self.sb_stroke.take() {
-                    s.points = crate::model::simplify(&s.points, 0.3);
-                    Arc::make_mut(&mut self.project.storyboard[i].drawing).strokes.push(s);
-                    self.changed = true;
-                }
-                if let Some(pre) = self.pre.take() {
-                    if self.changed {
-                        self.push_undo(pre);
-                        self.meta_skip = true;
-                    }
-                }
-                self.changed = false;
-                self.sb_last = None;
-            }
-            if resp.hovered() {
-                ui.ctx().set_cursor_icon(egui::CursorIcon::Crosshair);
-            }
-        });
+    /// ¿Se está dibujando dentro de un plano? (La sala Storyboard muestra entonces el visor con las capas del plano.)
+    pub(super) fn panel_canvas(&self) -> bool {
+        self.room_kind().def().story && self.sb_detail && self.project.stack.len() > self.sb_base
     }
 
+    /// Abre el plano `i` para editarlo con el visor, las capas y las herramientas (su composición pasa a ser la que se edita).
+    pub(super) fn open_panel(&mut self, i: usize) {
+        if i >= self.project.storyboard.len() {
+            return;
+        }
+        self.sb_sel = i;
+        self.sb_base = self.project.stack.len();
+        self.checkpoint();
+        if self.project.open_panel(i, self.cl, self.frame) {
+            self.reset_after_level_change();
+            self.frame = 0;
+            self.sb_detail = true;
+            self.need_fit = true;
+            self.say(format!("Plano {}: dibuja con el visor y las capas. «Cuadrícula» vuelve a todos los planos", i + 1));
+        }
+    }
+
+    /// Sale del plano que se edita y vuelve a la cuadrícula.
+    pub(super) fn close_panel(&mut self) {
+        self.exit_to_level(self.sb_base);
+        self.sb_detail = false;
+    }
+
+    /// Barra del plano abierto: volver a la cuadrícula e ir al plano anterior o siguiente.
+    fn sb_panel_bar(&mut self, ui: &mut egui::Ui) {
+        let n = self.project.storyboard.len();
+        let i = self.sb_sel.min(n.saturating_sub(1));
+        let mut go: Option<usize> = None;
+        let mut back = false;
+        egui::Frame::default().fill(BG2).inner_margin(egui::Margin::symmetric(10, 6)).show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 6.0;
+                if pill(ui, "< Cuadrícula", false).clicked() {
+                    back = true;
+                }
+                if pill(ui, "< Plano anterior", false).clicked() && i > 0 {
+                    go = Some(i - 1);
+                }
+                if pill(ui, "Plano siguiente >", false).clicked() && i + 1 < n {
+                    go = Some(i + 1);
+                }
+                ui.separator();
+                let title = self.project.storyboard.get(i).map(|p| p.title.clone()).unwrap_or_default();
+                muted(ui, format!("Plano {} de {n} · {title}", i + 1));
+            });
+        });
+        if back {
+            self.close_panel();
+        } else if let Some(j) = go {
+            self.close_panel();
+            self.open_panel(j);
+        }
+    }
     /// Panel derecho de la sala Storyboard: datos del plano elegido y exportación a PDF.
     pub(super) fn story_side(&mut self, ui: &mut egui::Ui) {
         if self.project.storyboard.is_empty() {
@@ -386,7 +312,13 @@ impl LeonApp {
         }
         ui.separator();
         ui.add_enabled(false, egui::Button::new("Exportar storyboard a PDF (pendiente)"));
-        muted(ui, "Doble clic en un plano para dibujarlo en detalle.");
+        if self.panel_canvas() {
+            ui.add_space(6.0);
+            panel_header(ui, "Paleta");
+            self.palette_groups(ui);
+        } else {
+            muted(ui, "Doble clic en un plano para dibujarlo con el visor y las capas.");
+        }
     }
 
     /// Panel derecho de la sala Animatic: planos con su duración y paso a la línea de tiempo.

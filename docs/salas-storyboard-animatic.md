@@ -79,3 +79,10 @@ Valores por defecto asumidos, a corregir si no convienen:
 
 3. **Numeración**: como en Storyboard Pro, escena y plano (por ejemplo «Escena 2 · Plano 30»), editable; el número simple (1, 2, 3) sigue visible en la cuadrícula.
 4. **Audio**: el audio del animatic (A2) sigue a M8a y no se adelanta; el resto de fases no depende del sonido.
+
+## 7. Estado de las fases
+
+| Fase | Estado |
+|---|---|
+| S1. Plano como composición | Hecha en el Issue #132: Panel.comp y Composition.panel; doble clic abre el plano en el visor con sus capas, las herramientas y las paletas; «< Cuadrícula», plano anterior y siguiente; la miniatura y el animatic se rehacen al salir; duplicar y borrar planos llevan su composición; los archivos antiguos conservan sus dibujos (capa «Dibujo»). La miniatura solo muestra capas vectoriales |
+| S2, S3, A1, A2 | Pendientes |

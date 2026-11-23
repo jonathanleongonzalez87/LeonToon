@@ -70,7 +70,11 @@ impl LeonApp {
     /// ¿La cabecera de herramienta del visor hace de cabecera del hueco principal? (Sala con visor.)
     pub(super) fn main_toolhead(&self) -> bool {
         let room = self.room_kind();
-        !room.def().story && (room == RoomKind::StopMotion || self.slot_editor(Slot::Main) == Editor::Viewer)
+        if room.def().story {
+            // Dentro de un plano, el hueco principal muestra el visor y trae su cabecera y su barra de herramientas.
+            return self.panel_canvas() && self.slot_editor(Slot::Main) == Editor::Storyboard;
+        }
+        room == RoomKind::StopMotion || self.slot_editor(Slot::Main) == Editor::Viewer
     }
 
     /// El selector de tipo de editor de un hueco, como el de Blender: un botón con el icono y el nombre del editor actual
@@ -179,6 +183,7 @@ impl LeonApp {
             let _ = p;
             match ed {
                 Editor::Viewer | Editor::SmStage => self.hover_area = 1,
+                Editor::Storyboard if self.panel_canvas() => self.hover_area = 1,
                 Editor::Timeline | Editor::Montage | Editor::SmStrip | Editor::SmXSheet => self.hover_area = 2,
                 _ => {}
             }

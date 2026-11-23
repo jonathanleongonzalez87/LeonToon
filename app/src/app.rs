@@ -64,7 +64,6 @@ const INK3: Color32 = Color32::from_rgb(0x85, 0x7a, 0x6e);
 const ACCENT: Color32 = Color32::from_rgb(0xfd, 0x67, 0x24);
 const ACCENT2: Color32 = Color32::from_rgb(0xff, 0x8a, 0x52);
 const ACCENT_INK: Color32 = Color32::from_rgb(0x26, 0x26, 0x26);
-const VIEWER_BG: Color32 = Color32::from_rgb(0x1a, 0x19, 0x18);
 const SEL_BG: Color32 = Color32::from_rgb(0x44, 0x2b, 0x1f);
 const CELL_SEL: Color32 = Color32::from_rgb(0x5a, 0x33, 0x20);
 const KEY_GOLD: Color32 = Color32::from_rgb(0xff, 0xcc, 0x44);/// Colores del papel cebolla del prototipo v0.3: anterior en ámbar, siguiente en azul
@@ -390,10 +389,8 @@ pub struct LeonApp {
     sb_sel: usize,
     sb_zoom: f32,
     sb_detail: bool,
-    sb_last: Option<[f32; 2]>,
-    sb_erase: bool,
-    sb_onion: bool,
-    sb_stroke: Option<Stroke>,
+    /// Profundidad de la pila de composiciones al abrir un plano: «Cuadrícula» vuelve a ella.
+    sb_base: usize,
     sb_drag: Option<usize>,
     render_opts: RenderOpts,
 
@@ -781,10 +778,7 @@ impl LeonApp {
             sb_sel: 0,
             sb_zoom: 260.0,
             sb_detail: false,
-            sb_last: None,
-            sb_erase: false,
-            sb_onion: true,
-            sb_stroke: None,
+            sb_base: 0,
             sb_drag: None,
             render_opts: RenderOpts { a: 1, b: len, scale: 1.0, transparent: false, columns: 8, message: "Listo.".into() },
             gesture: None,
@@ -872,6 +866,10 @@ impl LeonApp {
         // Capturas: LEONTOON_MUESTRA=stopmotion abre el proyecto de muestra de Stop Motion (como el botón de la pantalla de inicio).
         if std::env::var("LEONTOON_MUESTRA").as_deref() == Ok("stopmotion") {
             app.open_stopmotion_demo();
+        }
+        // Capturas: LEONTOON_PLANO=<n> abre ese plano del storyboard (en la sala Storyboard) para dibujarlo con el visor.
+        if let Some(n) = std::env::var("LEONTOON_PLANO").ok().and_then(|v| v.parse::<usize>().ok()) {
+            app.open_panel(n.saturating_sub(1));
         }
         if let Ok(v) = std::env::var("LEONTOON_ONION") {
             app.onion = v != "0";

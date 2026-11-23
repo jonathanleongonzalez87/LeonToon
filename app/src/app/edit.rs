@@ -841,7 +841,7 @@ impl LeonApp {
         if space && !self.space_down {
             self.space_panned = false;
         }
-        let story = self.room_kind().def().story;
+        let story = self.room_kind().def().story && !self.panel_canvas();
         if !space && self.space_down && !self.space_panned && !story {
             self.toggle_play();
         }

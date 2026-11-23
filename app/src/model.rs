@@ -312,11 +312,6 @@ impl Stroke {
     }
 }
 
-/// Simplificación sencilla (Ramer–Douglas–Peucker).
-pub fn simplify(pts: &[[f32; 2]], eps: f32) -> Vec<[f32; 2]> {
-    simplify_idx(pts, eps).into_iter().map(|i| pts[i]).collect()
-}
-
 /// Igual que simplify, pero devuelve los índices de los puntos que se quedan (para llevar datos aparte, como la presión).
 pub fn simplify_idx(pts: &[[f32; 2]], eps: f32) -> Vec<usize> {
     simplify_idx_attr(pts, None, eps)
@@ -534,8 +529,12 @@ pub struct Panel {
     pub trans: String,
     #[serde(default)]
     pub notes: String,
+    /// Aspecto del plano en el cuadro 1 (miniaturas, animatic): se recalcula al salir de la composición del plano.
     #[serde(default)]
     pub drawing: Arc<Drawing>,
+    /// Composición del plano (sus capas), en `Project::comps`. Se crea al abrir el plano por primera vez.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub comp: Option<u64>,
 }
 
 impl Panel {
@@ -1022,6 +1021,9 @@ pub struct Composition {
     pub name: String,
     pub layers: Vec<Layer>,
     pub length: u32,
+    /// Es la composición de un plano del storyboard (no una precomposición).
+    #[serde(skip_serializing_if = "is_false")]
+    pub panel: bool,
 }
 
 /// Un nivel de la pila de «entrar en la capa»: lo que había fuera de la composición que se está editando. Mientras se edita una
@@ -1588,6 +1590,11 @@ impl Project {
     /// precomposición que se pueda abrir.
     pub fn enter_comp(&mut self, li: usize, cl: usize, frame: u32) -> bool {
         let Some(id) = self.layers.get(li).filter(|l| l.kind == LayerKind::Precomp).and_then(|l| l.precomp) else { return false };
+        self.enter_comp_id(id, cl, frame)
+    }
+
+    /// Entra a editar la composición con ese id (una precomposición o la de un plano del storyboard).
+    pub fn enter_comp_id(&mut self, id: u64, cl: usize, frame: u32) -> bool {
         let Some(ci) = self.comps.iter().position(|c| c.id == id) else { return false };
         if self.stack.iter().any(|l| l.comp_id == id) {
             return false;
@@ -1607,6 +1614,13 @@ impl Project {
     /// Devuelve la capa y el cuadro que había elegidos fuera.
     pub fn exit_comp(&mut self) -> Option<(usize, u32)> {
         let lv = self.stack.pop()?;
+        // Al salir de la composición de un plano, su aspecto (miniatura y animatic) se recalcula con lo que se dibujó dentro.
+        if self.comps.iter().any(|c| c.id == lv.comp_id && c.panel) {
+            let d = self.flatten(0);
+            if let Some(p) = self.storyboard.iter_mut().find(|p| p.comp == Some(lv.comp_id)) {
+                p.drawing = Arc::new(d);
+            }
+        }
         let inner = std::mem::replace(&mut self.layers, lv.layers);
         if let Some(c) = self.comps.iter_mut().find(|c| c.id == lv.comp_id) {
             c.layers = inner;
@@ -1614,6 +1628,76 @@ impl Project {
         }
         self.length = lv.length;
         Some((lv.cl, lv.frame))
+    }
+
+    // ---------- Planos del storyboard como composiciones ----------
+
+    /// La composición del plano `i`; si aún no la tiene, la crea con una capa «Dibujo» que contiene lo que ya había dibujado.
+    pub fn ensure_panel_comp(&mut self, i: usize) -> Option<u64> {
+        let p = self.storyboard.get(i)?;
+        if let Some(id) = p.comp {
+            if self.comps.iter().any(|c| c.id == id) {
+                return Some(id);
+            }
+        }
+        let id = self.next_comp_id();
+        let mut l = Layer::new("Dibujo");
+        l.keys.insert(0, p.drawing.clone());
+        let length = ((p.dur * self.fps as f32).round() as u32).max(1);
+        let name = p.title.clone();
+        self.comps.push(Composition { id, name, layers: vec![l], length, panel: true });
+        self.storyboard[i].comp = Some(id);
+        Some(id)
+    }
+
+    /// Entra a editar el plano `i`: sus capas pasan a ser las del proyecto. Devuelve false si ya está abierto.
+    pub fn open_panel(&mut self, i: usize, cl: usize, frame: u32) -> bool {
+        match self.ensure_panel_comp(i) {
+            Some(id) => self.enter_comp_id(id, cl, frame),
+            None => false,
+        }
+    }
+
+    /// Duplica el plano `i` con una copia propia de su composición. Devuelve el índice de la copia.
+    pub fn duplicate_panel(&mut self, i: usize) -> Option<usize> {
+        let id = self.ensure_panel_comp(i)?;
+        if self.stack.iter().any(|l| l.comp_id == id) {
+            return None;
+        }
+        let mut c = self.comps.iter().find(|c| c.id == id)?.clone();
+        c.id = self.next_comp_id();
+        let mut p = self.storyboard[i].clone();
+        p.title = format!("{} copia", p.title);
+        c.name = p.title.clone();
+        p.comp = Some(c.id);
+        self.comps.push(c);
+        self.storyboard.insert(i + 1, p);
+        Some(i + 1)
+    }
+
+    /// Quita el plano `i` y su composición. Devuelve false si no existe o está abierto.
+    pub fn remove_panel(&mut self, i: usize) -> bool {
+        let Some(p) = self.storyboard.get(i) else { return false };
+        if let Some(id) = p.comp {
+            if self.stack.iter().any(|l| l.comp_id == id) {
+                return false;
+            }
+            self.comps.retain(|c| c.id != id);
+        }
+        self.storyboard.remove(i);
+        true
+    }
+
+    /// Pone un dibujo como todo el contenido del plano `i` (su composición queda con una sola capa «Dibujo»).
+    pub fn set_panel_drawing(&mut self, i: usize, d: Drawing) {
+        let Some(p) = self.storyboard.get_mut(i) else { return };
+        p.drawing = Arc::new(d);
+        let (drawing, comp) = (p.drawing.clone(), p.comp);
+        if let Some(c) = comp.and_then(|id| self.comps.iter_mut().find(|c| c.id == id && !c.layers.is_empty())) {
+            let mut l = Layer::new("Dibujo");
+            l.keys.insert(0, drawing);
+            c.layers = vec![l];
+        }
     }
 
     /// El proyecto tal como se guarda y se exporta: la composición principal, aunque se esté editando una precomposición.
@@ -1640,7 +1724,7 @@ impl Project {
             return None;
         }
         let id = self.next_comp_id();
-        self.comps.push(Composition { id, name: crate::animatic::NAME.into(), layers: built.layers, length: built.length });
+        self.comps.push(Composition { id, name: crate::animatic::NAME.into(), layers: built.layers, length: built.length, panel: false });
         let mut pl = Layer::new(crate::animatic::NAME);
         pl.kind = LayerKind::Precomp;
         pl.precomp = Some(id);
@@ -1663,7 +1747,7 @@ impl Project {
         let roots: Vec<usize> = sel.iter().copied().filter(|&i| !self.ancestors(i).iter().any(|a| sel.contains(a))).collect();
         let first = roots[0];
         let id = self.next_comp_id();
-        let name = format!("Precomp {}", self.comps.len() + self.stack.len() + 1);
+        let name = format!("Precomp {}", self.comps.iter().filter(|c| !c.panel).count() + self.stack.len() + 1);
         let group = self.collection_of(first).map(|ci| self.layers[ci].uid);
         let mut trees: Vec<Vec<Layer>> = Vec::new();
         for &r in roots.iter().rev() {
@@ -1687,7 +1771,7 @@ impl Project {
                 l.parent = None;
             }
         }
-        self.comps.push(Composition { id, name: name.clone(), layers: inner, length: self.length });
+        self.comps.push(Composition { id, name: name.clone(), layers: inner, length: self.length, panel: false });
         let mut pl = Layer::new(name);
         pl.kind = LayerKind::Precomp;
         pl.precomp = Some(id);
@@ -1848,7 +1932,11 @@ impl Project {
             self.normalize_groups();
             std::mem::swap(&mut self.layers, &mut self.comps[ci].layers);
         }
+        let ids: std::collections::HashSet<u64> = self.comps.iter().map(|c| c.id).collect();
         for pn in &mut self.storyboard {
+            if pn.comp.map_or(false, |id| !ids.contains(&id)) {
+                pn.comp = None;
+            }
             if !pn.dur.is_finite() {
                 pn.dur = 2.0;
             }
@@ -2482,5 +2570,114 @@ mod tests {
         d.strokes.push(Stroke { kind: ShapeKind::Line, points: vec![[0.0, 0.0], [100.0, 0.0]], color: [0, 0, 0, 255], width: 2.0, closed: false, fill: None, pressure: Vec::new(), style: None, original: None, nodes: None });
         assert!(d.erase([50.0, 0.0], 5.0));
         assert_eq!(d.strokes.len(), 2);
+    }
+}
+
+#[cfg(test)]
+mod panel_tests {
+    use super::*;
+
+    fn with_panels(n: usize) -> Project {
+        let mut p = Project::blank(1280, 720, 24, 24);
+        for i in 1..=n {
+            p.storyboard.push(Panel::new(i));
+        }
+        p
+    }
+
+    fn stroke() -> Stroke {
+        Stroke::shape(ShapeKind::Line, [10.0, 10.0], [200.0, 80.0], [0, 0, 0, 255], 4.0, None)
+    }
+
+    #[test]
+    fn opening_a_panel_edits_its_own_layers_and_refreshes_its_look_on_exit() {
+        let mut p = with_panels(2);
+        let main_layers = p.layers.len();
+        assert!(p.open_panel(0, 0, 0));
+        assert!(p.in_comp());
+        // El plano trae una capa «Dibujo»; se le pueden añadir más capas y trazos.
+        assert_eq!(p.layers.len(), 1);
+        assert_eq!(p.layers[0].name, "Dibujo");
+        let mut d = Drawing::default();
+        d.strokes.push(stroke());
+        p.layers[0].keys.insert(0, Arc::new(d));
+        let mut extra = Layer::new("Fondo del plano");
+        extra.keys.insert(0, Arc::new(Drawing::default()));
+        p.layers.push(extra);
+        assert_eq!(p.comp_path(), vec!["Escena".to_string(), "Plano 1".to_string()]);
+        p.exit_comp().unwrap();
+        assert_eq!(p.layers.len(), main_layers, "la escena vuelve como estaba");
+        assert_eq!(p.storyboard[0].drawing.strokes.len(), 1, "la miniatura se rehace al salir");
+        assert!(p.storyboard[1].drawing.strokes.is_empty());
+        // Se vuelve a abrir y tiene las dos capas.
+        assert!(p.open_panel(0, 0, 0));
+        assert_eq!(p.layers.len(), 2);
+    }
+
+    #[test]
+    fn a_panel_with_an_old_flat_drawing_becomes_a_drawing_layer() {
+        let mut p = with_panels(1);
+        let mut d = Drawing::default();
+        d.strokes.push(stroke());
+        p.storyboard[0].drawing = Arc::new(d);
+        assert!(p.storyboard[0].comp.is_none(), "un archivo antiguo no trae composición");
+        assert!(p.open_panel(0, 0, 0));
+        assert_eq!(p.layers[0].drawing_at(0).map(|d| d.strokes.len()), Some(1), "lo que ya estaba dibujado se conserva");
+    }
+
+    #[test]
+    fn panel_comps_survive_saving_and_do_not_count_as_precomps() {
+        let mut p = with_panels(2);
+        p.open_panel(1, 0, 0);
+        p.layers[0].keys.insert(0, Arc::new(Drawing { strokes: vec![stroke()], raster: None }));
+        // Se guarda siempre la composición principal, aunque se esté dentro de un plano.
+        let saved = p.root_clone();
+        let json = serde_json::to_string(&saved).unwrap();
+        let mut back: Project = serde_json::from_str(&json).unwrap();
+        back.sanitize();
+        assert!(!back.in_comp());
+        assert_eq!(back.comps.len(), 1);
+        assert!(back.comps[0].panel);
+        assert_eq!(back.storyboard[1].comp, Some(back.comps[0].id));
+        assert!(back.open_panel(1, 0, 0));
+        assert_eq!(back.layers[0].drawing_at(0).map(|d| d.strokes.len()), Some(1));
+        back.exit_comp();
+        // Una precomposición nueva se numera sin contar los planos.
+        let i = back.precompose(&[0]).unwrap();
+        assert_eq!(back.layers[i].name, "Precomp 1");
+    }
+
+    #[test]
+    fn duplicating_and_removing_panels_keep_their_compositions_apart() {
+        let mut p = with_panels(2);
+        p.open_panel(0, 0, 0);
+        p.layers[0].keys.insert(0, Arc::new(Drawing { strokes: vec![stroke()], raster: None }));
+        p.exit_comp();
+        let j = p.duplicate_panel(0).unwrap();
+        assert_eq!(j, 1);
+        assert_eq!(p.storyboard.len(), 3);
+        let (a, b) = (p.storyboard[0].comp.unwrap(), p.storyboard[1].comp.unwrap());
+        assert_ne!(a, b, "la copia tiene su propia composición");
+        // Dibujar en la copia no toca el original.
+        p.open_panel(1, 0, 0);
+        p.layers[0].keys.insert(0, Arc::new(Drawing::default()));
+        p.exit_comp();
+        assert_eq!(p.storyboard[0].drawing.strokes.len(), 1);
+        assert!(p.storyboard[1].drawing.strokes.is_empty());
+        // Un plano abierto no se puede borrar; cerrado, se lleva su composición.
+        p.open_panel(0, 0, 0);
+        assert!(!p.remove_panel(0));
+        p.exit_comp();
+        assert!(p.remove_panel(0));
+        assert_eq!(p.comps.len(), 1, "queda la composición de la copia");
+        assert!(p.comps.iter().all(|c| c.id != a));
+    }
+
+    #[test]
+    fn a_panel_that_points_to_a_missing_composition_is_repaired() {
+        let mut p = with_panels(1);
+        p.storyboard[0].comp = Some(99);
+        p.sanitize();
+        assert!(p.storyboard[0].comp.is_none());
     }
 }

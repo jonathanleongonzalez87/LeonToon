@@ -74,7 +74,7 @@ impl LeonApp {
         }
     }
 
-    fn reset_after_level_change(&mut self) {
+    pub(super) fn reset_after_level_change(&mut self) {
         self.cl = 0;
         self.lsel.clear();
         self.sel = None;
