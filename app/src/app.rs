@@ -563,6 +563,15 @@ impl LeonApp {
                 }
             }
         }
+        // Para capturas del animatic: LEONTOON_ANIMATIC=1 crea la composición «Animatic» (el segundo plano con fundido) y entra en ella.
+        if std::env::var("LEONTOON_ANIMATIC").is_ok() && project.storyboard.len() >= 2 {
+            project.storyboard[1].trans = "Fundido".into();
+            let built = crate::animatic::build(&project.storyboard, project.fps);
+            project.length = project.length.max(built.length);
+            if let Some(i) = project.set_animatic(built) {
+                project.enter_comp(i, 0, 0);
+            }
+        }
         // Para capturas de las precomposiciones: LEONTOON_PRECOMP=1 precompone las dos capas de arriba; con `dentro`, además entra.
         if let Ok(mode) = std::env::var("LEONTOON_PRECOMP") {
             if project.layers.len() >= 3 {

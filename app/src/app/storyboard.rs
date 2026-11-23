@@ -89,6 +89,35 @@ impl LeonApp {
         ui.painter().hline(r.x_range(), r.top(), stk(1.0, LINE));
     }
 
+    /// El animatic como composición: una precomposición «Animatic» con una capa-clip por plano (barra de entrada y salida y
+    /// fundidos cruzados). Se entra en ella para verla y editarla en la línea de tiempo de montaje.
+    fn animatic_comp(&mut self) {
+        if self.project.storyboard.is_empty() {
+            self.say("No hay planos");
+            return;
+        }
+        let built = crate::animatic::build(&self.project.storyboard, self.project.fps);
+        let length = built.length;
+        self.checkpoint();
+        // Estando dentro de la composición del animatic no se puede regenerar: se sale primero.
+        if self.project.comp_path().iter().any(|n| n == crate::animatic::NAME) {
+            self.exit_to_level(0);
+        }
+        let existed = self.project.layers.iter().any(|l| l.kind == LayerKind::Precomp && l.precomp.and_then(|id| self.project.comp(id)).map_or(false, |c| c.name == crate::animatic::NAME));
+        match self.project.set_animatic(built) {
+            Some(i) => {
+                self.project.length = self.project.length.max(length);
+                self.cl = i;
+                self.lsel.clear();
+                self.say(if existed {
+                    format!("Composición «Animatic» actualizada desde el storyboard: {length} fotogramas")
+                } else {
+                    format!("Composición «Animatic» creada: {length} fotogramas, un clip por plano. Tab para verla por dentro")
+                });
+            }
+            None => self.say("No se puede actualizar el animatic estando dentro de su composición"),
+        }
+    }
     fn animatic(&mut self) {
         if self.project.storyboard.is_empty() {
             self.say("No hay planos");
@@ -377,6 +406,15 @@ impl LeonApp {
                     ui.label(RichText::new(format!("{}  {}", i + 1, p.title)).color(TX));
                     ui.horizontal(|ui| {
                         ui.add(egui::DragValue::new(&mut p.dur).range(0.1..=600.0).speed(0.05).max_decimals(1).suffix(" s"));
+                        let fade = crate::animatic::is_fade(&p.trans);
+                        egui::ComboBox::from_id_salt(("plano_trans", i)).selected_text(if fade { "Fundido" } else { "Corte" }).width(76.0).show_ui(ui, |ui| {
+                            if ui.selectable_label(!fade, "Corte").clicked() && fade {
+                                p.trans = "Corte".into();
+                            }
+                            if ui.selectable_label(fade, "Fundido").clicked() && !fade {
+                                p.trans = "Fundido".into();
+                            }
+                        });
                         ui.label(RichText::new(format!("cuadro {}", (start * fps).round() as u32 + 1)).size(11.0).color(INK3));
                     });
                 });
@@ -389,11 +427,14 @@ impl LeonApp {
         }
         ui.separator();
         if pill(ui, "Animatic > línea de tiempo", true)
-            .on_hover_text("Crea una capa «Animatic» con cada plano durante su duración")
+            .on_hover_text("Crea (o actualiza) la composición «Animatic»: una capa-clip por plano, con su barra y sus fundidos. Se edita en la línea de tiempo de montaje")
             .clicked()
         {
+            self.animatic_comp();
+        }
+        if pill(ui, "Animatic > Xsheet", false).on_hover_text("Crea una columna «Animatic» con cada plano durante su duración (un dibujo por exposición)").clicked() {
             self.animatic();
         }
-        muted(ui, "Las transiciones entre planos están pendientes.");
+        muted(ui, "Fundido: el plano entra en fundido cruzado sobre el anterior (hasta medio segundo). Corte: sin transición.");
     }
 }

@@ -2,6 +2,7 @@
 
 mod app;
 mod abr;
+mod animatic;
 mod brush;
 mod capture;
 mod model;

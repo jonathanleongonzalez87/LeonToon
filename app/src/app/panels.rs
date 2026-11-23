@@ -196,7 +196,7 @@ impl LeonApp {
     /// Devuelve la posición vertical donde termina la lista de capas (el borde que se arrastra para repartir la columna).
     pub(super) fn right_column(&mut self, ui: &mut egui::Ui, rect: Rect) -> f32 {
         let rows = self.project.layers.len() as f32;
-        let auto = (28.0 + 8.0 + rows * 28.0 + 64.0).min(rect.height() * 0.45).max(150.0);
+        let auto = (28.0 + 8.0 + rows * 28.0 + 64.0 + if self.project.in_comp() { 26.0 } else { 0.0 }).min(rect.height() * 0.45).max(150.0);
         // La persona puede fijar el alto de la lista de capas; las propiedades se quedan con al menos 120 px.
         let lh = if self.sz.layers > 0.0 { self.sz.layers.min((rect.height() - 120.0).max(panelsize::PanelSizes::LAYERS_MIN)) } else { auto };
         let lr = Rect::from_min_size(rect.min, Vec2::new(rect.width(), lh));

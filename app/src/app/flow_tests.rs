@@ -909,3 +909,28 @@ fn guardar_dentro_de_una_precomposicion_guarda_la_composicion_principal() {
     assert_eq!(root.data(), again.data());
     finish(&dir);
 }
+
+#[test]
+fn el_animatic_muestra_cada_plano_en_su_tiempo_y_el_fundido_cruza_los_dos() {
+    let sheet = |gray: u8| Arc::new(Drawing { strokes: vec![Stroke::shape(ShapeKind::Rect, [0.0, 0.0], [1280.0, 720.0], [0, 0, 0, 0], 1.0, Some([gray, gray, gray, 255]))], ..Default::default() });
+    let mut sb = vec![crate::model::Panel::new(1), crate::model::Panel::new(2)];
+    sb[0].dur = 1.0;
+    sb[0].drawing = sheet(100);
+    sb[1].dur = 1.0;
+    sb[1].drawing = sheet(220);
+    sb[1].trans = "Fundido".into();
+    let mut p = Project::blank(1280, 720, 24, 48);
+    p.background = [0, 0, 0, 255];
+    p.layers = vec![Layer::new("vacía")];
+    p.set_animatic(crate::animatic::build(&sb, 24)).unwrap();
+    let at = |f: u32| {
+        let img = crate::render::render_frame(&p, f, 0.25).unwrap();
+        let px = img.pixel(img.width() / 2, img.height() / 2).unwrap();
+        px.red() as i32
+    };
+    assert_eq!(at(0), 100, "el primer plano al empezar");
+    assert_eq!(at(11), 100, "todavía no ha empezado el fundido");
+    assert!((at(18) - 160).abs() <= 2, "a mitad del fundido se mezclan: {}", at(18));
+    assert_eq!(at(30), 220, "después, solo el segundo plano");
+    assert_eq!(at(47), 220);
+}

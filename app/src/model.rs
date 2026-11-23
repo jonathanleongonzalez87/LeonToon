@@ -1623,6 +1623,33 @@ impl Project {
         p
     }
 
+    /// Pone el animatic en el proyecto: la composición «Animatic» con las capas-clip dadas (se actualiza si ya existía, en vez de duplicarla) y su capa de precomposición arriba del todo. Devuelve el índice de esa capa, o `None` si la composición está abierta ahora mismo.
+    pub fn set_animatic(&mut self, built: crate::animatic::Built) -> Option<usize> {
+        let existing = self.layers.iter().position(|l| l.kind == LayerKind::Precomp && l.precomp.and_then(|id| self.comp(id)).map_or(false, |c| c.name == crate::animatic::NAME));
+        if let Some(i) = existing {
+            let id = self.layers[i].precomp?;
+            if self.stack.iter().any(|lv| lv.comp_id == id) {
+                return None;
+            }
+            let c = self.comps.iter_mut().find(|c| c.id == id)?;
+            c.layers = built.layers;
+            c.length = built.length;
+            return Some(i);
+        }
+        if self.stack.iter().any(|lv| self.comp(lv.comp_id).map_or(false, |c| c.name == crate::animatic::NAME)) {
+            return None;
+        }
+        let id = self.next_comp_id();
+        self.comps.push(Composition { id, name: crate::animatic::NAME.into(), layers: built.layers, length: built.length });
+        let mut pl = Layer::new(crate::animatic::NAME);
+        pl.kind = LayerKind::Precomp;
+        pl.precomp = Some(id);
+        pl.uid = self.next_uid();
+        self.layers.insert(0, pl);
+        self.normalize_groups();
+        Some(0)
+    }
+
     /// Convierte las capas elegidas (o una colección con su contenido) en una precomposición nueva, en el sitio de la de más
     /// arriba y con el mismo aspecto que antes. Devuelve el índice de la capa de precomposición, o ``None`` si hay una cámara.
     pub fn precompose(&mut self, idx: &[usize]) -> Option<usize> {
@@ -2462,6 +2489,24 @@ mod tests {
         let pi = p.precompose(&[1]).unwrap();
         let comp = p.comp(p.layers[pi].precomp.unwrap()).unwrap();
         assert!(comp.layers[0].parent.is_none());
+    }
+
+    #[test]
+    fn el_animatic_se_crea_una_vez_y_se_actualiza_en_vez_de_duplicarse() {
+        let panels = |n: usize| (1..=n).map(|i| Panel { title: format!("P{i}"), dur: 1.0, ..Default::default() }).collect::<Vec<_>>();
+        let mut p = layers_named(&["a"]);
+        let i = p.set_animatic(crate::animatic::build(&panels(2), 24)).unwrap();
+        assert_eq!((i, p.layers[0].kind, p.layers[0].name.as_str()), (0, LayerKind::Precomp, "Animatic"));
+        assert_eq!(p.comps.len(), 1);
+        assert_eq!(p.comp(p.layers[0].precomp.unwrap()).unwrap().layers.len(), 2);
+        // Con más planos se actualiza la misma composición.
+        let j = p.set_animatic(crate::animatic::build(&panels(3), 24)).unwrap();
+        assert_eq!((j, p.comps.len(), p.layers.len()), (0, 1, 2));
+        let c = p.comp(p.layers[0].precomp.unwrap()).unwrap();
+        assert_eq!((c.layers.len(), c.length), (3, 72));
+        // Estando dentro de la composición no se puede regenerar.
+        assert!(p.enter_comp(0, 0, 0));
+        assert!(p.set_animatic(crate::animatic::build(&panels(1), 24)).is_none());
     }
     #[test]
     fn xsheet_operations() {
