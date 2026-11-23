@@ -869,6 +869,10 @@ impl LeonApp {
         if let Some(n) = std::env::var("LEONTOON_CUADRO").ok().and_then(|v| v.parse::<u32>().ok()) {
             app.frame = n.min(app.project.length.saturating_sub(1));
         }
+        // Capturas: LEONTOON_MUESTRA=stopmotion abre el proyecto de muestra de Stop Motion (como el botón de la pantalla de inicio).
+        if std::env::var("LEONTOON_MUESTRA").as_deref() == Ok("stopmotion") {
+            app.open_stopmotion_demo();
+        }
         if let Ok(v) = std::env::var("LEONTOON_ONION") {
             app.onion = v != "0";
         }

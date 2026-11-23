@@ -214,7 +214,10 @@ impl LeonApp {
                                     if home_item(ui, "Ejemplo: pelota que bota", "demo").clicked() {
                                         action = Some(1);
                                     }
-                                    for r in self.recent.clone().into_iter().take(4) {
+                                    if home_item(ui, "Ejemplo: Stop Motion con plastilina", "demo").clicked() {
+                                        action = Some(5);
+                                    }
+                                    for r in self.recent.clone().into_iter().take(3) {
                                         let name = r.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
                                         if home_item(ui, &name, "").on_hover_text(r.display().to_string()).clicked() {
                                             pick_recent = Some(r);
@@ -259,6 +262,7 @@ impl LeonApp {
                     self.stage = Stage::Work;
                     self.request(ctx, Pending::Open);
                 }
+                Some(5) => self.open_stopmotion_demo(),
                 Some(3) => {
                     self.stage = Stage::Work;
                     self.show_help = true;
@@ -273,6 +277,27 @@ impl LeonApp {
                     }
                 }
             }
+        }
+    }
+
+    /// Ejemplo de Stop Motion: las fotos de la secuencia se copian a la carpeta de datos y se abre la sala Stop Motion.
+    pub(crate) fn open_stopmotion_demo(&mut self) {
+        let Some(dir) = safety::data_dir().map(|d| d.join("muestras").join("stopmotion")) else {
+            self.say("No se encontró dónde guardar las fotos del ejemplo.");
+            return;
+        };
+        match crate::demo_sm::build(&dir) {
+            Ok(mut p) => {
+                p.room_set = "stopmotion".into();
+                p.rooms = tabs_for_set("stopmotion");
+                self.project = p;
+                self.path = None;
+                self.after_load();
+                self.stage = Stage::Work;
+                self.goto_room_kind(RoomKind::StopMotion);
+                self.say("Ejemplo abierto: una secuencia de plastilina. Pulsa Espacio para reproducirla.");
+            }
+            Err(e) => self.say(format!("No se pudo abrir el ejemplo: {e}")),
         }
     }
 

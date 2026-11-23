@@ -75,7 +75,7 @@ ser 2D o 3D, con profundidad animable, y se coloca en fondo, medio o primer plan
 
 ## Stop Motion
 
-La sala de Stop Motion se parece a un programa de captura: el escenario con su *Live View* arriba, controles de reproducción,
+Desde la pantalla de inicio se abre **«Ejemplo: Stop Motion con plastilina»**, una secuencia real de 91 fotos que viene dentro del programa (se copia a la carpeta de datos la primera vez). La sala de Stop Motion se parece a un programa de captura: el escenario con su *Live View* arriba, controles de reproducción,
 y alrededor las hojas de exposición y la tira de fotos.
 
 ![Sala de Stop Motion](docs/img/17-sala-stop-motion-v2.png)

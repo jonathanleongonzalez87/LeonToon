@@ -4,6 +4,8 @@ mod app;
 mod abr;
 mod animatic;
 mod demo;
+mod demo_sm;
+mod demo_sm_fotos;
 mod brush;
 mod capture;
 mod model;
