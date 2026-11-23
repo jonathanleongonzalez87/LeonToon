@@ -72,7 +72,15 @@ pub trait CaptureProvider: Send + Sync {
 /// Todos los proveedores disponibles. `LEONTOON_FAKECAM=1` usa solo la cámara simulada (para probar sin tocar ninguna cámara real).
 pub fn providers() -> Vec<Arc<dyn CaptureProvider>> {
     if std::env::var("LEONTOON_FAKECAM").is_ok() {
-        return vec![Arc::new(MockProvider::default())];
+        // LEONTOON_FAKECAM=<carpeta> (o la carpeta referencia/Sec_Ref_Stop_Motion, si existe) muestra esa secuencia como si fuera la cámara.
+        let v = std::env::var("LEONTOON_FAKECAM").unwrap_or_default();
+        let custom = std::path::PathBuf::from(&v);
+        let dir = if !v.is_empty() && v != "1" && custom.is_dir() {
+            Some(custom)
+        } else {
+            ["referencia/Sec_Ref_Stop_Motion", "../referencia/Sec_Ref_Stop_Motion"].into_iter().map(std::path::PathBuf::from).find(|p| p.is_dir())
+        };
+        return vec![Arc::new(MockProvider { frames_dir: dir, ..MockProvider::default() })];
     }
     vec![Arc::new(WebcamProvider)]
 }

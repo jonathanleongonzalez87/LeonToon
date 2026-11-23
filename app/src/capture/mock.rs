@@ -13,11 +13,13 @@ pub struct MockProvider {
     pub jpeg: bool,
     /// Si es false, el dispositivo no declara ningún control.
     pub with_controls: bool,
+    /// Carpeta con una secuencia de imágenes de referencia: la cámara las muestra en bucle (a 4 por segundo) en vez del degradado.
+    pub frames_dir: Option<std::path::PathBuf>,
 }
 
 impl Default for MockProvider {
     fn default() -> Self {
-        MockProvider { width: 1280, height: 720, fail_after: None, jpeg: true, with_controls: true }
+        MockProvider { width: 1280, height: 720, fail_after: None, jpeg: true, with_controls: true, frames_dir: None }
     }
 }
 
@@ -27,14 +29,21 @@ impl CaptureProvider for MockProvider {
     }
 
     fn list(&self) -> Result<Vec<DeviceInfo>, String> {
-        Ok(vec![DeviceInfo { id: "simulada:0".into(), name: "Cámara simulada".into(), provider: "simulada".into() }])
+        Ok(vec![DeviceInfo { id: "simulada:0".into(), name: if self.frames_dir.is_some() { "Cámara de prueba (secuencia de referencia)".into() } else { "Cámara simulada".into() }, provider: "simulada".into() }])
     }
 
     fn open(&self, id: &str) -> Result<Box<dyn CaptureDevice>, String> {
         if id != "simulada:0" {
             return Err(format!("no existe el dispositivo {id}"));
         }
-        Ok(Box::new(MockDevice { cfg: self.clone(), n: 0, brightness: 50 }))
+        let mut files: Vec<std::path::PathBuf> = self
+            .frames_dir
+            .as_ref()
+            .and_then(|d| std::fs::read_dir(d).ok())
+            .map(|rd| rd.filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x.eq_ignore_ascii_case("png") || x.eq_ignore_ascii_case("jpg"))).collect())
+            .unwrap_or_default();
+        files.sort();
+        Ok(Box::new(MockDevice { cfg: self.clone(), n: 0, brightness: 50, files, start: std::time::Instant::now() }))
     }
 }
 
@@ -42,6 +51,8 @@ struct MockDevice {
     cfg: MockProvider,
     n: u64,
     brightness: i64,
+    files: Vec<std::path::PathBuf>,
+    start: std::time::Instant,
 }
 
 impl CaptureDevice for MockDevice {
@@ -58,6 +69,20 @@ impl CaptureDevice for MockDevice {
         }
         std::thread::sleep(std::time::Duration::from_millis(8));
         self.n += 1;
+        if !self.files.is_empty() {
+            let i = (self.start.elapsed().as_millis() / 250) as usize % self.files.len();
+            let mut img = image::open(&self.files[i]).map_err(|e| e.to_string())?.to_rgb8();
+            let (w, h) = (img.width(), img.height());
+            let lum = (self.brightness as f32 / 50.0).clamp(0.0, 2.0);
+            if (lum - 1.0).abs() > 0.01 {
+                for p in img.pixels_mut() {
+                    for c in p.0.iter_mut() {
+                        *c = (*c as f32 * lum).min(255.0) as u8;
+                    }
+                }
+            }
+            return Ok(RawFrame { width: w, height: h, data: img.into_raw(), jpeg: false });
+        }
         let (w, h) = (self.cfg.width, self.cfg.height);
         let mut img = image::RgbImage::new(w, h);
         let lum = (self.brightness as f32 / 50.0).clamp(0.0, 2.0);

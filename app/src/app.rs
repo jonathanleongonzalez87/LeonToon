@@ -593,8 +593,26 @@ impl LeonApp {
         // con LEONTOON_SMFALTA=1 la capa apunta a una carpeta que no existe (para ver el aviso).
         if let Ok(dir) = std::env::var("LEONTOON_STOPMOTION") {
             let dir = std::path::PathBuf::from(dir);
-            if let Ok(mut f) = crate::stopmotion::SeqFolder::create(&dir, "Escena de prueba", 12) {
-                for i in 0..14u32 {
+            // LEONTOON_SMFOTOS=<carpeta> usa esas imágenes (en orden) como fotos de la secuencia en vez de las generadas.
+            let refs: Vec<std::path::PathBuf> = std::env::var("LEONTOON_SMFOTOS")
+                .ok()
+                .and_then(|d| std::fs::read_dir(d).ok())
+                .map(|rd| {
+                    let mut v: Vec<_> = rd.filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x.eq_ignore_ascii_case("png") || x.eq_ignore_ascii_case("jpg"))).collect();
+                    v.sort();
+                    v
+                })
+                .unwrap_or_default();
+            if let Ok(mut f) = crate::stopmotion::SeqFolder::create(&dir, "Escena de prueba", if refs.is_empty() { 12 } else { 24 }) {
+                for p in refs.iter().take(24) {
+                    if let Ok(img) = image::open(p) {
+                        let mut bytes = Vec::new();
+                        if image::codecs::jpeg::JpegEncoder::new_with_quality(&mut bytes, 90).encode_image(&img.to_rgb8()).is_ok() {
+                            let _ = f.append_photo(&bytes, None);
+                        }
+                    }
+                }
+                for i in 0..(if refs.is_empty() { 14u32 } else { 0 }) {
                     // Una bola blanca que avanza de foto en foto sobre un fondo que cambia de color: se nota el movimiento.
                     let (cx, cy) = (30.0 + i as f32 * 20.0, 90.0 - (i as f32 * 0.5).sin() * 40.0);
                     let img = image::RgbImage::from_fn(320, 180, |x, y| {
