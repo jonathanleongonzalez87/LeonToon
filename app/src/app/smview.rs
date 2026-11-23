@@ -90,7 +90,7 @@ impl LeonApp {
             let fit = (pw / sw).min(ph / sh);
             let (rw, rh) = (sw * fit, sh * fit);
             let (x0, y0) = ((pw - rw) / 2.0, (ph - rh) / 2.0);
-            let t = layer.transform_at(fr);
+            let t = self.project.effective_at(li, fr);
             let map = |p: [f32; 2]| {
                 let q = t.apply(pw, ph, p);
                 Pos2::new(origin.x + q[0] * z, origin.y + q[1] * z)

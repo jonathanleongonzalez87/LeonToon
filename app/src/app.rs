@@ -174,7 +174,7 @@ struct Meta {
     size: (u32, u32, u32, u32),
     bg: Rgba,
     palettes: Vec<crate::model::NamedPalette>,
-    layers: Vec<(String, bool, bool, f32, crate::tracks::Tracks, (u32, Option<u32>, bool, bool, u8))>,
+    layers: Vec<(String, bool, bool, f32, crate::tracks::Tracks, (u32, Option<u32>, bool, bool, u8, crate::model::Blend))>,
     sb: Vec<[String; 6]>,
     durs: Vec<u32>,
     range: Option<(u32, u32)>,
@@ -185,7 +185,7 @@ fn meta_of(p: &Project) -> Meta {
         size: (p.width, p.height, p.fps, p.length),
         bg: p.background,
         palettes: p.palettes.clone(),
-        layers: p.layers.iter().map(|l| (l.name.clone(), l.visible, l.locked, l.opacity, l.tracks.clone(), (l.in_f, l.out_f, l.solo, l.shy, l.label))).collect(),
+        layers: p.layers.iter().map(|l| (l.name.clone(), l.visible, l.locked, l.opacity, l.tracks.clone(), (l.in_f, l.out_f, l.solo, l.shy, l.label, l.blend))).collect(),
         sb: p
             .storyboard
             .iter()
@@ -207,7 +207,7 @@ fn apply_meta(p: &mut Project, m: &Meta) {
         l.locked = *lk;
         l.opacity = *o;
         l.tracks = x.clone();
-        (l.in_f, l.out_f, l.solo, l.shy, l.label) = *bar;
+        (l.in_f, l.out_f, l.solo, l.shy, l.label, l.blend) = *bar;
     }
     for ((s, t), d) in p.storyboard.iter_mut().zip(&m.sb).zip(&m.durs) {
         [s.title, s.action, s.dialogue, s.camera, s.trans, s.notes] = t.clone();
@@ -544,6 +544,13 @@ impl LeonApp {
             }
             l.keys.insert(0, std::sync::Arc::new(Drawing { strokes, raster: None }));
             project.layers.insert(0, l);
+        }
+        // Para capturas de los modos de fusión y los vínculos: LEONTOON_FUSION=1 pone la capa de arriba en Multiplicar y la vincula a la segunda.
+        if std::env::var("LEONTOON_FUSION").is_ok() && project.layers.len() >= 2 {
+            project.layers[0].blend = crate::model::Blend::Multiply;
+            project.layers[1].blend = crate::model::Blend::Difference;
+            project.set_parent(0, Some(1));
+            project.layers[1].tracks.set(Prop::Position, 0, [80.0, 40.0], crate::model::Interp::Linear);
         }
         // Para capturas de la capa Stop Motion: LEONTOON_STOPMOTION=<carpeta> crea ahí una secuencia con fotos de ejemplo y una capa que la usa;
         // con LEONTOON_SMFALTA=1 la capa apunta a una carpeta que no existe (para ver el aviso).

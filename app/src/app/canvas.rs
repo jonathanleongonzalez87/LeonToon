@@ -200,17 +200,28 @@ impl LeonApp {
             }
         }
         let any_solo = self.project.layers.iter().any(|l| l.solo);
+        // Con algún modo de fusión, la escena se compone con el mismo motor que la exportación (el visor no sabe fusionar):
+        // se muestra ya compuesta, sin papel cebolla, y solo se dibuja encima el trazo en curso.
+        let blended = self.project.has_blend_at(f);
+        if blended {
+            let scale = (z * painter.ctx().pixels_per_point()).clamp(0.05, 3.0);
+            if let Some(pm) = crate::render::render_frame_opts(&self.project, f, scale, true) {
+                let img = egui::ColorImage::from_rgba_premultiplied([pm.width() as usize, pm.height() as usize], pm.data());
+                let tex = painter.ctx().load_texture("escena_fusionada", img, egui::TextureOptions::LINEAR);
+                painter.image(tex.id(), cam, Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)), Color32::WHITE.gamma_multiply(op));
+            }
+        }
         for (li, layer) in self.project.layers.iter().enumerate().rev() {
             if !layer.shows_at(f, any_solo) {
                 continue;
             }
-            let t = layer.transform_at(f);
+            let t = self.project.effective_at(li, f);
             let map = move |p: [f32; 2]| {
                 let q = t.apply(w, h, p);
                 Pos2::new(origin.x + q[0] * z, origin.y + q[1] * z)
             };
             let zs = z * t.s.abs();
-            if live && self.onion && li == self.cl {
+            if live && self.onion && li == self.cl && !blended {
                 let cur = layer.key_at_or_before(f);
                 let mut shown: Vec<u32> = cur.into_iter().collect();
                 for (dir, n, tint) in [(-1i64, self.onion_before, ONION_BEFORE), (1, self.onion_after, ONION_AFTER)] {
@@ -224,7 +235,7 @@ impl LeonApp {
                             continue;
                         }
                         shown.push(k);
-                        let tg = layer.transform_at(g as u32);
+                        let tg = self.project.effective_at(li, g as u32);
                         let mapg = move |p: [f32; 2]| {
                             let q = tg.apply(w, h, p);
                             Pos2::new(origin.x + q[0] * z, origin.y + q[1] * z)
@@ -238,14 +249,14 @@ impl LeonApp {
                 }
             }
             let alpha = layer.opacity * t.o * op;
-            if layer.kind == LayerKind::Solid {
+            if layer.kind == LayerKind::Solid && !blended {
                 let cam = Rect::from_min_size(origin, Vec2::new(w, h) * z);
                 painter.rect_filled(cam, 0.0, with_alpha(c32(layer.solid), alpha));
             }
-            if layer.kind == LayerKind::StopMotion {
+            if layer.kind == LayerKind::StopMotion && !blended {
                 self.paint_stopmotion(painter, li, layer, origin, z, f, alpha, live, op);
             }
-            if let Some(d) = layer.drawing_at(f) {
+            if let (false, Some(d)) = (blended, layer.drawing_at(f)) {
                 paint_raster(painter, d, &map, alpha, 0);
                 paint_drawing(painter, d, &map, zs, None, alpha);
             }

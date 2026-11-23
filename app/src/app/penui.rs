@@ -166,7 +166,7 @@ impl LeonApp {
     /// Conversión de coordenadas del dibujo a pantalla para la capa actual.
     fn layer_map(&self, origin: Pos2, z: f32) -> impl Fn([f32; 2]) -> Pos2 {
         let (w, h) = (self.project.width as f32, self.project.height as f32);
-        let t = self.layer().transform_at(self.frame);
+        let t = self.project.effective_at(self.cl, self.frame);
         move |q: [f32; 2]| {
             let s = t.apply(w, h, q);
             Pos2::new(origin.x + s[0] * z, origin.y + s[1] * z)

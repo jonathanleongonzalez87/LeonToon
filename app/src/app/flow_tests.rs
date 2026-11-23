@@ -745,3 +745,55 @@ fn editing_the_sequence_changes_the_summary_but_never_the_photos() {
     assert!(near(spx(&pm, 50, 25), [0, 0, 255, 255]), "tras deshacer vuelve la foto");
     finish(&root);
 }
+
+/// Capa con un rectángulo gris que cubre toda la cámara.
+fn gray_sheet(name: &str, gray: u8) -> Layer {
+    let mut l = Layer::new(name);
+    let r = Stroke::shape(ShapeKind::Rect, [0.0, 0.0], [1280.0, 720.0], [0, 0, 0, 0], 1.0, Some([gray, gray, gray, 255]));
+    l.keys.insert(0, Arc::new(Drawing { strokes: vec![r], ..Default::default() }));
+    l
+}
+
+fn center_pixel(p: &Project) -> [u8; 3] {
+    let pm = crate::render::render_frame(p, 0, 0.25).expect("se dibuja");
+    let (w, h) = (pm.width(), pm.height());
+    let px = pm.pixel(w / 2, h / 2).expect("hay pixel");
+    [px.red(), px.green(), px.blue()]
+}
+
+#[test]
+fn el_modo_de_fusion_cambia_lo_que_se_exporta() {
+    let mut p = Project::blank(1280, 720, 24, 4);
+    p.background = [200, 100, 50, 255];
+    p.layers = vec![gray_sheet("gris", 128)];
+    let normal = center_pixel(&p);
+    assert_eq!(normal, [128, 128, 128], "normal: tapa el fondo");
+    p.layers[0].blend = crate::model::Blend::Multiply;
+    let m = center_pixel(&p);
+    // Multiplicar: fondo × gris / 255 (200→100, 100→50, 50→25).
+    assert!((m[0] as i32 - 100).abs() <= 2 && (m[1] as i32 - 50).abs() <= 2 && (m[2] as i32 - 25).abs() <= 2, "multiplicar dio {m:?}");
+    p.layers[0].blend = crate::model::Blend::Difference;
+    let d = center_pixel(&p);
+    assert!((d[0] as i32 - 72).abs() <= 2 && (d[1] as i32 - 28).abs() <= 2 && (d[2] as i32 - 78).abs() <= 2, "diferencia dio {d:?}");
+}
+
+#[test]
+fn modo_de_fusion_y_vinculo_se_guardan_y_las_capas_antiguas_se_abren_normales() {
+    let mut p = Project::blank(1280, 720, 24, 4);
+    p.layers = vec![gray_sheet("hija", 10), gray_sheet("madre", 20)];
+    p.layers[0].blend = crate::model::Blend::Screen;
+    assert!(p.set_parent(0, Some(1)));
+    let back: Project = serde_json::from_str(&serde_json::to_string(&p).unwrap()).unwrap();
+    assert_eq!(back.layers[0].blend, crate::model::Blend::Screen);
+    let parent_uid = back.layers[0].parent.expect("conserva el vínculo");
+    assert_eq!(back.layers[1].uid, parent_uid);
+    // Un proyecto sin esos campos: normal y sin vínculos.
+    let mut v: serde_json::Value = serde_json::to_value(&p).unwrap();
+    for l in v["layers"].as_array_mut().unwrap() {
+        l.as_object_mut().unwrap().remove("blend");
+        l.as_object_mut().unwrap().remove("parent");
+        l.as_object_mut().unwrap().remove("uid");
+    }
+    let old: Project = serde_json::from_value(v).unwrap();
+    assert!(old.layers.iter().all(|l| l.blend == crate::model::Blend::Normal && l.parent.is_none() && l.uid == 0));
+}

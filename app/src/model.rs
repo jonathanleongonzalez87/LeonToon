@@ -409,6 +409,36 @@ impl Drawing {
     }
 }
 
+/// Modo de fusión de una capa con lo que hay debajo (los ocho del prototipo).
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug, Default)]
+pub enum Blend {
+    #[default]
+    Normal,
+    Multiply,
+    Screen,
+    Overlay,
+    Darken,
+    Lighten,
+    Difference,
+    Add,
+}
+
+impl Blend {
+    pub const ALL: [Blend; 8] = [Blend::Normal, Blend::Multiply, Blend::Screen, Blend::Overlay, Blend::Darken, Blend::Lighten, Blend::Difference, Blend::Add];
+    pub fn label(self) -> &'static str {
+        match self {
+            Blend::Normal => "Normal",
+            Blend::Multiply => "Multiplicar",
+            Blend::Screen => "Pantalla",
+            Blend::Overlay => "Superponer",
+            Blend::Darken => "Oscurecer",
+            Blend::Lighten => "Aclarar",
+            Blend::Difference => "Diferencia",
+            Blend::Add => "Añadir",
+        }
+    }
+}
+
 /// Cómo se pasa de una clave de animación a la siguiente.
 #[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug, Default)]
 pub enum Interp {
@@ -452,6 +482,13 @@ impl XKey {
         let (sn, cs) = self.r.to_radians().sin_cos();
         [x * cs - y * sn + cx + self.x, x * sn + y * cs + cy + self.y]
     }
+    /// La transformación de una capa hija dentro de su madre: primero la de la hija y después la de la madre. Es otra
+    /// transformación del mismo tipo (con el anclaje en el centro de la cámara), así que todo lo que usa XKey sirve igual.
+    pub fn compose(&self, parent: &XKey, w: f32, h: f32) -> XKey {
+        let c = parent.apply(w, h, self.apply(w, h, [w / 2.0, h / 2.0]));
+        XKey { x: c[0] - w / 2.0, y: c[1] - h / 2.0, r: self.r + parent.r, s: self.s * parent.s, o: self.o, i: self.i, ax: 0.0, ay: 0.0 }
+    }
+
     /// Punto de la escena → punto del dibujo (lo contrario de `apply`).
     pub fn invert(&self, w: f32, h: f32, p: [f32; 2]) -> [f32; 2] {
         let (cx, cy) = (w / 2.0 + self.ax, h / 2.0 + self.ay);
@@ -634,6 +671,19 @@ pub struct Layer {
     /// Etiqueta de color (índice en LABELS; 0 = sin etiqueta).
     #[serde(default)]
     pub label: u8,
+    /// Modo de fusión con lo que hay debajo.
+    #[serde(default)]
+    pub blend: Blend,
+    /// Identificador de la capa (0 = aún sin asignar); lo usan los vínculos para no depender del orden de las capas.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub uid: u64,
+    /// Capa madre (su uid): la hija hereda su posición, giro y escala.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent: Option<u64>,
+}
+
+fn is_zero(v: &u64) -> bool {
+    *v == 0
 }
 
 /// Colores de etiqueta de las capas (el primero es «sin etiqueta»).
@@ -660,6 +710,9 @@ impl Layer {
             solo: false,
             shy: false,
             label: 0,
+            blend: Blend::Normal,
+            uid: 0,
+            parent: None,
         }
     }
 
@@ -994,16 +1047,108 @@ impl Project {
         }
     }
 
+    /// Índice de la capa con ese uid.
+    pub fn index_of_uid(&self, uid: u64) -> Option<usize> {
+        (uid != 0).then(|| self.layers.iter().position(|l| l.uid == uid)).flatten()
+    }
+
+    /// Transformación con la que se dibuja la capa li en el cuadro f: la suya compuesta con la de sus madres (con un tope de
+    /// profundidad por si un archivo roto trae un ciclo).
+    pub fn effective_at(&self, li: usize, f: u32) -> XKey {
+        let (w, h) = (self.width as f32, self.height as f32);
+        let mut t = self.layers[li].transform_at(f);
+        let mut cur = li;
+        for _ in 0..16 {
+            let Some(pi) = self.layers[cur].parent.and_then(|u| self.index_of_uid(u)) else { break };
+            if pi == li {
+                break;
+            }
+            t = t.compose(&self.layers[pi].transform_at(f), w, h);
+            cur = pi;
+        }
+        t
+    }
+
+    /// ¿Vincular child a parent crearía un ciclo (o la capa a sí misma)?
+    pub fn would_cycle(&self, child: usize, parent: usize) -> bool {
+        let mut cur = parent;
+        for _ in 0..=self.layers.len() {
+            if cur == child {
+                return true;
+            }
+            match self.layers[cur].parent.and_then(|u| self.index_of_uid(u)) {
+                Some(p) => cur = p,
+                None => return false,
+            }
+        }
+        true
+    }
+
+    fn next_uid(&self) -> u64 {
+        self.layers.iter().map(|l| l.uid).max().unwrap_or(0) + 1
+    }
+
+    /// Vincula la capa child a parent (o la suelta con None). Devuelve false si crearía un ciclo.
+    pub fn set_parent(&mut self, child: usize, parent: Option<usize>) -> bool {
+        let Some(p) = parent else {
+            self.layers[child].parent = None;
+            return true;
+        };
+        if p >= self.layers.len() || self.would_cycle(child, p) {
+            return false;
+        }
+        if self.layers[p].uid == 0 {
+            self.layers[p].uid = self.next_uid();
+        }
+        self.layers[child].parent = Some(self.layers[p].uid);
+        true
+    }
+
+    /// Suelta a las hijas de la capa li (antes de borrarla).
+    pub fn release_children(&mut self, li: usize) {
+        let uid = self.layers[li].uid;
+        if uid != 0 {
+            for l in &mut self.layers {
+                if l.parent == Some(uid) {
+                    l.parent = None;
+                }
+            }
+        }
+    }
+
+    /// Deja los vínculos válidos (por si el archivo está editado o dañado): uid únicos, madres que existen y sin ciclos.
+    pub fn fix_links(&mut self) {
+        let mut seen = std::collections::HashSet::new();
+        for l in &mut self.layers {
+            if l.uid != 0 && !seen.insert(l.uid) {
+                l.uid = 0;
+            }
+        }
+        for i in 0..self.layers.len() {
+            let Some(u) = self.layers[i].parent else { continue };
+            let ok = self.index_of_uid(u).map_or(false, |p| p != i && !self.would_cycle(i, p));
+            if !ok {
+                self.layers[i].parent = None;
+            }
+        }
+    }
+
+    /// ¿Alguna capa que se ve en el cuadro f usa un modo de fusión que no es Normal?
+    pub fn has_blend_at(&self, f: u32) -> bool {
+        let any_solo = self.layers.iter().any(|l| l.solo);
+        self.layers.iter().any(|l| l.blend != Blend::Normal && l.shows_at(f, any_solo))
+    }
+
     /// Dibujo con todo lo visible en el fotograma `f` (para los planos del StoryBoard).
     pub fn flatten(&self, f: u32) -> Drawing {
         let (w, h) = (self.width as f32, self.height as f32);
         let mut out = Drawing::default();
         let any_solo = self.layers.iter().any(|l| l.solo);
-        for l in self.layers.iter().rev() {
+        for (li, l) in self.layers.iter().enumerate().rev() {
             if !l.shows_at(f, any_solo) {
                 continue;
             }
-            let t = l.transform_at(f);
+            let t = self.effective_at(li, f);
             if let Some(d) = l.drawing_at(f) {
                 for s in &d.strokes {
                     let mut s = s.clone();
@@ -1157,6 +1302,7 @@ impl Project {
             l.migrate_legacy();
             l.tracks.sanitize();
         }
+        self.fix_links();
         for pn in &mut self.storyboard {
             if !pn.dur.is_finite() {
                 pn.dur = 2.0;
@@ -1314,6 +1460,53 @@ mod tests {
         let l: Layer = serde_json::from_str(r#"{"name":"a","visible":true,"locked":false,"opacity":1.0,"keys":{}}"#).unwrap();
         assert_eq!((l.in_f, l.out_f, l.solo, l.shy, l.label), (0, None, false, false, 0));
         assert!(l.shows_at(500, false));
+    }
+
+    #[test]
+    fn la_transformacion_de_la_hija_dentro_de_la_madre_es_aplicar_una_y_luego_la_otra() {
+        let (w, h) = (1280.0, 720.0);
+        let child = XKey { x: 30.0, r: 20.0, s: 1.5, ax: 10.0, ay: -5.0, ..XKey::default() };
+        let parent = XKey { x: -50.0, y: 40.0, r: -35.0, s: 0.8, ..XKey::default() };
+        let c = child.compose(&parent, w, h);
+        for p in [[0.0, 0.0], [300.0, 200.0], [1000.0, 600.0]] {
+            let a = parent.apply(w, h, child.apply(w, h, p));
+            let b = c.apply(w, h, p);
+            assert!((a[0] - b[0]).abs() < 1e-2 && (a[1] - b[1]).abs() < 1e-2, "{p:?}: {a:?} frente a {b:?}");
+        }
+    }
+
+    #[test]
+    fn el_vinculo_hereda_el_movimiento_de_la_madre_sin_ciclos() {
+        let mut p = Project::blank(1280, 720, 24, 10);
+        p.layers = vec![Layer::new("hija"), Layer::new("madre"), Layer::new("abuela")];
+        p.layers[1].tracks.set(Prop::Position, 0, [100.0, 0.0], Interp::Linear);
+        p.layers[0].tracks.set(Prop::Position, 0, [5.0, 0.0], Interp::Linear);
+        assert!(p.set_parent(0, Some(1)));
+        assert_eq!(p.effective_at(0, 0).x, 105.0, "la hija suma su movimiento al de la madre");
+        // La madre sin vínculo conserva su propio movimiento; la hija se sigue animando por su cuenta.
+        assert_eq!(p.effective_at(1, 0).x, 100.0);
+        // Cadena de tres y ciclos.
+        assert!(p.set_parent(1, Some(2)));
+        p.layers[2].tracks.set(Prop::Position, 0, [1000.0, 0.0], Interp::Linear);
+        assert_eq!(p.effective_at(0, 0).x, 1105.0);
+        assert!(!p.set_parent(2, Some(0)), "la abuela no puede colgar de su nieta");
+        assert!(!p.set_parent(1, Some(1)), "ni una capa de sí misma");
+        // Al quitar la madre, la hija queda libre.
+        p.release_children(1);
+        assert_eq!(p.effective_at(0, 0).x, 5.0);
+    }
+
+    #[test]
+    fn un_archivo_con_vinculos_rotos_se_repara() {
+        let mut p = Project::blank(1280, 720, 24, 10);
+        p.layers = vec![Layer::new("a"), Layer::new("b")];
+        p.layers[0].uid = 7;
+        p.layers[1].uid = 7; // repetido
+        p.layers[0].parent = Some(99); // madre que no existe
+        p.layers[1].parent = Some(7); // apunta a sí misma o a la otra con el mismo uid
+        p.fix_links();
+        assert_eq!(p.layers[1].uid, 0, "el uid repetido se descarta");
+        assert!(p.layers[0].parent.is_none() && p.layers[1].parent.map_or(true, |u| p.index_of_uid(u).is_some()));
     }
     #[test]
     fn xsheet_operations() {

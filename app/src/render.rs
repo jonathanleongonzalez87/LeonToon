@@ -118,6 +118,21 @@ pub fn draw_drawing(pm: &mut Pixmap, d: &Drawing, tr: Transform) {
     }
 }
 
+/// El modo de fusión de una capa en tiny-skia.
+fn blend_mode(b: crate::model::Blend) -> BlendMode {
+    use crate::model::Blend;
+    match b {
+        Blend::Normal => BlendMode::SourceOver,
+        Blend::Multiply => BlendMode::Multiply,
+        Blend::Screen => BlendMode::Screen,
+        Blend::Overlay => BlendMode::Overlay,
+        Blend::Darken => BlendMode::Darken,
+        Blend::Lighten => BlendMode::Lighten,
+        Blend::Difference => BlendMode::Difference,
+        Blend::Add => BlendMode::Plus,
+    }
+}
+
 pub fn render_frame_opts(p: &Project, frame: u32, scale: f32, transparent: bool) -> Option<Pixmap> {
     let (fw, fh) = (p.width as f32, p.height as f32);
     let w = ((fw * scale).round() as u32).max(1);
@@ -128,20 +143,20 @@ pub fn render_frame_opts(p: &Project, frame: u32, scale: f32, transparent: bool)
         pm.fill(Color::from_rgba8(b[0], b[1], b[2], b[3]));
     }
     let any_solo = p.layers.iter().any(|l| l.solo);
-    for layer in p.layers.iter().rev() {
-        let t = layer.transform_at(frame);
+    for (li, layer) in p.layers.iter().enumerate().rev() {
+        let t = p.effective_at(li, frame);
         let op = (layer.opacity * t.o).clamp(0.0, 1.0);
         if !layer.shows_at(frame, any_solo) || op <= 0.0 {
             continue;
         }
         if layer.kind == LayerKind::StopMotion {
-            draw_stopmotion(&mut pm, p, layer, frame, &t, scale, op);
+            draw_stopmotion(&mut pm, p, layer, frame, &t, scale, op, blend_mode(layer.blend));
             continue;
         }
         if let Some(d) = layer.drawing_at(frame) {
             let mut lp = Pixmap::new(w, h)?;
             draw_drawing(&mut lp, d, layer_transform(&t, fw, fh, scale));
-            let pp = PixmapPaint { opacity: op, ..Default::default() };
+            let pp = PixmapPaint { opacity: op, blend_mode: blend_mode(layer.blend), ..Default::default() };
             pm.draw_pixmap(0, 0, lp.as_ref(), &pp, Transform::identity(), None);
         }
     }
@@ -151,7 +166,7 @@ pub fn render_frame_opts(p: &Project, frame: u32, scale: f32, transparent: bool)
 /// Dibuja la foto que toca en este cuadro de una capa Stop Motion, con el mismo cálculo de cuadros, ajuste y transformación
 /// que el visor. Se lee el **original** (reducido al tamaño que hace falta) y nunca se modifica. Si la carpeta, la foto o la
 /// secuencia faltan, la capa no dibuja nada (la exportación no falla por eso).
-fn draw_stopmotion(pm: &mut Pixmap, p: &Project, layer: &Layer, frame: u32, t: &XKey, scale: f32, op: f32) {
+fn draw_stopmotion(pm: &mut Pixmap, p: &Project, layer: &Layer, frame: u32, t: &XKey, scale: f32, op: f32, blend: BlendMode) {
     let Some(r) = &layer.stopmotion else { return };
     let Some(folder) = p.sm.folder(r, p.base_dir.as_deref()) else { return };
     let Some(idx) = folder.seq.item_for_project_frame(r.start, p.fps, frame) else { return };
@@ -169,7 +184,7 @@ fn draw_stopmotion(pm: &mut Pixmap, p: &Project, layer: &Layer, frame: u32, t: &
     let (rw, rh) = (src.width as f32 * fit, src.height as f32 * fit);
     let fit_t = Transform::from_translate((fw - rw) / 2.0, (fh - rh) / 2.0).pre_scale(fit / k, fit / k);
     let full = layer_transform(t, fw, fh, scale).pre_concat(fit_t);
-    let paint = PixmapPaint { opacity: op, quality: FilterQuality::Bicubic, ..Default::default() };
+    let paint = PixmapPaint { opacity: op, quality: FilterQuality::Bicubic, blend_mode: blend, ..Default::default() };
     pm.draw_pixmap(0, 0, photo.pixmap.as_ref(), &paint, full, None);
 }
 

@@ -38,7 +38,7 @@ impl LeonApp {
 
     /// Escala de la vista para la capa actual (píxeles de pantalla por unidad del dibujo).
     pub(super) fn view_scale(&self) -> f32 {
-        (self.zoom * self.layer().transform_at(self.frame).s.abs()).max(0.01)
+        (self.zoom * self.project.effective_at(self.cl, self.frame).s.abs()).max(0.01)
     }
 
     /// Qué hacer al pulsar con la Selección en el punto `p` (del dibujo).
@@ -285,7 +285,7 @@ impl LeonApp {
             return;
         }
         let (w, h) = (self.project.width as f32, self.project.height as f32);
-        let t = self.layer().transform_at(self.frame);
+        let t = self.project.effective_at(self.cl, self.frame);
         let map = |q: [f32; 2]| {
             let s = t.apply(w, h, q);
             Pos2::new(origin.x + s[0] * z, origin.y + s[1] * z)

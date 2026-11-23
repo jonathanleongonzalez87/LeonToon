@@ -111,7 +111,7 @@ Respuestas de la persona a las siete preguntas de la primera versión de este do
 |---|---|
 | M1. Pistas por propiedad | Hecha en el Issue #98: una pista por propiedad (anclaje, posición, escala, rotación y opacidad), cronómetro en el panel de claves y conversión de los archivos antiguos al abrirlos. Falta ver los cronómetros y las claves por propiedad en la línea de tiempo (modo Montaje, M4) |
 | M2. Barra de capa | Hecha en el Issue #99: entrada, salida y desplazamiento por capa (campos en el panel «Capa» y barra arrastrable en la línea de tiempo horizontal), solo, tímida con botón maestro y etiqueta de color. Los interruptores en columnas y la barra en la hoja vertical llegan con el modo Montaje (M4) |
-| M3. Fusión y vínculo (sin mates) | Pendiente |
+| M3. Fusión y vínculo (sin mates) | Hecha en el Issue #104: los ocho modos de fusión en la exportación y en el visor, y vínculo madre e hija (hereda posición, giro y escala) con selectores en el panel «Capa». La vista 3D aún no aplica el vínculo |
 | Mates de seguimiento | Pendiente, aparte |
 | M4 a M7 | Pendientes |
 | M8. Vídeo y audio | Planificado; primero un estudio de decodificadores (Issue #100) |

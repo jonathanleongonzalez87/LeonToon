@@ -178,6 +178,7 @@ impl LeonApp {
         self.checkpoint();
         let mut l = self.layer().clone();
         l.name = format!("{} copia", l.name);
+        l.uid = 0; // la copia es otra capa: se le dará su propio identificador si hace falta
         self.project.layers.insert(self.cl, l);
         self.say("Capa duplicada");
     }
@@ -188,6 +189,7 @@ impl LeonApp {
             return;
         }
         self.checkpoint();
+        self.project.release_children(self.cl);
         let l = self.project.layers.remove(self.cl);
         self.cl = self.cl.min(self.project.layers.len() - 1);
         self.sel = None;
@@ -353,7 +355,7 @@ impl LeonApp {
 
     /// Punto de la escena → punto dentro del dibujo de la capa actual (deshace su animación).
     fn local(&self, p: [f32; 2]) -> [f32; 2] {
-        let t = self.layer().transform_at(self.frame);
+        let t = self.project.effective_at(self.cl, self.frame);
         if t.is_identity() {
             p
         } else {
