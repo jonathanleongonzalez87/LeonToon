@@ -1,6 +1,6 @@
 [package]
 name = "leontoon"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "LeonToon - estudio de animación 2D cuadro a cuadro"
 
