@@ -555,6 +555,12 @@ pub struct Panel {
     /// Composición del plano (sus capas), en `Project::comps`. Se crea al abrir el plano por primera vez.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub comp: Option<u64>,
+    /// Escena a la que pertenece el plano (texto libre: «2», «2B»…). Vacía si no se usa.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub scene: String,
+    /// Número del plano dentro de la escena (texto libre: «30», «30A»). Vacío = el número de orden, 1, 2, 3…
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub num: String,
     /// Movimiento de la cámara durante el plano (pista de cámara del storyboard).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cam: Option<CamMove>,
@@ -563,6 +569,16 @@ pub struct Panel {
 impl Panel {
     pub fn new(n: usize) -> Self {
         Panel { title: format!("Plano {n}"), dur: 2.0, ..Default::default() }
+    }
+
+    /// El número que se ve del plano en la posición `i`: «escena·plano» o solo el plano; sin número propio, el de orden.
+    pub fn label(&self, i: usize) -> String {
+        let n = if self.num.trim().is_empty() { (i + 1).to_string() } else { self.num.trim().to_string() };
+        if self.scene.trim().is_empty() {
+            n
+        } else {
+            format!("{}·{n}", self.scene.trim())
+        }
     }
 }
 
@@ -1691,11 +1707,19 @@ impl Project {
         c.id = self.next_comp_id();
         let mut p = self.storyboard[i].clone();
         p.title = format!("{} copia", p.title);
+        p.num.clear(); // la copia toma el número de orden: dos planos no se llaman igual
         c.name = p.title.clone();
         p.comp = Some(c.id);
         self.comps.push(c);
         self.storyboard.insert(i + 1, p);
         Some(i + 1)
+    }
+
+    /// Numera los planos de `step` en `step` (10, 20, 30…, para poder intercalar) o de uno en uno; la escena no se toca.
+    pub fn renumber_panels(&mut self, step: u32) {
+        for (i, p) in self.storyboard.iter_mut().enumerate() {
+            p.num = ((i as u32 + 1) * step.max(1)).to_string();
+        }
     }
 
     /// Quita el plano `i` y su composición. Devuelve false si no existe o está abierto.

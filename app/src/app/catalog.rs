@@ -551,7 +551,7 @@ impl RightKind {
             RightKind::Rig => "Rigging",
             RightKind::Comp => "Composición",
             RightKind::Palettes => "Paletas",
-            RightKind::StoryPdf => "Plano",
+            RightKind::StoryPdf => "Datos del plano",
             RightKind::Animatic => "Animatic",
             RightKind::StopMotion => "Stop Motion",
             RightKind::Export => "Exportar",

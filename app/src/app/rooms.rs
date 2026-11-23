@@ -227,6 +227,9 @@ impl LeonApp {
                             };
                         }
                     }
+                    if pill(ui, "Storyboard a PDF", false).on_hover_text("Hojas A4 con la miniatura de cada plano y sus textos").clicked() {
+                        self.export_storyboard_pdf();
+                    }
                     if pill(ui, "GIF animado", false).clicked() {
                         if let Some(p) = rfd::FileDialog::new().add_filter("GIF animado", &["gif"]).set_file_name("mi_animacion.gif").save_file() {
                             let maxw = (self.project.width as f32 * scale).round() as u32;

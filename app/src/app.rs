@@ -902,6 +902,10 @@ impl LeonApp {
             }
             app.end_panel_stroke();
         }
+        // Capturas y pruebas: LEONTOON_PDF=<archivo> exporta el storyboard a ese PDF al arrancar.
+        if let Ok(p) = std::env::var("LEONTOON_PDF") {
+            app.write_storyboard_pdf(std::path::Path::new(&p));
+        }
         if let Ok(v) = std::env::var("LEONTOON_ONION") {
             app.onion = v != "0";
         }

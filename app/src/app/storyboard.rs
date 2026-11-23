@@ -76,6 +76,9 @@ impl LeonApp {
                     self.project.set_panel_drawing(self.sb_sel, d);
                     self.say(format!("Plano {} = fotograma {}", self.sb_sel + 1, self.frame + 1));
                 }
+                if pill(ui, "PDF", false).on_hover_text("Exportar el storyboard a PDF").clicked() {
+                    self.export_storyboard_pdf();
+                }
                 if pill(ui, "Crear animatic", true)
                     .on_hover_text("Crea (o actualiza) la composición «Animatic»: un clip por plano, en el orden y con la duración de la línea de tiempo del storyboard, con sus fundidos y su cámara. Tab entra en ella")
                     .clicked()
@@ -142,10 +145,11 @@ impl LeonApp {
                             }
                             ui.painter().rect_stroke(tr, 2.0, stk(1.0, Color32::BLACK), EStrokeKind::Outside);
                             // El número es el asa del plano: clic lo abre, arrastrarlo lo reordena.
-                            let badge = Rect::from_min_size(tr.min + Vec2::new(4.0, 4.0), Vec2::new(22.0, 16.0));
+                            let label = self.project.storyboard[i].label(i);
+                            let badge = Rect::from_min_size(tr.min + Vec2::new(4.0, 4.0), Vec2::new((label.chars().count() as f32 * 6.5 + 10.0).max(22.0), 16.0));
                             let bresp = ui.interact(badge, ui.id().with(("sb_badge", i)), Sense::click_and_drag());
                             ui.painter().rect_filled(badge, 3.0, if bresp.hovered() { ACCENT2 } else { ACCENT });
-                            ui.painter().text(badge.center(), Align2::CENTER_CENTER, format!("{}", i + 1), FontId::proportional(11.0), Color32::WHITE);
+                            ui.painter().text(badge.center(), Align2::CENTER_CENTER, label.clone(), FontId::proportional(11.0), Color32::WHITE);
                             if bresp.hovered() {
                                 bresp.clone().on_hover_text("Clic: abrir el plano · arrastrar: reordenar");
                             }
@@ -395,6 +399,25 @@ impl LeonApp {
             self.open_panel(j);
         }
     }
+    /// Exporta el storyboard a PDF: pide dónde guardarlo y escribe una hoja A4 por cada seis planos.
+    pub(super) fn export_storyboard_pdf(&mut self) {
+        let name = self.path.as_ref().and_then(|p| p.file_stem()).map(|s| format!("{}_storyboard.pdf", s.to_string_lossy())).unwrap_or_else(|| "storyboard.pdf".into());
+        if let Some(path) = rfd::FileDialog::new().add_filter("PDF", &["pdf"]).set_file_name(name).save_file() {
+            self.write_storyboard_pdf(&path);
+        }
+    }
+
+    /// Escribe el PDF del storyboard en `path` y avisa del resultado.
+    pub(super) fn write_storyboard_pdf(&mut self, path: &std::path::Path) {
+        let title = self.path.as_ref().and_then(|p| p.file_stem()).map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "Storyboard".into());
+        // Se exporta la composición principal aunque se esté dentro de un plano.
+        let root = self.project.root_clone();
+        match crate::pdf::storyboard_pdf(&root, &title).and_then(|bytes| std::fs::write(path, bytes).map_err(|e| e.to_string())) {
+            Ok(()) => self.say(format!("Storyboard exportado: {} ({} planos)", path.display(), root.storyboard.len())),
+            Err(e) => self.say(format!("No se pudo exportar el PDF: {e}")),
+        }
+    }
+
     // ---------- Línea de tiempo del storyboard (Issue #133, fase S2) ----------
 
     fn sbt_total(&self) -> f32 {
@@ -532,9 +555,10 @@ impl LeonApp {
                 let tr = Rect::from_min_size(r.min + Vec2::new(5.0, 5.0), Vec2::new(tw, tw * h / w));
                 paint_thumb(&painter, tr, &drawing, w, h, Color32::WHITE);
                 painter.rect_stroke(tr, 1.0, stk(1.0, Color32::BLACK), EStrokeKind::Outside);
-                let badge = Rect::from_min_size(tr.min + Vec2::new(2.0, 2.0), Vec2::new(18.0, 13.0));
+                let label = self.project.storyboard[i].label(i);
+                let badge = Rect::from_min_size(tr.min + Vec2::new(2.0, 2.0), Vec2::new((label.chars().count() as f32 * 5.8 + 8.0).max(18.0), 13.0));
                 painter.rect_filled(badge, 3.0, ACCENT);
-                painter.text(badge.center(), Align2::CENTER_CENTER, format!("{}", i + 1), FontId::proportional(10.0), Color32::WHITE);
+                painter.text(badge.center(), Align2::CENTER_CENTER, label, FontId::proportional(10.0), Color32::WHITE);
                 painter.with_clip_rect(r.shrink(2.0)).text(Pos2::new(r.min.x + 6.0, r.max.y - 11.0), Align2::LEFT_CENTER, format!("{title} · {dur:.1} s"), FontId::proportional(11.0), TX);
                 painter.rect_stroke(r.shrink(1.0), 4.0, stk(2.0, if on { ACCENT } else { LINE }), EStrokeKind::Inside);
                 // Cuerpo del plano (clic elige y pone la cabeza, doble clic abre, arrastrar reordena) y borde derecho (duración).
@@ -715,8 +739,14 @@ impl LeonApp {
         let total: f32 = self.project.storyboard.iter().map(|p| p.dur).sum();
         muted(ui, format!("{} planos · {:.1} s", self.project.storyboard.len(), total));
         let p = &mut self.project.storyboard[i];
-        ui.label(RichText::new(format!("Plano {}", i + 1)).strong().color(ACCENT2));
+        ui.label(RichText::new(format!("Plano {}", p.label(i))).strong().color(ACCENT2));
         ui.add(egui::TextEdit::singleline(&mut p.title).desired_width(f32::INFINITY));
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("Escena").color(MU));
+            ui.add(egui::TextEdit::singleline(&mut p.scene).desired_width(52.0).hint_text("—"));
+            ui.label(RichText::new("Plano").color(MU));
+            ui.add(egui::TextEdit::singleline(&mut p.num).desired_width(52.0).hint_text(format!("{}", i + 1)));
+        });
         ui.horizontal(|ui| {
             ui.label(RichText::new("Duración (s)").color(MU));
             ui.add(egui::DragValue::new(&mut p.dur).range(0.1..=600.0).speed(0.05).max_decimals(1));
@@ -745,7 +775,19 @@ impl LeonApp {
             ui.checkbox(&mut c.ease, "Arranque y frenado suaves");
         }
         ui.separator();
-        ui.add_enabled(false, egui::Button::new("Exportar storyboard a PDF (pendiente)"));
+        ui.horizontal_wrapped(|ui| {
+            if pill(ui, "Renumerar de 10 en 10", false).on_hover_text("Plano 10, 20, 30… para poder intercalar planos nuevos entre dos").clicked() {
+                self.checkpoint();
+                self.project.renumber_panels(10);
+            }
+            if pill(ui, "De 1 en 1", false).clicked() {
+                self.checkpoint();
+                self.project.renumber_panels(1);
+            }
+        });
+        if pill(ui, "Exportar storyboard a PDF", true).on_hover_text("Hojas A4 con la miniatura de cada plano y sus textos").clicked() {
+            self.export_storyboard_pdf();
+        }
 
         if self.panel_canvas() {
             ui.add_space(6.0);
