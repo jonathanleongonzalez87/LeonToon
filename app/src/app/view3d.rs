@@ -23,7 +23,6 @@ pub(super) struct GizDrag {
     /// Vector en pantalla del eje al empezar a arrastrar.
     pub dir: Vec2,
     pub xk: XKey,
-    pub depth: f32,
 }
 
 struct Cam {
@@ -72,7 +71,7 @@ impl LeonApp {
         for l in &self.project.layers {
             if l.kind == LayerKind::Camera && l.visible {
                 let t = l.transform_at(self.frame);
-                return Cam { x: t.x, y: t.y, z: l.depth };
+                return Cam { x: t.x, y: t.y, z: l.depth_at(self.frame) };
             }
         }
         Cam { x: 0.0, y: 0.0, z: -CAM_DIST }
@@ -164,19 +163,27 @@ impl LeonApp {
         }
     }
 
-    /// Cambia el plano (BG → MG → FG) o activa el 3D de la capa `i`, como la etiqueta de plano del prototipo.
+    /// Cicla el espacio de la capa i: 2D → BG → MG → FG → 2D, como la etiqueta de plano del prototipo. Una capa 2D queda fija al
+    /// tamaño de la cámara; una 3D tiene eje Z y se anima ante la cámara.
     pub(super) fn cycle_plane(&mut self, i: usize) {
         if self.project.layers[i].kind == LayerKind::Camera || self.project.layers[i].locked {
             return;
         }
         self.checkpoint();
-        let l = &mut self.project.layers[i];
-        if !l.is3d {
-            l.is3d = true;
-        } else {
-            l.plane = (l.plane + 1) % 3;
+        self.project.layers[i].next_space();
+    }
+
+    /// Pasa la capa i de 2D a 3D (en el plano que tuviera) o de 3D a 2D.
+    pub(super) fn toggle_3d(&mut self, i: usize) {
+        if self.project.layers[i].kind == LayerKind::Camera || self.project.layers[i].locked {
+            return;
         }
-        l.depth = plane_z(l.plane);
+        self.checkpoint();
+        let l = &mut self.project.layers[i];
+        l.is3d = !l.is3d;
+        if l.is3d {
+            l.depth = plane_z(l.plane);
+        }
     }
 
     /// Mueve la cámara en X en el fotograma actual (control «Cámara X»).
@@ -229,7 +236,6 @@ impl LeonApp {
                             start: p,
                             dir: g.ax[axis] - g.o,
                             xk: self.layer().transform_at(self.frame),
-                            depth: self.layer().depth,
                         });
                     }
                 }
@@ -241,19 +247,16 @@ impl LeonApp {
                     let d = p - gd.start;
                     let t = d.dot(gd.dir) / gd.dir.length_sq().max(1.0);
                     let mut xk = gd.xk;
-                    let mut depth = gd.depth;
                     match gd.axis {
                         0 => xk.x += 150.0 * t,
-                        1 => depth += 360.0 * t,
+                        // La profundidad se anima como el resto: arrastrar el eje pone una clave de profundidad.
+                        1 => xk.dz += 360.0 * t,
                         _ => xk.y -= 150.0 * t,
                     }
                     let f = self.frame;
                     let cl = self.cl;
                     let l = &mut self.project.layers[cl];
                     l.tracks.set_changed(f, &xk, &gd.xk);
-                    if gd.axis == 1 {
-                        l.depth = depth;
-                    }
                 }
             } else {
                 self.giz_drag = None;
@@ -310,7 +313,7 @@ impl LeonApp {
             if members.is_empty() {
                 continue;
             }
-            let zs: Vec<f32> = members.iter().map(|&m| self.project.layers[m].z()).collect();
+            let zs: Vec<f32> = members.iter().map(|&m| self.project.layers[m].z_at(f)).collect();
             let (zmin, zmax) = (zs.iter().cloned().fold(f32::MAX, f32::min), zs.iter().cloned().fold(f32::MIN, f32::max));
             // Cuántos niveles de colecciones hay dentro de esta: cada nivel hace el cubo un poco más grande que el de dentro.
             let base = self.project.depth_of(ci);
@@ -373,13 +376,13 @@ impl LeonApp {
                 let l = &self.project.layers[i];
                 self.project.shows(i, f, any_solo) && !matches!(l.kind, LayerKind::Camera | LayerKind::Light)
             })
-            .map(|i| (i, v.p(pw / 2.0, ph / 2.0, self.project.layers[i].z()).2))
+            .map(|i| (i, v.p(pw / 2.0, ph / 2.0, self.project.layers[i].z_at(f)).2))
             .collect();
         order.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         // Rieles de la mesa multiplano
         if !v.cam_view && order.len() > 1 {
-            let zs: Vec<f32> = order.iter().map(|(i, _)| self.project.layers[*i].z()).collect();
+            let zs: Vec<f32> = order.iter().map(|(i, _)| self.project.layers[*i].z_at(f)).collect();
             let zmin = zs.iter().cloned().fold(f32::MAX, f32::min);
             let zmax = zs.iter().cloned().fold(f32::MIN, f32::max);
             for (qx, qy) in [(-60.0, -60.0), (pw + 60.0, -60.0), (pw + 60.0, ph + 60.0), (-60.0, ph + 60.0)] {
@@ -397,7 +400,7 @@ impl LeonApp {
         for (i, _) in &order {
             let l = &self.project.layers[*i];
             let sel = *i == self.cl;
-            let z = l.z();
+            let z = l.z_at(f);
             let ls = if l.is3d { (CAM_DIST + z) / CAM_DIST } else { 1.0 };
             // La transformación incluye la de sus madres y la de sus colecciones.
             let t = self.project.effective_at(*i, f);
@@ -476,8 +479,8 @@ impl LeonApp {
                 let (cxp, cyp) = (pw / 2.0 + t.x, ph / 2.0 + t.y);
                 if l.kind == LayerKind::Camera {
                     let col = if sel { ACCENT } else if light_bg { Color32::from_rgb(0x1a, 0x1a, 0x1a) } else { Color32::from_rgb(0xd8, 0xcf, 0xc2) };
-                    let ap = v.p(cxp, cyp, l.depth).0;
-                    let dz = l.depth * 0.72;
+                    let ap = v.p(cxp, cyp, l.depth_at(f)).0;
+                    let dz = l.depth_at(f) * 0.72;
                     let (hw, hh) = (pw * 0.13, ph * 0.13);
                     let b: Vec<Pos2> = [(-hw, -hh), (hw, -hh), (hw, hh), (-hw, hh)].iter().map(|(dx, dy)| v.p(cxp + dx, cyp + dy, dz).0).collect();
                     let st = stk(if sel { 1.8 } else { 1.4 }, col);
@@ -495,7 +498,7 @@ impl LeonApp {
                     painter.add(Shape::dashed_line(&fr, stk(1.0, Color32::from_rgba_unmultiplied(128, 128, 128, 180)), 2.0, 4.0));
                 }
                 if l.kind == LayerKind::Light {
-                    let q = v.p(cxp, cyp, l.depth).0;
+                    let q = v.p(cxp, cyp, l.depth_at(f)).0;
                     let col = if sel { ACCENT } else { Color32::from_rgb(0xf2, 0xd2, 0x7a) };
                     painter.circle_stroke(q, 8.0, stk(1.5, col));
                     for a in 0..8 {
@@ -512,7 +515,7 @@ impl LeonApp {
         let l = &self.project.layers[self.cl];
         if (l.is3d || l.kind == LayerKind::Camera) && !(v.cam_view && l.kind == LayerKind::Camera) {
             let t = l.transform_at(f);
-            let base = (pw / 2.0 + t.x, ph / 2.0 + t.y, l.z());
+            let base = (pw / 2.0 + t.x, ph / 2.0 + t.y, l.z_at(f));
             let len = 150.0;
             let o = v.p(base.0, base.1, base.2).0;
             let ends = [(AX_RED, [len, 0.0, 0.0]), (AX_GREEN, [0.0, 0.0, len * 2.4]), (AX_BLUE, [0.0, -len, 0.0])];

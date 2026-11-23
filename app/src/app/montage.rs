@@ -22,6 +22,7 @@ const W_LABEL: f32 = 20.0;
 const W_NUM: f32 = 24.0;
 const W_NAME: f32 = 150.0;
 const W_SHY: f32 = 22.0;
+const W_3D: f32 = 26.0;
 const W_BLEND: f32 = 104.0;
 const W_MATE: f32 = 96.0;
 const W_PARENT: f32 = 112.0;
@@ -83,6 +84,9 @@ enum Act {
     BarOut(usize, u32),
     BarShift(usize, i32),
     Checkpoint,
+    /// Clic en el nombre de una capa, con Ctrl y Mayús para la selección múltiple.
+    Click(usize, bool, bool),
+    Toggle3d(usize),
     Fold(usize),
     Group(usize),
     MoveTo(usize, usize),
@@ -104,9 +108,10 @@ struct Info {
     parent: Option<usize>,
     in_f: u32,
     out_f: u32,
-    animated: [bool; 5],
+    animated: [bool; 6],
     key_frames: Vec<u32>,
     is_col: bool,
+    is3d: bool,
     /// Cuántas colecciones envuelven a la capa (sangrado).
     depth: usize,
     collapsed: bool,
@@ -114,25 +119,27 @@ struct Info {
 
 /// Qué filas salen. `hidden[li]`: la capa está en una colección plegada. `animated[li][p]`: la propiedad `p` de la capa `li` tiene claves. Las capas tímidas se ocultan con el botón
 /// maestro (menos la elegida).
-pub(super) fn build_rows(shy: &[bool], hidden: &[bool], animated: &[[bool; 5]], cl: usize, hide_shy: bool, open: &[bool], reveal: &Option<Reveal>) -> Vec<Row> {
+pub(super) fn build_rows(shy: &[bool], hidden: &[bool], is3d: &[bool], animated: &[[bool; 6]], cl: usize, hide_shy: bool, open: &[bool], reveal: &Option<Reveal>) -> Vec<Row> {
     let mut out = Vec::new();
     for li in 0..shy.len() {
         if (hide_shy && shy[li] && li != cl) || hidden.get(li).copied().unwrap_or(false) {
             continue;
         }
         out.push(Row::Layer(li));
+        // La profundidad (eje Z) solo la tienen las capas 3D.
+        let keep = |p: &Prop| *p != Prop::Depth || is3d.get(li).copied().unwrap_or(false);
         let props: Vec<Prop> = match reveal {
-            Some(Reveal::Animated) => Prop::ALL.iter().copied().filter(|p| animated[li][*p as usize]).collect(),
+            Some(Reveal::Animated) => Prop::ALL.iter().copied().filter(|p| animated[li][*p as usize] && keep(p)).collect(),
             Some(Reveal::Props(ks)) => {
                 if li == cl {
-                    ks.clone()
+                    ks.iter().copied().filter(|p| keep(p)).collect()
                 } else {
                     Vec::new()
                 }
             }
             None => {
                 if open.get(li).copied().unwrap_or(false) {
-                    Prop::ALL.to_vec()
+                    Prop::ALL.iter().copied().filter(|p| keep(p)).collect()
                 } else {
                     Vec::new()
                 }
@@ -176,6 +183,7 @@ fn prop_key(p: Prop) -> &'static str {
         Prop::Scale => "S",
         Prop::Rotation => "R",
         Prop::Opacity => "T",
+        Prop::Depth => "Z",
     }
 }
 
@@ -183,7 +191,7 @@ impl LeonApp {
     fn mt_left_w(&self) -> f32 {
         let mut w = W_EYE + W_SOLO + W_LOCK + W_LABEL + W_NUM + W_NAME;
         if self.mt.cols != 2 {
-            w += W_SHY;
+            w += W_SHY + W_3D;
         }
         if self.mt.cols != 1 {
             w += W_BLEND + W_MATE + W_PARENT;
@@ -195,9 +203,10 @@ impl LeonApp {
         let n = self.project.layers.len();
         self.mt.open.resize(n, false);
         let shy: Vec<bool> = self.project.layers.iter().map(|l| l.shy).collect();
-        let animated: Vec<[bool; 5]> = self.project.layers.iter().map(|l| Prop::ALL.map(|p| l.tracks.has(p))).collect();
+        let animated: Vec<[bool; 6]> = self.project.layers.iter().map(|l| Prop::ALL.map(|p| l.tracks.has(p))).collect();
         let hidden: Vec<bool> = (0..n).map(|li| self.project.is_hidden_by_fold(li)).collect();
-        build_rows(&shy, &hidden, &animated, self.cl, self.hide_shy, &self.mt.open, &self.mt.reveal)
+        let is3d: Vec<bool> = self.project.layers.iter().map(|l| l.is3d || l.kind == LayerKind::Camera).collect();
+        build_rows(&shy, &hidden, &is3d, &animated, self.cl, self.hide_shy, &self.mt.open, &self.mt.reveal)
     }
 
     /// Teclas de la línea de tiempo de montaje, con el puntero encima: A, P, S, R y T muestran esa propiedad (Mayús suma),
@@ -292,6 +301,7 @@ impl LeonApp {
                     animated: Prop::ALL.map(|p| l.tracks.has(p)),
                     key_frames: l.tracks.frames().into_iter().collect(),
                     is_col: l.kind == LayerKind::Collection,
+                    is3d: l.is3d || l.kind == LayerKind::Camera,
                     depth: self.project.depth_of(li),
                     collapsed: l.collapsed,
                 }
@@ -304,6 +314,7 @@ impl LeonApp {
         let (sx, sy) = (clip.min.x.max(o.x), clip.min.y.max(o.y));
         let tx = |f: u32| o.x + left_w + f as f32 * cell;
         let frame = self.frame;
+        let sel_set = self.selected_layers();
         let fps = self.project.fps.max(1);
         let (f0, f1) = {
             let a = ((clip.min.x - o.x - left_w) / cell).floor().max(0.0) as u32;
@@ -325,7 +336,7 @@ impl LeonApp {
                 Row::Layer(l) | Row::Group(l) | Row::Prop(l, _) => *l,
             };
             let bg = match row {
-                Row::Layer(_) if li == self.cl => SEL_BG,
+                Row::Layer(_) if li == self.cl || sel_set.contains(&li) => SEL_BG,
                 Row::Layer(_) => if ri % 2 == 0 { BG2 } else { BG3 },
                 _ => Color32::from_rgb(0x20, 0x1f, 0x1e),
             };
@@ -472,7 +483,7 @@ impl LeonApp {
             match *row {
                 Row::Layer(li) => {
                     let inf = &infos[li];
-                    let sel = li == self.cl;
+                    let sel = li == self.cl || sel_set.contains(&li);
                     painter.rect_filled(full, 0.0, if sel { SEL_BG } else if ri % 2 == 0 { BG2 } else { BG3 });
                     let mut x = lx;
                     let mut cellr = |w: f32| {
@@ -529,7 +540,8 @@ impl LeonApp {
                     painter.with_clip_rect(name_r).text(Pos2::new(name_r.min.x, y + ROW_H / 2.0), Align2::LEFT_CENTER, &inf.name, semi(11.5), if inf.visible { TX } else { INK3 });
                     let name_resp = ui.interact(Rect::from_min_max(r.min + Vec2::new(ind + 16.0, 0.0), r.max), ui.id().with(("mt_name", li)), Sense::click_and_drag());
                     if name_resp.clicked() {
-                        acts.push(Act::Select(li));
+                        let (ctrl, shift) = ui.input(|i| (i.modifiers.command, i.modifiers.shift));
+                        acts.push(Act::Click(li, ctrl, shift));
                     }
                     if name_resp.drag_started() {
                         acts.push(Act::Select(li));
@@ -574,6 +586,16 @@ impl LeonApp {
                         }
                         if toggle(ui, r, "mt_shy").on_hover_text("Tímida: se puede ocultar de las listas con el botón «Tímidas»").clicked() {
                             acts.push(Act::ToggleShy(li));
+                        }
+                        // Espacio de la capa: 2D (fija al tamaño de la cámara) o 3D (eje Z, animable ante la cámara).
+                        let r = cellr(W_3D);
+                        if !inf.is_col && inf.kind != LayerKind::Camera {
+                            painter.text(r.center(), Align2::CENTER_CENTER, if inf.is3d { "3D" } else { "2D" }, semi(10.0), if inf.is3d { ACCENT } else { INK3 });
+                            if toggle(ui, r, "mt_3d").on_hover_text("2D: fija al tamaño de la cámara · 3D: con eje Z, se anima ante la cámara (clic para cambiar)").clicked() {
+                                acts.push(Act::Toggle3d(li));
+                            }
+                        } else if inf.kind == LayerKind::Camera {
+                            painter.text(r.center(), Align2::CENTER_CENTER, "3D", semi(10.0), with_alpha(ACCENT, 0.5));
                         }
                     }
                     if self.mt.cols != 1 {
@@ -655,6 +677,7 @@ impl LeonApp {
                             Prop::Scale => changed |= ui.add(egui::DragValue::new(&mut v[0]).speed(0.01).max_decimals(2)).changed(),
                             Prop::Rotation => changed |= ui.add(egui::DragValue::new(&mut v[0]).speed(1.0).max_decimals(1).suffix("°")).changed(),
                             Prop::Opacity => changed |= ui.add(egui::DragValue::new(&mut v[0]).speed(0.01).max_decimals(2).range(0.0..=1.0)).changed(),
+                            Prop::Depth => changed |= ui.add(egui::DragValue::new(&mut v[0]).speed(2.0).max_decimals(0).prefix("z ")).changed(),
                         }
                     });
                     if changed {
@@ -665,6 +688,7 @@ impl LeonApp {
                             Prop::Scale => new.s = v[0],
                             Prop::Rotation => new.r = v[0],
                             Prop::Opacity => new.o = v[0].clamp(0.0, 1.0),
+                            Prop::Depth => new.dz = v[0],
                         }
                         acts.push(Act::EditValue(li, new, now));
                     }
@@ -724,6 +748,8 @@ impl LeonApp {
         if self.mt.cols != 2 {
             painter.text(Pos2::new(hx + 4.0, sy + HEAD_H / 2.0), Align2::LEFT_CENTER, "~", FontId::proportional(11.0), MU);
             hx += W_SHY;
+            painter.text(Pos2::new(hx + 4.0, sy + HEAD_H / 2.0), Align2::LEFT_CENTER, "3D", FontId::proportional(9.5), MU);
+            hx += W_3D;
         }
         if self.mt.cols != 1 {
             for (t, w) in [("Modo", W_BLEND), ("Mate", W_MATE), ("Primario y vínculo", W_PARENT)] {
@@ -832,6 +858,11 @@ impl LeonApp {
             Act::BarShift(li, d) => {
                 self.project.layers[li].shift_time(d);
             }
+            Act::Click(li, ctrl, shift) => {
+                let order: Vec<usize> = self.mt_rows().iter().filter_map(|r| if let Row::Layer(l) = r { Some(*l) } else { None }).collect();
+                self.click_layer(li, ctrl, shift, &order);
+            }
+            Act::Toggle3d(li) => self.toggle_3d(li),
             Act::Fold(li) => {
                 if let Some(l) = self.project.layers.get_mut(li) {
                     l.collapsed = !l.collapsed;
@@ -839,13 +870,17 @@ impl LeonApp {
                 self.cl = li.min(n.saturating_sub(1));
             }
             Act::Group(li) => {
-                self.cl = li.min(n.saturating_sub(1));
+                // Con varias capas elegidas, el menú de una de ellas las agrupa a todas; si no, solo esa.
+                if !self.selected_layers().contains(&li) {
+                    self.click_layer(li.min(n.saturating_sub(1)), false, false, &[]);
+                }
                 self.group_current();
             }
             Act::MoveTo(li, ci) => self.move_to_collection(li, ci),
             Act::Leave(li) => self.leave_collection(li),
             Act::Drop(src, d) => {
                 self.checkpoint();
+                self.lsel.clear();
                 if let Some(nn) = self.project.move_layer_tree(src, d) {
                     self.cl = nn;
                 }
@@ -868,18 +903,18 @@ fn diamond(p: &egui::Painter, c: Pos2, r: f32, col: Color32) {
 mod tests {
     use super::*;
 
-    fn animated(n: usize) -> Vec<[bool; 5]> {
-        vec![[false; 5]; n]
+    fn animated(n: usize) -> Vec<[bool; 6]> {
+        vec![[false; 6]; n]
     }
 
     #[test]
     fn sin_desplegar_hay_una_fila_por_capa_y_al_desplegar_salen_el_grupo_y_las_cinco_propiedades() {
         let shy = [false, false, false];
         let mut open = vec![false; 3];
-        let rows = build_rows(&shy, &[false; 3], &animated(3), 0, false, &open, &None);
+        let rows = build_rows(&shy, &[false; 3], &[false; 3], &animated(3), 0, false, &open, &None);
         assert_eq!(rows, vec![Row::Layer(0), Row::Layer(1), Row::Layer(2)]);
         open[1] = true;
-        let rows = build_rows(&shy, &[false; 3], &animated(3), 0, false, &open, &None);
+        let rows = build_rows(&shy, &[false; 3], &[false; 3], &animated(3), 0, false, &open, &None);
         assert_eq!(rows.len(), 3 + 1 + 5);
         assert_eq!(rows[1], Row::Layer(1));
         assert_eq!(rows[2], Row::Group(1));
@@ -893,16 +928,27 @@ mod tests {
         let shy = [false; 4];
         // La capa 1 y la 2 están en una colección plegada (la 0).
         let hidden = [false, true, true, false];
-        let rows = build_rows(&shy, &hidden, &animated(4), 0, false, &[false; 4], &None);
+        let rows = build_rows(&shy, &hidden, &[false; 4], &animated(4), 0, false, &[false; 4], &None);
         assert_eq!(rows, vec![Row::Layer(0), Row::Layer(3)]);
+    }
+
+    #[test]
+    fn la_profundidad_solo_sale_en_las_capas_3d() {
+        let shy = [false, false];
+        let open = [true, true];
+        // La capa 0 es 2D y la 1 es 3D: la 3D tiene una propiedad más (Profundidad).
+        let rows = build_rows(&shy, &[false; 2], &[false, true], &animated(2), 0, false, &open, &None);
+        let props = |li: usize| rows.iter().filter(|r| matches!(r, Row::Prop(l, _) if *l == li)).count();
+        assert_eq!((props(0), props(1)), (5, 6));
+        assert!(rows.contains(&Row::Prop(1, Prop::Depth)) && !rows.contains(&Row::Prop(0, Prop::Depth)));
     }
 
     #[test]
     fn las_capas_timidas_se_ocultan_menos_la_elegida() {
         let shy = [false, true, true];
-        let rows = build_rows(&shy, &[false; 3], &animated(3), 2, true, &[false; 3], &None);
+        let rows = build_rows(&shy, &[false; 3], &[false; 3], &animated(3), 2, true, &[false; 3], &None);
         assert_eq!(rows, vec![Row::Layer(0), Row::Layer(2)]);
-        let all = build_rows(&shy, &[false; 3], &animated(3), 2, false, &[false; 3], &None);
+        let all = build_rows(&shy, &[false; 3], &[false; 3], &animated(3), 2, false, &[false; 3], &None);
         assert_eq!(all.len(), 3);
     }
 
@@ -913,10 +959,10 @@ mod tests {
         an[0][Prop::Position as usize] = true;
         an[1][Prop::Opacity as usize] = true;
         // P en la capa elegida (1): solo su posición, ninguna fila de la otra capa.
-        let rows = build_rows(&shy, &[false; 2], &an, 1, false, &[false; 2], &Some(Reveal::Props(vec![Prop::Position])));
+        let rows = build_rows(&shy, &[false; 2], &[false; 2], &an, 1, false, &[false; 2], &Some(Reveal::Props(vec![Prop::Position])));
         assert_eq!(rows, vec![Row::Layer(0), Row::Layer(1), Row::Prop(1, Prop::Position)]);
         // U: las propiedades con claves de todas las capas, sin la fila «Transformar».
-        let rows = build_rows(&shy, &[false; 2], &an, 0, false, &[false; 2], &Some(Reveal::Animated));
+        let rows = build_rows(&shy, &[false; 2], &[false; 2], &an, 0, false, &[false; 2], &Some(Reveal::Animated));
         assert_eq!(rows, vec![Row::Layer(0), Row::Prop(0, Prop::Position), Row::Layer(1), Row::Prop(1, Prop::Opacity)]);
     }
 

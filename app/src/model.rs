@@ -471,17 +471,20 @@ pub struct XKey {
     pub ax: f32,
     #[serde(default)]
     pub ay: f32,
+    /// Profundidad animada (eje Z): se suma a la profundidad de la capa 3D. Las capas 2D la ignoran.
+    #[serde(default)]
+    pub dz: f32,
 }
 
 impl Default for XKey {
     fn default() -> Self {
-        XKey { x: 0.0, y: 0.0, r: 0.0, s: 1.0, o: 1.0, i: Interp::Linear, ax: 0.0, ay: 0.0 }
+        XKey { x: 0.0, y: 0.0, r: 0.0, s: 1.0, o: 1.0, i: Interp::Linear, ax: 0.0, ay: 0.0, dz: 0.0 }
     }
 }
 
 impl XKey {
     pub fn is_identity(&self) -> bool {
-        self.x == 0.0 && self.y == 0.0 && self.r == 0.0 && self.s == 1.0 && self.o == 1.0 && self.ax == 0.0 && self.ay == 0.0
+        self.x == 0.0 && self.y == 0.0 && self.r == 0.0 && self.s == 1.0 && self.o == 1.0 && self.ax == 0.0 && self.ay == 0.0 && self.dz == 0.0
     }
     /// Punto del dibujo → punto de la escena (giro y escala alrededor del punto de anclaje, que por defecto es el centro de la cámara).
     pub fn apply(&self, w: f32, h: f32, p: [f32; 2]) -> [f32; 2] {
@@ -494,7 +497,7 @@ impl XKey {
     /// transformación del mismo tipo (con el anclaje en el centro de la cámara), así que todo lo que usa XKey sirve igual.
     pub fn compose(&self, parent: &XKey, w: f32, h: f32) -> XKey {
         let c = parent.apply(w, h, self.apply(w, h, [w / 2.0, h / 2.0]));
-        XKey { x: c[0] - w / 2.0, y: c[1] - h / 2.0, r: self.r + parent.r, s: self.s * parent.s, o: self.o, i: self.i, ax: 0.0, ay: 0.0 }
+        XKey { x: c[0] - w / 2.0, y: c[1] - h / 2.0, r: self.r + parent.r, s: self.s * parent.s, o: self.o, i: self.i, ax: 0.0, ay: 0.0, dz: self.dz + parent.dz }
     }
 
     /// Punto de la escena → punto del dibujo (lo contrario de `apply`).
@@ -742,12 +745,30 @@ impl Layer {
         }
     }
 
-    /// Distancia en profundidad: 0 para capas 2D.
-    pub fn z(&self) -> f32 {
+    /// Profundidad en el cuadro f: la de la capa más lo que anima su pista de profundidad (sea o no 3D).
+    pub fn depth_at(&self, f: u32) -> f32 {
+        self.depth + self.tracks.value_at(Prop::Depth, f).0[0]
+    }
+
+    /// Profundidad con la que se ve la capa en el cuadro f: 0 para las 2D (fijas al tamaño de la cámara).
+    pub fn z_at(&self, f: u32) -> f32 {
         if self.is3d || self.kind == LayerKind::Camera {
-            self.depth
+            self.depth_at(f)
         } else {
             0.0
+        }
+    }
+
+    /// Pasa al siguiente espacio: 2D → BG → MG → FG → 2D. Una capa 2D queda fija al tamaño de la cámara; una 3D tiene eje Z.
+    pub fn next_space(&mut self) {
+        let idx = if self.is3d { 1 + self.plane as usize } else { 0 };
+        match (idx + 1) % 4 {
+            0 => self.is3d = false,
+            n => {
+                self.is3d = true;
+                self.plane = (n - 1) as u8;
+                self.depth = plane_z(self.plane);
+            }
         }
     }
 
@@ -1259,6 +1280,47 @@ impl Project {
         self.layers.insert(li, c);
         self.layers[li + 1].group = Some(uid);
         Some(li)
+    }
+
+    /// Mete varias capas a la vez en una colección nueva, en el sitio de la de más arriba y dentro de su misma colección, con el
+    /// orden que tenían. Si una de las elegidas es una colección y también lo está lo que contiene, solo se mueve la colección (con
+    /// su contenido). Devuelve el índice de la colección nueva.
+    pub fn group_layers(&mut self, idx: &[usize]) -> Option<usize> {
+        let n = self.layers.len();
+        let mut sel: Vec<usize> = idx.iter().copied().filter(|&i| i < n).collect();
+        sel.sort_unstable();
+        sel.dedup();
+        match sel.len() {
+            0 => return None,
+            1 => return self.group_layer(sel[0]),
+            _ => {}
+        }
+        let roots: Vec<usize> = sel.iter().copied().filter(|&i| !self.ancestors(i).iter().any(|a| sel.contains(a))).collect();
+        let first = roots[0];
+        let count = self.layers.iter().filter(|l| l.kind == LayerKind::Collection).count() + 1;
+        let mut c = Layer::new(format!("Colección {count}"));
+        c.kind = LayerKind::Collection;
+        c.uid = self.next_uid();
+        c.group = self.collection_of(first).map(|ci| self.layers[ci].uid);
+        let uid = c.uid;
+        // Se sacan los árboles de abajo arriba para que los índices de los de arriba no cambien.
+        let mut trees: Vec<Vec<Layer>> = Vec::new();
+        for &r in roots.iter().rev() {
+            let len = self.subtree_len(r);
+            trees.push(self.layers.drain(r..r + len).collect());
+        }
+        trees.reverse();
+        self.layers.insert(first, c);
+        let mut at = first + 1;
+        for mut tree in trees {
+            tree[0].group = Some(uid);
+            for l in tree {
+                self.layers.insert(at, l);
+                at += 1;
+            }
+        }
+        let map = self.normalize_groups();
+        Some(map[first])
     }
 
     /// ¿Se puede soltar la capa li en ese sitio? No sobre sí misma ni dentro de su propio contenido, y «dentro» solo en
@@ -1961,6 +2023,84 @@ mod tests {
         for i in 0..p.layers.len() {
             assert!(p.ancestors(i).len() <= 1);
         }
+    }
+
+    #[test]
+    fn el_espacio_de_la_capa_cicla_entre_2d_y_los_tres_planos_y_vuelve() {
+        let mut l = Layer::new("a");
+        assert!(!l.is3d);
+        let mut seen = Vec::new();
+        for _ in 0..5 {
+            l.next_space();
+            seen.push((l.is3d, l.plane));
+        }
+        assert_eq!(seen, vec![(true, 0), (true, 1), (true, 2), (false, 2), (true, 0)]);
+        l.is3d = true;
+        l.plane = 2;
+        l.next_space();
+        assert!(!l.is3d, "tras FG vuelve a 2D");
+    }
+
+    #[test]
+    fn la_profundidad_solo_cuenta_en_capas_3d_y_se_anima() {
+        let mut l = Layer::new("a");
+        l.depth = 100.0;
+        l.tracks.set(Prop::Depth, 0, [0.0, 0.0], Interp::Linear);
+        l.tracks.set(Prop::Depth, 10, [200.0, 0.0], Interp::Linear);
+        // Una capa 2D se queda fija al tamaño de la cámara aunque tenga pista de profundidad.
+        assert_eq!(l.z_at(5), 0.0);
+        assert_eq!(l.depth_at(5), 200.0, "base 100 + 100 animados");
+        l.is3d = true;
+        assert_eq!(l.z_at(0), 100.0);
+        assert_eq!(l.z_at(10), 300.0);
+        assert!((l.z_at(5) - 200.0).abs() < 1e-3);
+        // La cámara siempre es 3D.
+        let mut c = Layer::new("cam");
+        c.kind = LayerKind::Camera;
+        c.depth = -2400.0;
+        c.tracks.set(Prop::Depth, 0, [0.0, 0.0], Interp::Linear);
+        c.tracks.set(Prop::Depth, 24, [1200.0, 0.0], Interp::Linear);
+        assert_eq!(c.z_at(24), -1200.0, "travelling: la cámara se acerca");
+        // La profundidad de la madre y de la colección se suma a la de la hija.
+        let mut p = Project::blank(1280, 720, 24, 10);
+        p.layers = vec![Layer::new("hija"), Layer::new("madre")];
+        p.layers[1].tracks.set(Prop::Depth, 0, [50.0, 0.0], Interp::Linear);
+        p.layers[0].tracks.set(Prop::Depth, 0, [5.0, 0.0], Interp::Linear);
+        assert!(p.set_parent(0, Some(1)));
+        assert_eq!(p.effective_at(0, 0).dz, 55.0);
+    }
+
+    #[test]
+    fn agrupar_varias_capas_las_mete_juntas_en_el_sitio_de_la_de_arriba() {
+        let mut p = layers_named(&["a", "b", "c", "d", "e"]);
+        let ci = p.group_layers(&[3, 1, 2]).unwrap(); // b, c, d (da igual el orden en que se pasen)
+        let names: Vec<&str> = p.layers.iter().map(|l| l.name.as_str()).collect();
+        assert_eq!(names, vec!["a", "Colección 1", "b", "c", "d", "e"]);
+        assert_eq!(ci, 1);
+        assert_eq!(p.members_of(ci), vec![2, 3, 4], "con el orden que tenían");
+        assert!(p.collection_of(0).is_none() && p.collection_of(5).is_none());
+        // Una sola capa se agrupa como siempre; una lista vacía o con índices que no existen no hace nada.
+        assert!(p.group_layers(&[]).is_none() && p.group_layers(&[99]).is_none());
+        assert!(p.group_layers(&[0]).is_some());
+    }
+
+    #[test]
+    fn agrupar_capas_de_distintas_colecciones_y_una_coleccion_con_su_contenido() {
+        let mut p = layers_named(&["a", "b", "c", "d"]);
+        let c1 = p.group_layer(0).unwrap(); // [Col1, a, b, c, d]
+        let c2 = p.group_layer(4).unwrap(); // [Col1, a, b, c, Col2, d]
+        let _ = (c1, c2);
+        // «a» (en Col1), la propia Col2 y «d» (dentro de Col2): se elige la colección y no hace falta mover «d» por separado.
+        let a = p.layers.iter().position(|l| l.name == "a").unwrap();
+        let col2 = p.layers.iter().position(|l| l.name == "Colección 2").unwrap();
+        let d = p.layers.iter().position(|l| l.name == "d").unwrap();
+        let g = p.group_layers(&[a, col2, d]).unwrap();
+        assert_eq!(p.layers[g].kind, LayerKind::Collection);
+        assert_eq!(p.subtree_len(g), 1 + 1 + 2, "la nueva colección, «a» y la colección 2 con «d»");
+        let d = p.layers.iter().position(|l| l.name == "d").unwrap();
+        assert_eq!(p.depth_of(d), 3, "«d» está en la colección 2, dentro de la nueva, dentro de la 1");
+        // El sitio de la nueva colección es el de «a», dentro de Col1.
+        assert_eq!(p.collection_of(g), p.layers.iter().position(|l| l.name == "Colección 1"));
     }
     #[test]
     fn xsheet_operations() {

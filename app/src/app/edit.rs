@@ -131,6 +131,7 @@ impl LeonApp {
 
     pub(super) fn add_layer(&mut self) {
         self.checkpoint();
+        self.lsel.clear();
         let name = self.unique_layer_name("Capa");
         self.project.layers.insert(self.cl, Layer::new(name.clone()));
         self.say(format!("Capa «{name}» creada"));
@@ -139,6 +140,7 @@ impl LeonApp {
     /// Crea una capa del tipo elegido en el menú Mayús+A y la inserta sobre la actual.
     pub(super) fn add_layer_kind(&mut self, kind: LayerKind) {
         self.checkpoint();
+        self.lsel.clear();
         let name = self.unique_layer_name(kind.label());
         let mut l = Layer::new(name.clone());
         l.kind = kind;
@@ -179,11 +181,17 @@ impl LeonApp {
 
     /// Mete la capa actual en una colección nueva (Ctrl+G), dentro de la misma colección que ella si estaba en una.
     pub(super) fn group_current(&mut self) {
+        let sel = self.selected_layers();
         self.checkpoint();
-        if let Some(ci) = self.project.group_layer(self.cl) {
+        self.lsel.clear();
+        if let Some(ci) = self.project.group_layers(&sel) {
             self.cl = ci + 1;
             let name = self.project.layers[ci].name.clone();
-            self.say(format!("Colección «{name}» creada con la capa dentro"));
+            if sel.len() > 1 {
+                self.say(format!("Colección «{name}» creada con {} capas dentro", sel.len()));
+            } else {
+                self.say(format!("Colección «{name}» creada con la capa dentro"));
+            }
         }
     }
 
@@ -195,6 +203,7 @@ impl LeonApp {
             return;
         };
         self.checkpoint();
+        self.lsel.clear();
         let name = self.project.layers[ci].name.clone();
         if let Some(n) = self.project.ungroup(ci) {
             self.cl = n;
@@ -206,6 +215,7 @@ impl LeonApp {
     /// Mueve la capa li a la colección ci.
     pub(super) fn move_to_collection(&mut self, li: usize, ci: usize) {
         self.checkpoint();
+        self.lsel.clear();
         if let Some(n) = self.project.move_to_collection(li, ci) {
             self.cl = n;
         }
@@ -214,6 +224,7 @@ impl LeonApp {
     /// Saca la capa li de su colección.
     pub(super) fn leave_collection(&mut self, li: usize) {
         self.checkpoint();
+        self.lsel.clear();
         if let Some(n) = self.project.leave_collection(li) {
             self.cl = n;
         }
@@ -221,6 +232,7 @@ impl LeonApp {
 
     pub(super) fn duplicate_layer(&mut self) {
         self.checkpoint();
+        self.lsel.clear();
         let mut l = self.layer().clone();
         l.name = format!("{} copia", l.name);
         l.uid = 0; // la copia es otra capa: se le dará su propio identificador si hace falta
@@ -234,6 +246,7 @@ impl LeonApp {
             return;
         }
         self.checkpoint();
+        self.lsel.clear();
         self.project.release_children(self.cl);
         self.project.release_members(self.cl);
         let l = self.project.layers.remove(self.cl);
@@ -249,6 +262,7 @@ impl LeonApp {
             return;
         }
         self.checkpoint();
+        self.lsel.clear();
         let l = self.project.layers.remove(from);
         self.project.layers.insert(to, l);
         // Las capas de una colección se quedan juntas, debajo de ella.

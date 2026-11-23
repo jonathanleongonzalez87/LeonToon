@@ -19,10 +19,12 @@ pub enum Prop {
     Scale,
     Rotation,
     Opacity,
+    /// Profundidad (eje Z) de una capa 3D: un desplazamiento sobre su plano (BG, MG o FG) o sobre la posición de la cámara.
+    Depth,
 }
 
 impl Prop {
-    pub const ALL: [Prop; 5] = [Prop::Anchor, Prop::Position, Prop::Scale, Prop::Rotation, Prop::Opacity];
+    pub const ALL: [Prop; 6] = [Prop::Anchor, Prop::Position, Prop::Scale, Prop::Rotation, Prop::Opacity, Prop::Depth];
 
     pub fn name(self) -> &'static str {
         match self {
@@ -31,13 +33,14 @@ impl Prop {
             Prop::Scale => "Escala",
             Prop::Rotation => "Rotación",
             Prop::Opacity => "Opacidad",
+            Prop::Depth => "Profundidad (Z)",
         }
     }
 
     /// Valor por defecto (el de una capa sin animar). Las propiedades escalares usan solo el primer número.
     pub fn default_value(self) -> [f32; 2] {
         match self {
-            Prop::Anchor | Prop::Position | Prop::Rotation => [0.0, 0.0],
+            Prop::Anchor | Prop::Position | Prop::Rotation | Prop::Depth => [0.0, 0.0],
             Prop::Scale | Prop::Opacity => [1.0, 0.0],
         }
     }
@@ -50,6 +53,7 @@ impl Prop {
             Prop::Scale => [k.s, 0.0],
             Prop::Rotation => [k.r, 0.0],
             Prop::Opacity => [k.o, 0.0],
+            Prop::Depth => [k.dz, 0.0],
         }
     }
 
@@ -60,6 +64,7 @@ impl Prop {
             Prop::Scale => k.s = v[0],
             Prop::Rotation => k.r = v[0],
             Prop::Opacity => k.o = v[0],
+            Prop::Depth => k.dz = v[0],
         }
     }
 }
@@ -81,6 +86,7 @@ pub struct Tracks {
     scale: BTreeMap<u32, PKey>,
     rotation: BTreeMap<u32, PKey>,
     opacity: BTreeMap<u32, PKey>,
+    depth: BTreeMap<u32, PKey>,
 }
 
 impl Tracks {
@@ -91,6 +97,7 @@ impl Tracks {
             Prop::Scale => &self.scale,
             Prop::Rotation => &self.rotation,
             Prop::Opacity => &self.opacity,
+            Prop::Depth => &self.depth,
         }
     }
 
@@ -101,6 +108,7 @@ impl Tracks {
             Prop::Scale => &mut self.scale,
             Prop::Rotation => &mut self.rotation,
             Prop::Opacity => &mut self.opacity,
+            Prop::Depth => &mut self.depth,
         }
     }
 
@@ -182,6 +190,10 @@ impl Tracks {
     /// Clave en las cinco propiedades con los valores de `k` (como «añadir clave a todo»).
     pub fn set_all(&mut self, f: u32, k: &XKey) {
         for p in Prop::ALL {
+            // La profundidad solo se anima si la capa ya la anima o se ha movido en Z: una capa 2D no gana una pista inútil.
+            if p == Prop::Depth && k.dz == 0.0 && !self.has(Prop::Depth) {
+                continue;
+            }
             self.set(p, f, p.of(k), k.i);
         }
     }
@@ -464,6 +476,21 @@ mod tests {
         assert_eq!(t.eval(6).x, 1.0, "la clave movida sustituye a la que estaba");
         assert!(!t.move_key(Prop::Position, 2, 4), "no hay clave en el cuadro de origen");
         assert!(!t.move_key(Prop::Position, 6, 6));
+    }
+
+    #[test]
+    fn la_profundidad_es_una_propiedad_mas_y_una_capa_2d_no_gana_pista_al_poner_clave_en_todo() {
+        let mut t = Tracks::default();
+        t.set_all(3, &XKey::default());
+        assert!(!t.has(Prop::Depth), "sin profundidad no se crea la pista");
+        assert!(t.has(Prop::Position) && t.has(Prop::Opacity));
+        t.set(Prop::Depth, 0, [0.0, 0.0], Interp::Linear);
+        t.set(Prop::Depth, 10, [100.0, 0.0], Interp::Linear);
+        assert_eq!(t.eval(5).dz, 50.0);
+        // Con la pista ya creada, «clave en todo» también la pone.
+        t.set_all(5, &XKey { dz: 50.0, ..XKey::default() });
+        assert!(t.has_prop_key_at(Prop::Depth, 5));
+        assert_eq!(Prop::Depth.of(&XKey { dz: 7.0, ..XKey::default() }), [7.0, 0.0]);
     }
 
     #[test]

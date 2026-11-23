@@ -224,6 +224,10 @@ impl LeonApp {
             Drop(usize, crate::model::LayerDrop),
         }
         let mut lacts: Vec<LAct> = Vec::new();
+        // Selección múltiple: Ctrl + clic suma o quita; Mayús + clic elige el rango, en el orden en que se ve la lista.
+        let sel_set = self.selected_layers();
+        let order: Vec<usize> = (0..self.project.layers.len()).filter(|&i| !self.project.is_hidden_by_fold(i) && !(self.hide_shy && self.project.layers[i].shy && i != self.cl)).collect();
+        let mut click: Option<(usize, bool, bool)> = None;
         let drag_id = ui.id().with("layer_drag");
         let mut row_rects: Vec<(usize, Rect, bool)> = Vec::new();
         let collections: Vec<(usize, String)> = self.project.layers.iter().enumerate().filter(|(_, l)| l.kind == LayerKind::Collection).map(|(i, l)| (i, l.name.clone())).collect();
@@ -253,6 +257,8 @@ impl LeonApp {
                 if on {
                     p.rect_filled(r, 4.0, SEL_BG);
                     p.rect_filled(Rect::from_min_size(r.min, Vec2::new(2.0, r.height())), 0.0, ACCENT);
+                } else if sel_set.contains(&i) {
+                    p.rect_filled(r, 4.0, SEL_BG);
                 } else if resp.hovered() {
                     p.rect_filled(r, 4.0, BG3);
                 }
@@ -307,7 +313,8 @@ impl LeonApp {
                         pick = Some(i);
                         lacts.push(LAct::Fold(i));
                     } else {
-                        pick = Some(i);
+                        let (ctrl, shift) = ui.input(|inp| (inp.modifiers.command, inp.modifiers.shift));
+                        click = Some((i, ctrl, shift));
                     }
                 }
                 if resp.double_clicked() {
@@ -386,12 +393,18 @@ impl LeonApp {
             self.project.layers[i].locked = !self.project.layers[i].locked;
         }
         if let Some(i) = pick {
-            self.cl = i;
+            self.click_layer(i, false, false, &order);
+        }
+        if let Some((i, ctrl, shift)) = click {
+            self.click_layer(i, ctrl, shift, &order);
         }
         for a in lacts {
             match a {
                 LAct::Group(i) => {
-                    self.cl = i;
+                    // Con varias capas elegidas, el menú de una de ellas las agrupa a todas; si no, solo esa.
+                    if !self.selected_layers().contains(&i) {
+                        self.click_layer(i, false, false, &[]);
+                    }
                     self.group_current();
                 }
                 LAct::MoveTo(i, ci) => self.move_to_collection(i, ci),
@@ -407,6 +420,7 @@ impl LeonApp {
                 }
                 LAct::Drop(src, d) => {
                     self.checkpoint();
+                    self.lsel.clear();
                     if let Some(n) = self.project.move_layer_tree(src, d) {
                         self.cl = n;
                     }
@@ -543,6 +557,7 @@ impl LeonApp {
         let layer = self.layer();
         let is_key = layer.tracks.has_key_at(f);
         let mut t = layer.transform_at(f);
+        let layer3d = layer.is3d || layer.kind == LayerKind::Camera;
         let animated: Vec<bool> = Prop::ALL.iter().map(|p| layer.tracks.has(*p)).collect();
         let keyed: Vec<bool> = Prop::ALL.iter().map(|p| layer.tracks.has_prop_key_at(*p, f)).collect();
         muted(ui, format!("Capa «{}» · cuadro {}{}", layer.name, f + 1, if is_key { " · CLAVE" } else { "" }));
@@ -550,6 +565,10 @@ impl LeonApp {
         let mut toggle: Option<Prop> = None;
         egui::Grid::new("anim_grid").num_columns(3).spacing([6.0, 5.0]).show(ui, |ui| {
             for (n, p) in Prop::ALL.iter().enumerate() {
+                // La profundidad (eje Z) solo la tienen las capas 3D.
+                if *p == Prop::Depth && !layer3d {
+                    continue;
+                }
                 // Cronómetro: naranja si la propiedad está animada.
                 let (r, resp) = ui.allocate_exact_size(Vec2::splat(18.0), Sense::click());
                 let col = if animated[n] { ACCENT } else if resp.hovered() { TX } else { MU };
@@ -562,7 +581,7 @@ impl LeonApp {
                 }
                 ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing.x = 3.0;
-                    ui.label(RichText::new(if *p == Prop::Anchor { "Anclaje" } else { p.name() }).color(MU));
+                    ui.label(RichText::new(match p { Prop::Anchor => "Anclaje", Prop::Depth => "Profundidad", _ => p.name() }).color(MU));
                     if keyed[n] {
                         ui.label(RichText::new("◆").size(10.0).color(KEY_GOLD));
                     }
@@ -586,6 +605,9 @@ impl LeonApp {
                         }
                         Prop::Opacity => {
                             ui.add(egui::DragValue::new(&mut t.o).speed(0.01).max_decimals(2));
+                        }
+                        Prop::Depth => {
+                            ui.add(egui::DragValue::new(&mut t.dz).speed(2.0).max_decimals(0).prefix("z "));
                         }
                     }
                 });
@@ -644,6 +666,27 @@ impl LeonApp {
             ui.label(RichText::new("Opacidad").color(MU));
             ui.add(egui::Slider::new(&mut layer.opacity, 0.0..=1.0).custom_formatter(|v, _| format!("{:.0} %", v * 100.0)));
         });
+        // Espacio: 2D (fija al tamaño de la cámara) o 3D (eje Z, plano BG, MG o FG, animable ante la cámara).
+        if layer.kind != LayerKind::Camera && layer.kind != LayerKind::Collection {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("Espacio").color(MU));
+                if ui.selectable_label(!layer.is3d, "2D").on_hover_text("Fija al tamaño de la cámara").clicked() {
+                    layer.is3d = false;
+                }
+                if ui.selectable_label(layer.is3d, "3D").on_hover_text("Con eje Z: se puede animar su profundidad ante la cámara").clicked() && !layer.is3d {
+                    layer.is3d = true;
+                    layer.depth = crate::model::plane_z(layer.plane);
+                }
+                if layer.is3d {
+                    for (pl, name) in [(0u8, "BG"), (1, "MG"), (2, "FG")] {
+                        if ui.selectable_label(layer.plane == pl, name).clicked() {
+                            layer.plane = pl;
+                            layer.depth = crate::model::plane_z(pl);
+                        }
+                    }
+                }
+            });
+        }
         // Etiqueta de color
         ui.horizontal(|ui| {
             ui.label(RichText::new("Etiqueta").color(MU));
