@@ -5,9 +5,9 @@ de motion graphics y de stop motion (salas de trabajo, mesa de luz, papel ceboll
 exposición, Live View) con un motor propio de dibujo **vectorial** y de **píxeles**. Está en desarrollo activo; la versión
 actual es la **0.3.0**.
 
-![LeonToon: salas, editores y herramientas](docs/img/00-portada.png)
+![LeonToon: salas, editores y herramientas](docs/img/00-portada-v2.png)
 
-**Contenido:** [Dibujo](#dibujo) · [Interfaz](#interfaz-por-editores) · [Montaje y motion graphics](#montaje-y-motion-graphics) ·
+Todas las imágenes salen del **proyecto de muestra** que trae el programa: una pelota que rebota (animación tradicional, a dos cuadros), un sol que va y viene (interpolación) y un paisaje con paralaje en bucle de cuatro segundos, con cielo, nubes, montañas, arbustos y carretera. Se abre desde la pantalla de inicio.`n`n**Contenido:** [Dibujo](#dibujo) · [Interfaz](#interfaz-por-editores) · [Montaje y motion graphics](#montaje-y-motion-graphics) ·
 [Stop Motion](#stop-motion) · [Storyboard y animatic](#storyboard-y-animatic) · [Exportar](#exportar) ·
 [Descargar](#descargar) · [Compilar](#compilar) · [Estado y límites](#estado-y-límites)
 
@@ -34,7 +34,7 @@ La pantalla se divide en **huecos** y cada hueco muestra el **editor** que elija
 X-Sheet, storyboard…), como en Blender. Cada sala trae su propia disposición, pero se puede cambiar. La barra de herramientas
 tiene iconos con color y los ajustes de la herramienta elegida están en la barra lateral **N**, pestaña *Herramienta*.
 
-![Barra de herramientas con iconos de color y panel de la herramienta](docs/img/08-barra-de-herramientas.png)
+![Barra de herramientas con iconos de color y panel de la herramienta](docs/img/08-barra-de-herramientas-v2.png)
 
 Al abrir el programa, la pantalla de inicio ofrece un archivo nuevo según el tipo de animación (storyboard, animatic,
 animación tradicional, cutout, motion graphics o stop motion), cada uno con su conjunto de salas.
@@ -43,7 +43,7 @@ animación tradicional, cutout, motion graphics o stop motion), cada uno con su 
 
 El selector de cada hueco agrupa los editores por familia, con su icono:
 
-![Selector de editores](docs/img/10-selector-de-editores.png)
+![Selector de editores](docs/img/10-selector-de-editores-v2.png)
 
 ## Montaje y motion graphics
 
@@ -51,27 +51,27 @@ La **línea de tiempo de montaje** es un editor propio para motion graphics: una
 interruptores (visible, solo, bloqueo, tímida), etiqueta de color y, al desplegar la capa, una pista por propiedad
 (punto de anclaje, posición, escala, rotación, opacidad y profundidad) con sus propias claves.
 
-![Línea de tiempo de montaje con las pistas de transformación](docs/img/11-linea-de-tiempo-de-montaje.png)
+![Línea de tiempo de montaje con las pistas de transformación](docs/img/11-linea-de-tiempo-de-montaje-v2.png)
 
 **Fusión y vínculo.** Cada capa tiene modo de fusión (Multiplicar, Diferencia y otros ocho modos), mate y un *primario*:
-una capa puede heredar la transformación de otra. En la imagen, la pelota está en Multiplicar y vinculada al Sol.
+una capa puede heredar la transformación de otra. En la imagen, las Montañas y las Nubes están en Multiplicar y los Arbustos tienen a las Montañas como primario.
 
-![Modo de fusión y vínculo entre capas](docs/img/12-fusion-y-vinculo.png)
+![Modo de fusión y vínculo entre capas](docs/img/12-fusion-y-vinculo-v2.png)
 
 **Colecciones.** Las capas se agrupan en colecciones anidables sin límite, arrastrando capas dentro de ellas, y la vista 3D
 dibuja cada colección como un cubo de líneas punteadas.
 
-![Colecciones anidadas y cubo 3D](docs/img/13-colecciones-y-cubo-3d.png)
+![Colecciones anidadas y cubo 3D](docs/img/13-colecciones-y-cubo-3d-v2.png)
 
 **Propiedades de capa y espacio 2D/3D.** La selección múltiple (Ctrl y Mayús) permite agrupar varias capas. Cada capa puede
 ser 2D o 3D, con profundidad animable, y se coloca en fondo, medio o primer plano.
 
-![Panel de propiedades: claves, capa, espacio 2D/3D, etiqueta y barra](docs/img/14-propiedades-y-espacio-2d-3d.png)
+![Panel de propiedades: claves, capa, espacio 2D/3D, etiqueta y barra](docs/img/14-propiedades-y-espacio-2d-3d-v2.png)
 
 **Precomposición.** Un grupo de capas se convierte en su propia composición; se entra en ella para editarla y se sale con
 *Salir*, y la ruta (Escena › Precomp 1) queda a la vista.
 
-![Entrar y salir de una precomposición](docs/img/15-precomposicion.png)
+![Entrar y salir de una precomposición](docs/img/15-precomposicion-v2.png)
 
 ## Stop Motion
 
@@ -98,12 +98,12 @@ y alrededor las hojas de exposición y la tira de fotos.
 El **storyboard** muestra los planos como miniaturas con nombre y duración; se reordenan arrastrando y *Animatic > Xsheet*
 los lleva a la hoja de exposición.
 
-![Storyboard](docs/img/21-storyboard.png)
+![Storyboard](docs/img/21-storyboard-v2.png)
 
 El **animatic** es una composición de planos con transiciones (corte, fundido…). Cada plano es una capa de la línea de
 tiempo de montaje, y la lista de planos del panel permite cambiar la duración y la transición.
 
-![El animatic como composición de planos](docs/img/16-animatic-como-composicion.png)
+![El animatic como composición de planos](docs/img/16-animatic-como-composicion-v2.png)
 
 ## Exportar
 

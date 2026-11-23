@@ -553,17 +553,22 @@ impl LeonApp {
             l.keys.insert(0, std::sync::Arc::new(Drawing { strokes, raster: None }));
             project.layers.insert(0, l);
         }
-        // Para capturas de las colecciones: LEONTOON_COLECCION=1 mete las dos capas de arriba en una colección.
-        if std::env::var("LEONTOON_COLECCION").is_ok() && project.layers.len() >= 3 {
-            if let Some(ci) = project.group_layer(1) {
-                project.move_to_collection(0, ci);
-                // Con LEONTOON_COLECCION=2, además, esa colección se mete en otra (anidado).
-                if std::env::var("LEONTOON_COLECCION").as_deref() == Ok("2") {
-                    project.group_layer(ci);
+        // Para capturas de las colecciones: LEONTOON_COLECCION=1 mete Arbustos, Montañas y Nubes en la colección «Paisaje».
+        // Con LEONTOON_COLECCION=2, además, esa colección se mete en otra («Escena»), junto con la carretera (anidado).
+        let named = |p: &Project, names: &[&str]| -> Vec<usize> { names.iter().filter_map(|n| p.layers.iter().position(|l| l.name == *n)).collect() };
+        if let Ok(mode) = std::env::var("LEONTOON_COLECCION") {
+            let idx = named(&project, &["Arbustos", "Montañas", "Nubes"]);
+            if idx.len() == 3 {
+                if let Some(ci) = project.group_layers(&idx) {
+                    project.layers[ci].name = "Paisaje".into();
+                    if mode == "2" {
+                        if let Some(oi) = project.group_layer(ci) {
+                            project.layers[oi].name = "Escena".into();
+                        }
+                    }
                 }
             }
-        }
-        // Para capturas del animatic: LEONTOON_ANIMATIC=1 crea la composición «Animatic» (el segundo plano con fundido) y entra en ella.
+        }        // Para capturas del animatic: LEONTOON_ANIMATIC=1 crea la composición «Animatic» (el segundo plano con fundido) y entra en ella.
         if std::env::var("LEONTOON_ANIMATIC").is_ok() && project.storyboard.len() >= 2 {
             project.storyboard[1].trans = "Fundido".into();
             let built = crate::animatic::build(&project.storyboard, project.fps);
@@ -572,24 +577,25 @@ impl LeonApp {
                 project.enter_comp(i, 0, 0);
             }
         }
-        // Para capturas de las precomposiciones: LEONTOON_PRECOMP=1 precompone las dos capas de arriba; con `dentro`, además entra.
+        // Para capturas de las precomposiciones: LEONTOON_PRECOMP=1 precompone Arbustos, Montañas y Nubes; con `dentro`, además entra.
         if let Ok(mode) = std::env::var("LEONTOON_PRECOMP") {
-            if project.layers.len() >= 3 {
-                if let Some(pi) = project.precompose(&[0, 1]) {
+            let idx = named(&project, &["Arbustos", "Montañas", "Nubes"]);
+            if idx.len() == 3 {
+                if let Some(pi) = project.precompose(&idx) {
                     if mode == "dentro" {
                         project.enter_comp(pi, 0, 0);
                     }
                 }
             }
-        }
-        // Para capturas de los modos de fusión y los vínculos: LEONTOON_FUSION=1 pone la capa de arriba en Multiplicar y la vincula a la segunda.
-        if std::env::var("LEONTOON_FUSION").is_ok() && project.layers.len() >= 2 {
-            project.layers[0].blend = crate::model::Blend::Multiply;
-            project.layers[1].blend = crate::model::Blend::Difference;
-            project.set_parent(0, Some(1));
-            project.layers[1].tracks.set(Prop::Position, 0, [80.0, 40.0], crate::model::Interp::Linear);
-        }
-        // Para capturas de la capa Stop Motion: LEONTOON_STOPMOTION=<carpeta> crea ahí una secuencia con fotos de ejemplo y una capa que la usa;
+        }        // Para capturas de los modos de fusión y los vínculos: LEONTOON_FUSION=1 pone las Montañas y las Nubes en Multiplicar y
+        // vincula los Arbustos a las Montañas (primario).
+        if std::env::var("LEONTOON_FUSION").is_ok() {
+            if let [m, s, a] = named(&project, &["Montañas", "Nubes", "Arbustos"])[..] {
+                project.layers[m].blend = crate::model::Blend::Multiply;
+                project.layers[s].blend = crate::model::Blend::Multiply;
+                project.set_parent(a, Some(m));
+            }
+        }        // Para capturas de la capa Stop Motion: LEONTOON_STOPMOTION=<carpeta> crea ahí una secuencia con fotos de ejemplo y una capa que la usa;
         // con LEONTOON_SMFALTA=1 la capa apunta a una carpeta que no existe (para ver el aviso).
         if let Ok(dir) = std::env::var("LEONTOON_STOPMOTION") {
             let dir = std::path::PathBuf::from(dir);
@@ -863,8 +869,8 @@ impl LeonApp {
         if let Some(n) = std::env::var("LEONTOON_CUADRO").ok().and_then(|v| v.parse::<u32>().ok()) {
             app.frame = n.min(app.project.length.saturating_sub(1));
         }
-        if std::env::var("LEONTOON_ONION").is_ok() {
-            app.onion = true;
+        if let Ok(v) = std::env::var("LEONTOON_ONION") {
+            app.onion = v != "0";
         }
         // LEONTOON_VNODE=<n> elige ese nodo de la curva elegida (captura de la edición de nodos).
         if let Some(n) = std::env::var("LEONTOON_VNODE").ok().and_then(|v| v.parse().ok()) {
