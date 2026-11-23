@@ -78,20 +78,20 @@ ser 2D o 3D, con profundidad animable, y se coloca en fondo, medio o primer plan
 La sala de Stop Motion se parece a un programa de captura: el escenario con su *Live View* arriba, controles de reproducción,
 y alrededor las hojas de exposición y la tira de fotos.
 
-![Sala de Stop Motion](docs/img/17-sala-stop-motion.png)
+![Sala de Stop Motion](docs/img/17-sala-stop-motion-v2.png)
 
-- **Cámara y captura**: elegir cámara (o una cámara simulada para probar), brillo, *animación directa*, foto anterior encima con opacidad, y herramientas del Live View (ajustar, 2×, 4×, cuadrícula de tercios, cruz de centro, enfoque asistido, ver foto anterior con L).
+- **Cámara y captura**: elegir cámara, brillo, *animación directa*, foto anterior encima con opacidad, y herramientas del Live View (ajustar, 2×, 4×, cuadrícula de tercios, cruz de centro, enfoque asistido, ver foto anterior con L).
 - **Capturar y avanzar** con Intro o F5, o capturar y revisar.
 
-![Live View, controles y panel de cámara y captura](docs/img/18-live-view-y-camara.png)
+![Live View, controles y panel de cámara y captura](docs/img/18-live-view-y-camara-v2.png)
 
 **X-Sheet**: la hoja de exposición muestra posición, cuadros, foto y exposición (cuántos cuadros dura cada foto).
 
-![X-Sheet de Stop Motion](docs/img/19-x-sheet-de-stop-motion.png)
+![X-Sheet de Stop Motion](docs/img/19-x-sheet-de-stop-motion-v2.png)
 
 **Tira de fotos** con secuencia y *Frame Browser*; duplicar, eliminar, vaciar, congelar, ocultar y poses o marcadores.
 
-![Tira de fotos](docs/img/20-tira-de-fotos.png)
+![Tira de fotos](docs/img/20-tira-de-fotos-v2.png)
 
 ## Storyboard y animatic
 
@@ -135,7 +135,7 @@ LeonToon está en construcción. Entre lo que todavía falta o no se ha probado 
 
 - La presión de **tableta gráfica** no se ha probado con hardware real, y la inclinación del lápiz no está disponible.
 - Los `.abr` exportados no se han abierto todavía en Photoshop.
-- La captura con **cámara real** en Stop Motion depende del dispositivo; las imágenes de este README usan la cámara simulada.
+- La captura con **cámara real** en Stop Motion depende del dispositivo; las imágenes de este README usan una secuencia de fotos de referencia (`referencia/Sec_Ref_Stop_Motion`) en lugar de la cámara.
 - Pendientes: importar **video y audio** al montaje, herramienta Texto, rigging, luz y profundidad de campo en 3D, sonido, exportar con la cámara 3D.
 
 ## Documentación y desarrollo
