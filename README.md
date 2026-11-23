@@ -103,7 +103,7 @@ Desde la pantalla de inicio se abre **«Ejemplo: Animatic con bocetos (A y B)»*
 ![Storyboard](docs/img/21-storyboard-v2.png)
 
 El **animatic** es una composición con un clip vivo por plano, en el orden y con la duración de la línea de tiempo del storyboard,
-con sus transiciones (corte, fundido, fundido a negro, deslizar y empujar) y su cámara. En la sala Animatic la línea de tiempo tiene el transporte (reproducir, pausa, bucle), la cabeza de reproducción en la regla y los bordes de cada plano arrastrables; el animatic se rehace solo al cambiar duraciones, transiciones, cámara u orden, y si cambias un plano, el animatic lo refleja.
+con sus transiciones (corte, fundido, fundido a negro, deslizar y empujar) y su cámara. La sala Animatic trae el visor estándar y la línea de tiempo de montaje; la línea de tiempo del storyboard (transporte, cabeza de reproducción en la regla, bordes de cada plano arrastrables y selector de transición) se puede elegir en su selector de editor; el animatic se rehace solo al cambiar duraciones, transiciones, cámara u orden, y si cambias un plano, el animatic lo refleja.
 
 ![El animatic como composición de planos](docs/img/16-animatic-como-composicion-v2.png)
 

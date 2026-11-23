@@ -531,8 +531,10 @@ impl RoomKind {
                 }
             }
             // Interpolación y Composición 3D son de motion graphics: su tiempo es la línea de tiempo de montaje.
-            Slot::Time if matches!(self, RoomKind::Interp | RoomKind::Comp) => Editor::Montage,
-            Slot::Time if matches!(self, RoomKind::Story | RoomKind::Animatic) => Editor::PanelTimeline,
+            // La sala Animatic usa la línea de tiempo de montaje y el visor estándar; la línea de tiempo del storyboard (planos,
+            // transiciones y cámara) se puede elegir en su selector.
+            Slot::Time if matches!(self, RoomKind::Interp | RoomKind::Comp | RoomKind::Animatic) => Editor::Montage,
+            Slot::Time if self == RoomKind::Story => Editor::PanelTimeline,
             Slot::Time => Editor::Timeline,
             Slot::Layers => Editor::Layers,
             Slot::Props => Editor::RoomProps,
