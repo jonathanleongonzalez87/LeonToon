@@ -1,30 +1,113 @@
 # LeonToon
 
-Estudio de animación 2D de escritorio, hecho en Rust con egui. Mezcla ideas de los programas de animación tradicional y
-digital (salas de trabajo, mesa de luz, papel cebolla, línea de tiempo y hoja de exposición) con un motor propio de
-dibujo **vectorial** y de **píxeles**. Está en desarrollo activo; la versión actual es la 0.2.0.
+Estudio de animación 2D de escritorio, hecho en Rust con egui. Mezcla ideas de los programas de animación tradicional,
+de motion graphics y de stop motion (salas de trabajo, mesa de luz, papel cebolla, línea de tiempo de montaje, hoja de
+exposición, Live View) con un motor propio de dibujo **vectorial** y de **píxeles**. Está en desarrollo activo; la versión
+actual es la **0.3.0**.
 
-![Lápiz vectorial con su biblioteca de pinceles](docs/img/01-vectorial-biblioteca.png)
+![LeonToon: salas, editores y herramientas](docs/img/00-portada.png)
 
-## Qué se puede hacer hoy
+**Contenido:** [Dibujo](#dibujo) · [Interfaz](#interfaz-por-editores) · [Montaje y motion graphics](#montaje-y-motion-graphics) ·
+[Stop Motion](#stop-motion) · [Storyboard y animatic](#storyboard-y-animatic) · [Exportar](#exportar) ·
+[Descargar](#descargar) · [Compilar](#compilar) · [Estado y límites](#estado-y-límites)
 
-- **Dibujo vectorial** con el Lápiz (L): grosor por presión, perfiles de grosor (afilado o dibujado con puntos), extremos y uniones, y una biblioteca de 22 pinceles con vista previa, favoritos, buscador y paquetes `.ltvb` para importar y exportar.
-- **Pluma Bézier** (P) con nodos y tiradores, y edición de nodos; los trazos libres se pueden convertir en curvas.
+## Dibujo
+
+- **Lápiz vectorial** (L) con grosor por presión, perfiles de grosor (afilado o dibujado con puntos), extremos y uniones, y una biblioteca de 22 pinceles con vista previa, favoritos, buscador y paquetes `.ltvb` para importar y exportar.
+- **Pluma Bézier** (P) con nodos y tiradores; los trazos libres se pueden convertir en curvas.
 - **Edición no destructiva**: se eligen uno o varios trazos para cambiar grosor, color, opacidad, perfil o pincel sin volver a dibujarlos, y se puede restaurar el aspecto original.
 - **Capas de mapa de bits** con un motor de pinceles de píxeles (dureza, espaciado, dinámica de forma y de transferencia, dispersión, textura, doble pincel, bordes húmedos, puntas de imagen) e importación y exportación de pinceles `.abr` de Photoshop.
 - **Mesa de luz** con luz, temperatura, papel cebolla y **papeles de estudio** (Bond, Genga, TMK y otros) con grano orgánico cuya intensidad sigue la luz.
-- **Vista 3D** de composición con planos de fondo, medio y primer plano, y cámara.
-- Línea de tiempo, hoja de exposición, claves, storyboard y animatic.
-- Exportar a PNG, GIF y MP4 (para MP4 hace falta [ffmpeg](https://ffmpeg.org/) aparte). Los proyectos se guardan como `.ltoon`.
 
 | | |
 |---|---|
-| ![Edición de trazos](docs/img/03-edicion-de-trazos.png) | ![Pluma y nodos](docs/img/02-pluma-nodos.png) |
-| **Edición de trazos**: un solo panel para el Lápiz y para lo elegido | **Pluma y nodos**: curvas Bézier editables |
-| ![Perfil de grosor](docs/img/07-perfil-de-grosor.png) | ![Pinceles de píxeles](docs/img/04-pinceles-de-pixeles.png) |
-| **Perfil de grosor** dibujado con puntos | **Pinceles de píxeles** con presets y dinámicas |
-| ![Papeles de estudio](docs/img/05-papeles-de-estudio.png) | ![Vista 3D](docs/img/06-vista-3d.png) |
-| **Papeles de estudio** con grano que responde a la luz | **Vista 3D** de planos y cámara |
+| ![Lápiz vectorial con su biblioteca de pinceles](docs/img/01-vectorial-biblioteca.png) | ![Edición de trazos](docs/img/03-edicion-de-trazos.png) |
+| **Biblioteca de pinceles**: vista previa, favoritos y paquetes `.ltvb` | **Edición de trazos**: un solo panel para el Lápiz y para lo elegido |
+| ![Pluma y nodos](docs/img/02-pluma-nodos.png) | ![Perfil de grosor](docs/img/07-perfil-de-grosor.png) |
+| **Pluma y nodos**: curvas Bézier editables | **Perfil de grosor** dibujado con puntos |
+| ![Pinceles de píxeles](docs/img/04-pinceles-de-pixeles.png) | ![Papeles de estudio](docs/img/05-papeles-de-estudio.png) |
+| **Pinceles de píxeles** con presets y dinámicas | **Papeles de estudio** con grano que responde a la luz |
+
+## Interfaz por editores
+
+La pantalla se divide en **huecos** y cada hueco muestra el **editor** que elijas (visor, capas, propiedades, línea de tiempo,
+X-Sheet, storyboard…), como en Blender. Cada sala trae su propia disposición, pero se puede cambiar. La barra de herramientas
+tiene iconos con color y los ajustes de la herramienta elegida están en la barra lateral **N**, pestaña *Herramienta*.
+
+![Barra de herramientas con iconos de color y panel de la herramienta](docs/img/08-barra-de-herramientas.png)
+
+Al abrir el programa, la pantalla de inicio ofrece un archivo nuevo según el tipo de animación (storyboard, animatic,
+animación tradicional, cutout, motion graphics o stop motion), cada uno con su conjunto de salas.
+
+![Pantalla de inicio y lista de tipos de animación](docs/img/09-pantalla-de-inicio.png)
+
+El selector de cada hueco agrupa los editores por familia, con su icono:
+
+![Selector de editores](docs/img/10-selector-de-editores.png)
+
+## Montaje y motion graphics
+
+La **línea de tiempo de montaje** es un editor propio para motion graphics: una fila por capa con barra de duración,
+interruptores (visible, solo, bloqueo, tímida), etiqueta de color y, al desplegar la capa, una pista por propiedad
+(punto de anclaje, posición, escala, rotación, opacidad y profundidad) con sus propias claves.
+
+![Línea de tiempo de montaje con las pistas de transformación](docs/img/11-linea-de-tiempo-de-montaje.png)
+
+**Fusión y vínculo.** Cada capa tiene modo de fusión (Multiplicar, Diferencia y otros ocho modos), mate y un *primario*:
+una capa puede heredar la transformación de otra. En la imagen, la pelota está en Multiplicar y vinculada al Sol.
+
+![Modo de fusión y vínculo entre capas](docs/img/12-fusion-y-vinculo.png)
+
+**Colecciones.** Las capas se agrupan en colecciones anidables sin límite, arrastrando capas dentro de ellas, y la vista 3D
+dibuja cada colección como un cubo de líneas punteadas.
+
+![Colecciones anidadas y cubo 3D](docs/img/13-colecciones-y-cubo-3d.png)
+
+**Propiedades de capa y espacio 2D/3D.** La selección múltiple (Ctrl y Mayús) permite agrupar varias capas. Cada capa puede
+ser 2D o 3D, con profundidad animable, y se coloca en fondo, medio o primer plano.
+
+![Panel de propiedades: claves, capa, espacio 2D/3D, etiqueta y barra](docs/img/14-propiedades-y-espacio-2d-3d.png)
+
+**Precomposición.** Un grupo de capas se convierte en su propia composición; se entra en ella para editarla y se sale con
+*Salir*, y la ruta (Escena › Precomp 1) queda a la vista.
+
+![Entrar y salir de una precomposición](docs/img/15-precomposicion.png)
+
+## Stop Motion
+
+La sala de Stop Motion se parece a un programa de captura: el escenario con su *Live View* arriba, controles de reproducción,
+y alrededor las hojas de exposición y la tira de fotos.
+
+![Sala de Stop Motion](docs/img/17-sala-stop-motion.png)
+
+- **Cámara y captura**: elegir cámara (o una cámara simulada para probar), brillo, *animación directa*, foto anterior encima con opacidad, y herramientas del Live View (ajustar, 2×, 4×, cuadrícula de tercios, cruz de centro, enfoque asistido, ver foto anterior con L).
+- **Capturar y avanzar** con Intro o F5, o capturar y revisar.
+
+![Live View, controles y panel de cámara y captura](docs/img/18-live-view-y-camara.png)
+
+**X-Sheet**: la hoja de exposición muestra posición, cuadros, foto y exposición (cuántos cuadros dura cada foto).
+
+![X-Sheet de Stop Motion](docs/img/19-x-sheet-de-stop-motion.png)
+
+**Tira de fotos** con secuencia y *Frame Browser*; duplicar, eliminar, vaciar, congelar, ocultar y poses o marcadores.
+
+![Tira de fotos](docs/img/20-tira-de-fotos.png)
+
+## Storyboard y animatic
+
+El **storyboard** muestra los planos como miniaturas con nombre y duración; se reordenan arrastrando y *Animatic > Xsheet*
+los lleva a la hoja de exposición.
+
+![Storyboard](docs/img/21-storyboard.png)
+
+El **animatic** es una composición de planos con transiciones (corte, fundido…). Cada plano es una capa de la línea de
+tiempo de montaje, y la lista de planos del panel permite cambiar la duración y la transición.
+
+![El animatic como composición de planos](docs/img/16-animatic-como-composicion.png)
+
+## Exportar
+
+PNG, GIF y MP4 (para MP4 hace falta [ffmpeg](https://ffmpeg.org/) aparte). Los proyectos se guardan como `.ltoon`.
 
 ## Descargar
 
@@ -52,7 +135,13 @@ LeonToon está en construcción. Entre lo que todavía falta o no se ha probado 
 
 - La presión de **tableta gráfica** no se ha probado con hardware real, y la inclinación del lápiz no está disponible.
 - Los `.abr` exportados no se han abierto todavía en Photoshop.
-- Pendientes: herramienta Texto, rigging, luz y profundidad de campo en 3D, sonido, exportar con la cámara 3D.
+- La captura con **cámara real** en Stop Motion depende del dispositivo; las imágenes de este README usan la cámara simulada.
+- Pendientes: importar **video y audio** al montaje, herramienta Texto, rigging, luz y profundidad de campo en 3D, sonido, exportar con la cámara 3D.
+
+## Documentación y desarrollo
+
+Notas de diseño en [`docs/`](docs): [arquitectura de editores](docs/arquitectura-editores.md),
+[editor de tiempo de montaje](docs/editor-de-tiempo-montaje.md) y [Stop Motion de estudio](docs/stop-motion-estudio.md).
 
 El trabajo se organiza con [Issues](https://github.com/jonathanleongonzalez87/LeonToon/issues) (con etiquetas de área, tipo y
 prioridad, y hitos por versión) y se entrega con Pull Requests. Para publicar una versión, ver [RELEASING.md](RELEASING.md).
