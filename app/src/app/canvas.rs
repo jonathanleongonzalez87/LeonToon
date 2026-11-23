@@ -212,7 +212,7 @@ impl LeonApp {
             }
         }
         for (li, layer) in self.project.layers.iter().enumerate().rev() {
-            if !layer.shows_at(f, any_solo) {
+            if !self.project.shows(li, f, any_solo) {
                 continue;
             }
             let t = self.project.effective_at(li, f);

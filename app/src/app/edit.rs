@@ -158,6 +158,9 @@ impl LeonApp {
             }
             _ => {}
         }
+        if kind == LayerKind::Collection {
+            l.uid = self.project.next_uid();
+        }
         self.project.layers.insert(self.cl, l);
         self.sel = None;
         if kind == LayerKind::Camera {
@@ -171,6 +174,56 @@ impl LeonApp {
             self.say(format!("Capa «{name}» ({}) creada. Su efecto en la escena queda pendiente.", kind.label()));
         } else {
             self.say(format!("Capa agregada: «{name}» ({})", kind.label()));
+        }
+    }
+
+    /// Mete la capa actual en una colección nueva (Ctrl+G).
+    pub(super) fn group_current(&mut self) {
+        if self.project.collection_of(self.cl).is_some() {
+            self.say("La capa ya está en una colección: sácala antes (menú de la capa) o desagrupa");
+            return;
+        }
+        if self.layer().kind == LayerKind::Collection {
+            self.say("Las colecciones no se meten dentro de otras colecciones");
+            return;
+        }
+        self.checkpoint();
+        if let Some(ci) = self.project.group_layer(self.cl) {
+            self.cl = ci + 1;
+            let name = self.project.layers[ci].name.clone();
+            self.say(format!("Colección «{name}» creada con la capa dentro"));
+        }
+    }
+
+    /// Deshace la colección de la capa actual (o la actual, si lo es) y deja sus capas sueltas (Ctrl+Mayús+G).
+    pub(super) fn ungroup_current(&mut self) {
+        let ci = if self.layer().kind == LayerKind::Collection { Some(self.cl) } else { self.project.collection_of(self.cl) };
+        let Some(ci) = ci else {
+            self.say("La capa actual no está en ninguna colección");
+            return;
+        };
+        self.checkpoint();
+        let name = self.project.layers[ci].name.clone();
+        if let Some(n) = self.project.ungroup(ci) {
+            self.cl = n;
+            self.sel = None;
+            self.say(format!("Colección «{name}» deshecha: sus capas quedan sueltas"));
+        }
+    }
+
+    /// Mueve la capa li a la colección ci.
+    pub(super) fn move_to_collection(&mut self, li: usize, ci: usize) {
+        self.checkpoint();
+        if let Some(n) = self.project.move_to_collection(li, ci) {
+            self.cl = n;
+        }
+    }
+
+    /// Saca la capa li de su colección.
+    pub(super) fn leave_collection(&mut self, li: usize) {
+        self.checkpoint();
+        if let Some(n) = self.project.leave_collection(li) {
+            self.cl = n;
         }
     }
 
@@ -190,6 +243,7 @@ impl LeonApp {
         }
         self.checkpoint();
         self.project.release_children(self.cl);
+        self.project.release_members(self.cl);
         let l = self.project.layers.remove(self.cl);
         self.cl = self.cl.min(self.project.layers.len() - 1);
         self.sel = None;
@@ -205,7 +259,9 @@ impl LeonApp {
         self.checkpoint();
         let l = self.project.layers.remove(from);
         self.project.layers.insert(to, l);
-        self.cl = to;
+        // Las capas de una colección se quedan juntas, debajo de ella.
+        let map = self.project.normalize_groups();
+        self.cl = map[to];
         self.sel = None;
     }
 
@@ -795,6 +851,11 @@ impl LeonApp {
         let none = Modifiers::NONE;
         let sh = Modifiers::SHIFT;
         let cmd = Modifiers::COMMAND;
+        if k(cs, Key::G) {
+            self.ungroup_current();
+        } else if k(cmd, Key::G) {
+            self.group_current();
+        }
         if k(cs, Key::Z) || k(cmd, Key::Y) {
             self.do_redo();
         }

@@ -82,7 +82,7 @@ fn rich_project() -> Project {
     bitmap.keys.insert(0, Arc::new(Drawing { strokes: Vec::new(), raster: Some(Arc::new(r)) }));
     p.layers.push(bitmap);
 
-    for (i, k) in [LayerKind::Solid, LayerKind::Null, LayerKind::Text, LayerKind::Light, LayerKind::Camera, LayerKind::StopMotion].into_iter().enumerate() {
+    for (i, k) in [LayerKind::Solid, LayerKind::Null, LayerKind::Text, LayerKind::Light, LayerKind::Camera, LayerKind::StopMotion, LayerKind::Collection].into_iter().enumerate() {
         let mut l = Layer::new(format!("Capa {k:?}"));
         l.kind = k;
         if k == LayerKind::StopMotion {
@@ -227,8 +227,8 @@ fn old_projects_keep_their_details_and_render() {
     let p = open_bytes(V010_COMPLETO, "detalles");
     assert_eq!(p.range, Some((2, 18)));
     let kinds: Vec<LayerKind> = p.layers.iter().map(|l| l.kind).collect();
-    // Las capas Stop Motion no existían en 0.1.0: el resto de clases sí están.
-    for k in LayerKind::ALL.into_iter().filter(|k| *k != LayerKind::StopMotion) {
+    // Las capas Stop Motion y las colecciones no existían en 0.1.0: el resto de clases sí están.
+    for k in LayerKind::ALL.into_iter().filter(|k| !matches!(k, LayerKind::StopMotion | LayerKind::Collection)) {
         assert!(kinds.contains(&k), "falta una capa {k:?} del proyecto viejo");
     }
     assert!(p.layers.iter().all(|l| l.stopmotion.is_none()), "un proyecto viejo no trae secuencias Stop Motion");
@@ -796,4 +796,44 @@ fn modo_de_fusion_y_vinculo_se_guardan_y_las_capas_antiguas_se_abren_normales() 
     }
     let old: Project = serde_json::from_value(v).unwrap();
     assert!(old.layers.iter().all(|l| l.blend == crate::model::Blend::Normal && l.parent.is_none() && l.uid == 0));
+}
+
+#[test]
+fn una_coleccion_se_compone_como_unidad_con_su_opacidad_y_su_visibilidad() {
+    let mut p = Project::blank(1280, 720, 24, 4);
+    p.background = [200, 100, 50, 255];
+    // Orden de arriba abajo: colección, y debajo sus dos capas (una gris encima de otra más clara).
+    p.layers = vec![Layer::new("Colección"), gray_sheet("clara", 220), gray_sheet("gris", 100)];
+    p.layers[0].kind = LayerKind::Collection;
+    p.layers[0].uid = 1;
+    p.layers[1].group = Some(1);
+    p.layers[2].group = Some(1);
+    p.normalize_groups();
+    // Sin opacidad propia, la colección deja ver lo mismo que las capas sueltas: manda la de más arriba (la clara).
+    assert_eq!(center_pixel(&p), [220, 220, 220]);
+    // Con la mitad de opacidad, se mezcla el conjunto ya compuesto con el fondo (no cada capa por separado).
+    p.layers[0].opacity = 0.5;
+    let m = center_pixel(&p);
+    assert!((m[0] as i32 - 210).abs() <= 2 && (m[1] as i32 - 160).abs() <= 2 && (m[2] as i32 - 135).abs() <= 2, "opacidad de la colección: {m:?}");
+    // Con la colección oculta no se ve ninguna de sus capas.
+    p.layers[0].visible = false;
+    assert_eq!(center_pixel(&p), [200, 100, 50]);
+}
+
+#[test]
+fn la_pertenencia_a_una_coleccion_se_guarda_y_se_repara() {
+    let mut p = Project::blank(1280, 720, 24, 4);
+    p.layers = vec![gray_sheet("a", 10), gray_sheet("b", 20)];
+    let ci = p.group_layer(1).expect("se agrupa");
+    assert_eq!(p.layers[ci].kind, LayerKind::Collection);
+    assert_eq!(p.members_of(ci), vec![ci + 1]);
+    let back: Project = serde_json::from_str(&serde_json::to_string(&p).unwrap()).unwrap();
+    let c2 = back.layers.iter().position(|l| l.kind == LayerKind::Collection).unwrap();
+    assert_eq!(back.members_of(c2).len(), 1);
+    assert_eq!(back.collection_of(c2 + 1), Some(c2));
+    // Un archivo cuya capa apunta a una colección que no existe la deja suelta.
+    let mut q = back.clone();
+    q.layers.retain(|l| l.kind != LayerKind::Collection);
+    q.sanitize();
+    assert!(q.layers.iter().all(|l| l.group.is_none()));
 }

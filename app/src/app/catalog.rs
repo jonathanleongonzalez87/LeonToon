@@ -171,7 +171,7 @@ impl Tool {
     /// Devuelve el motivo si la herramienta no se puede usar en esa clase de capa.
     pub(crate) fn layer_block(self, kind: LayerKind) -> Option<&'static str> {
         let paints = self.draws() || matches!(self, Tool::Fill);
-        if paints && matches!(kind, LayerKind::Camera | LayerKind::Light | LayerKind::Null | LayerKind::Text | LayerKind::StopMotion) {
+        if paints && matches!(kind, LayerKind::Camera | LayerKind::Light | LayerKind::Null | LayerKind::Text | LayerKind::StopMotion | LayerKind::Collection) {
             return Some("Esta capa no contiene dibujos: elige una capa vectorial o de mapa de bits.");
         }
         if matches!(self, Tool::Vector | Tool::Pen) && kind == LayerKind::Bitmap {

@@ -570,10 +570,12 @@ pub enum LayerKind {
     Camera,
     /// Secuencia de fotos (Stop Motion): sus fotos viven en una carpeta elegida por la persona.
     StopMotion,
+    /// Colección (grupo o carpeta): organiza capas de una misma composición, sin tiempo propio (ver `Layer::group`).
+    Collection,
 }
 
 impl LayerKind {
-    pub const ALL: [LayerKind; 8] = [
+    pub const ALL: [LayerKind; 9] = [
         LayerKind::Vector,
         LayerKind::Bitmap,
         LayerKind::Solid,
@@ -582,6 +584,7 @@ impl LayerKind {
         LayerKind::Light,
         LayerKind::Camera,
         LayerKind::StopMotion,
+        LayerKind::Collection,
     ];
     pub fn label(self) -> &'static str {
         match self {
@@ -593,6 +596,7 @@ impl LayerKind {
             LayerKind::Light => "Luz",
             LayerKind::Camera => "Cámara",
             LayerKind::StopMotion => "Stop Motion",
+            LayerKind::Collection => "Colección",
         }
     }
     /// Letra de la etiqueta en la lista de capas.
@@ -606,6 +610,7 @@ impl LayerKind {
             LayerKind::Light => "L",
             LayerKind::Camera => "C",
             LayerKind::StopMotion => "M",
+            LayerKind::Collection => "G",
         }
     }
     /// Color de etiqueta del prototipo.
@@ -618,6 +623,7 @@ impl LayerKind {
             LayerKind::Text => [0xe9, 0xa0, 0x7a, 255],
             LayerKind::Light => [0xf2, 0xd2, 0x7a, 255],
             LayerKind::StopMotion => [0x7a, 0xc9, 0xa4, 255],
+            LayerKind::Collection => [0xa8, 0xcf, 0x8f, 255],
         }
     }
     /// Se crean y se guardan, pero aún no se dibujan ni actúan en la escena (necesitan 3D o texto).
@@ -680,6 +686,16 @@ pub struct Layer {
     /// Capa madre (su uid): la hija hereda su posición, giro y escala.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent: Option<u64>,
+    /// Colección a la que pertenece (el uid de una capa de tipo Colección). Solo un nivel: una colección no está en otra.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<u64>,
+    /// Colección plegada en las listas (sus capas se siguen dibujando).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub collapsed: bool,
+}
+
+fn is_false(v: &bool) -> bool {
+    !*v
 }
 
 fn is_zero(v: &u64) -> bool {
@@ -713,6 +729,8 @@ impl Layer {
             blend: Blend::Normal,
             uid: 0,
             parent: None,
+            group: None,
+            collapsed: false,
         }
     }
 
@@ -736,6 +754,7 @@ impl Layer {
     }
 
     /// ¿Se dibuja la capa en el cuadro `f`? Visible, dentro de su barra y, si hay capas en solo, que esté en solo.
+    #[allow(dead_code)]
     pub fn shows_at(&self, f: u32, any_solo: bool) -> bool {
         self.visible && self.active_at(f) && (!any_solo || self.solo)
     }
@@ -1066,6 +1085,12 @@ impl Project {
             t = t.compose(&self.layers[pi].transform_at(f), w, h);
             cur = pi;
         }
+        // Una capa de una colección se mueve con ella (la colección no está dentro de otra, así que no hay recursión infinita).
+        if let Some(ci) = self.collection_of(li) {
+            if ci != li {
+                t = t.compose(&self.effective_at(ci, f), w, h);
+            }
+        }
         t
     }
 
@@ -1084,7 +1109,7 @@ impl Project {
         true
     }
 
-    fn next_uid(&self) -> u64 {
+    pub fn next_uid(&self) -> u64 {
         self.layers.iter().map(|l| l.uid).max().unwrap_or(0) + 1
     }
 
@@ -1133,19 +1158,143 @@ impl Project {
         }
     }
 
-    /// ¿Alguna capa que se ve en el cuadro f usa un modo de fusión que no es Normal?
-    pub fn has_blend_at(&self, f: u32) -> bool {
-        let any_solo = self.layers.iter().any(|l| l.solo);
-        self.layers.iter().any(|l| l.blend != Blend::Normal && l.shows_at(f, any_solo))
+    /// La colección (índice) a la que pertenece la capa li, si tiene una que existe.
+    pub fn collection_of(&self, li: usize) -> Option<usize> {
+        self.layers[li].group.and_then(|u| self.index_of_uid(u)).filter(|&ci| self.layers[ci].kind == LayerKind::Collection)
     }
 
+    /// Las capas de la colección ci, de arriba abajo.
+    pub fn members_of(&self, ci: usize) -> Vec<usize> {
+        let uid = self.layers[ci].uid;
+        if uid == 0 || self.layers[ci].kind != LayerKind::Collection {
+            return Vec::new();
+        }
+        (0..self.layers.len()).filter(|&i| self.layers[i].group == Some(uid)).collect()
+    }
+
+    /// ¿Se dibuja la capa li en el cuadro f? Las colecciones no dibujan nada por sí mismas; una capa de una colección
+    /// necesita además que la colección esté visible y dentro de su barra, y vale el solo de la colección.
+    pub fn shows(&self, li: usize, f: u32, any_solo: bool) -> bool {
+        let l = &self.layers[li];
+        if l.kind == LayerKind::Collection {
+            return false;
+        }
+        let g = self.collection_of(li).map(|ci| &self.layers[ci]);
+        l.visible && l.active_at(f) && g.map_or(true, |g| g.visible && g.active_at(f)) && (!any_solo || l.solo || g.map_or(false, |g| g.solo))
+    }
+
+    /// ¿Hay algo que el visor no sabe dibujar capa a capa en el cuadro f? Un modo de fusión que no es Normal, o una colección
+    /// con opacidad o fusión propias (se componen aparte y luego se mezclan como una unidad).
+    pub fn has_blend_at(&self, f: u32) -> bool {
+        let any_solo = self.layers.iter().any(|l| l.solo);
+        (0..self.layers.len()).any(|i| {
+            let l = &self.layers[i];
+            if l.kind == LayerKind::Collection {
+                l.visible && l.active_at(f) && (l.blend != Blend::Normal || l.opacity < 1.0 || l.tracks.has(Prop::Opacity)) && self.members_of(i).iter().any(|&m| self.shows(m, f, any_solo))
+            } else {
+                l.blend != Blend::Normal && self.shows(i, f, any_solo)
+            }
+        })
+    }
+
+    /// Mete la capa li en una colección nueva (justo donde estaba). Devuelve el índice de la colección; la capa queda debajo.
+    pub fn group_layer(&mut self, li: usize) -> Option<usize> {
+        if li >= self.layers.len() || self.layers[li].kind == LayerKind::Collection || self.collection_of(li).is_some() {
+            return None;
+        }
+        let n = self.layers.iter().filter(|l| l.kind == LayerKind::Collection).count() + 1;
+        let mut c = Layer::new(format!("Colección {n}"));
+        c.kind = LayerKind::Collection;
+        c.uid = self.next_uid();
+        let uid = c.uid;
+        self.layers.insert(li, c);
+        self.layers[li + 1].group = Some(uid);
+        Some(li)
+    }
+
+    /// Mueve la capa li a la colección ci. Devuelve el nuevo índice de la capa.
+    pub fn move_to_collection(&mut self, li: usize, ci: usize) -> Option<usize> {
+        if li >= self.layers.len() || ci >= self.layers.len() || li == ci || self.layers[ci].kind != LayerKind::Collection || self.layers[li].kind == LayerKind::Collection {
+            return None;
+        }
+        if self.layers[ci].uid == 0 {
+            self.layers[ci].uid = self.next_uid();
+        }
+        self.layers[li].group = Some(self.layers[ci].uid);
+        let map = self.normalize_groups();
+        Some(map[li])
+    }
+
+    /// Saca la capa li de su colección (queda justo debajo de ella). Devuelve el nuevo índice de la capa.
+    pub fn leave_collection(&mut self, li: usize) -> Option<usize> {
+        self.layers.get(li)?.group?;
+        self.layers[li].group = None;
+        let map = self.normalize_groups();
+        Some(map[li])
+    }
+
+    /// Deshace la colección ci: sus capas quedan sueltas en su sitio. Devuelve el índice donde queda la primera.
+    pub fn ungroup(&mut self, ci: usize) -> Option<usize> {
+        if ci >= self.layers.len() || self.layers[ci].kind != LayerKind::Collection {
+            return None;
+        }
+        self.release_members(ci);
+        self.release_children(ci);
+        self.layers.remove(ci);
+        Some(ci.min(self.layers.len().saturating_sub(1)))
+    }
+
+    /// Suelta las capas de la colección ci (antes de borrarla).
+    pub fn release_members(&mut self, ci: usize) {
+        let uid = self.layers[ci].uid;
+        if uid != 0 {
+            for l in &mut self.layers {
+                if l.group == Some(uid) {
+                    l.group = None;
+                }
+            }
+        }
+    }
+
+    /// Deja las colecciones en orden: las capas de cada una justo debajo de ella, una colección nunca dentro de otra y sin
+    /// referencias a colecciones que no existen. Devuelve dónde queda cada capa (índice antiguo → nuevo).
+    pub fn normalize_groups(&mut self) -> Vec<usize> {
+        let n = self.layers.len();
+        let valid: std::collections::HashSet<u64> = self.layers.iter().filter(|l| l.kind == LayerKind::Collection && l.uid != 0).map(|l| l.uid).collect();
+        for l in &mut self.layers {
+            if l.kind == LayerKind::Collection || l.group.map_or(false, |g| !valid.contains(&g)) {
+                l.group = None;
+            }
+        }
+        let mut order: Vec<usize> = Vec::with_capacity(n);
+        for i in 0..n {
+            if self.layers[i].group.is_some() {
+                continue;
+            }
+            order.push(i);
+            if self.layers[i].kind == LayerKind::Collection {
+                let uid = self.layers[i].uid;
+                order.extend((0..n).filter(|&j| self.layers[j].group == Some(uid)));
+            }
+        }
+        let mut map = vec![0usize; n];
+        if order.iter().enumerate().all(|(k, &i)| k == i) {
+            return (0..n).collect();
+        }
+        for (new, &old) in order.iter().enumerate() {
+            map[old] = new;
+        }
+        let old_layers = std::mem::take(&mut self.layers);
+        self.layers = order.iter().map(|&i| old_layers[i].clone()).collect();
+        map
+    }
     /// Dibujo con todo lo visible en el fotograma `f` (para los planos del StoryBoard).
     pub fn flatten(&self, f: u32) -> Drawing {
         let (w, h) = (self.width as f32, self.height as f32);
         let mut out = Drawing::default();
         let any_solo = self.layers.iter().any(|l| l.solo);
         for (li, l) in self.layers.iter().enumerate().rev() {
-            if !l.shows_at(f, any_solo) {
+            if !self.shows(li, f, any_solo) {
                 continue;
             }
             let t = self.effective_at(li, f);
@@ -1303,6 +1452,7 @@ impl Project {
             l.tracks.sanitize();
         }
         self.fix_links();
+        self.normalize_groups();
         for pn in &mut self.storyboard {
             if !pn.dur.is_finite() {
                 pn.dur = 2.0;
@@ -1507,6 +1657,96 @@ mod tests {
         p.fix_links();
         assert_eq!(p.layers[1].uid, 0, "el uid repetido se descarta");
         assert!(p.layers[0].parent.is_none() && p.layers[1].parent.map_or(true, |u| p.index_of_uid(u).is_some()));
+    }
+
+    fn layers_named(names: &[&str]) -> Project {
+        let mut p = Project::blank(1280, 720, 24, 10);
+        p.layers = names.iter().map(|n| Layer::new(*n)).collect();
+        p
+    }
+
+    #[test]
+    fn agrupar_crea_la_coleccion_donde_estaba_la_capa_y_desagrupar_la_deshace() {
+        let mut p = layers_named(&["a", "b", "c"]);
+        let ci = p.group_layer(1).unwrap();
+        assert_eq!((ci, p.layers[ci].kind, p.layers[ci + 1].name.as_str()), (1, LayerKind::Collection, "b"));
+        assert_eq!(p.layers.len(), 4);
+        assert_eq!(p.collection_of(2), Some(1));
+        assert!(p.collection_of(0).is_none() && p.collection_of(3).is_none());
+        // Una capa que ya está en una colección, o una colección, no se agrupa otra vez.
+        assert!(p.group_layer(2).is_none() && p.group_layer(1).is_none());
+        let first = p.ungroup(1).unwrap();
+        assert_eq!(first, 1);
+        assert_eq!(p.layers.iter().map(|l| l.name.as_str()).collect::<Vec<_>>(), vec!["a", "b", "c"]);
+        assert!(p.layers.iter().all(|l| l.group.is_none()));
+    }
+
+    #[test]
+    fn mover_a_otra_coleccion_y_sacar_mantienen_las_capas_juntas() {
+        let mut p = layers_named(&["a", "b", "c", "d"]);
+        let c1 = p.group_layer(0).unwrap(); // [Col1, a, b, c, d]
+        p.layers[c1].name = "Col1".into();
+        let c2 = p.group_layer(4).unwrap(); // [Col1, a, b, c, Col2, d]
+        assert_eq!(p.layers[c2].kind, LayerKind::Collection);
+        // «b» pasa a la segunda colección: queda justo debajo de ella.
+        let b = p.layers.iter().position(|l| l.name == "b").unwrap();
+        let nb = p.move_to_collection(b, c2).unwrap();
+        let names: Vec<&str> = p.layers.iter().map(|l| l.name.as_str()).collect();
+        assert_eq!(names[nb], "b");
+        let c2 = p.layers.iter().position(|l| l.name == "Colección 2").unwrap();
+        assert!(p.members_of(c2).contains(&nb) && nb > c2);
+        assert!(p.members_of(c2).iter().all(|&m| m > c2), "las capas siguen debajo de su colección");
+        // Sacarla la deja suelta justo después de su colección.
+        let nb = p.leave_collection(nb).unwrap();
+        assert!(p.layers[nb].group.is_none());
+        // Una colección no entra en otra.
+        let c1 = p.layers.iter().position(|l| l.name == "Col1").unwrap();
+        assert!(p.move_to_collection(c1, c2).is_none());
+    }
+
+    #[test]
+    fn una_capa_de_una_coleccion_se_mueve_con_ella_y_hereda_su_visibilidad() {
+        let mut p = layers_named(&["a", "b"]);
+        let ci = p.group_layer(0).unwrap();
+        p.layers[ci].tracks.set(Prop::Position, 0, [50.0, 0.0], Interp::Linear);
+        p.layers[ci + 1].tracks.set(Prop::Position, 0, [5.0, 0.0], Interp::Linear);
+        assert_eq!(p.effective_at(ci + 1, 0).x, 55.0, "suma el movimiento de la colección");
+        let solo = |p: &Project, li: usize| p.shows(li, 0, false);
+        assert!(solo(&p, ci + 1) && !solo(&p, ci), "la colección no dibuja nada por sí misma");
+        p.layers[ci].visible = false;
+        assert!(!solo(&p, ci + 1), "ocultar la colección oculta sus capas");
+        p.layers[ci].visible = true;
+        p.layers[ci].in_f = 5;
+        assert!(!solo(&p, ci + 1), "fuera de la barra de la colección no se ve");
+        // El solo de la colección vale para sus capas.
+        p.layers[ci].in_f = 0;
+        p.layers[ci].solo = true;
+        let any = p.layers.iter().any(|l| l.solo);
+        assert!(p.shows(ci + 1, 0, any) && !p.shows(ci + 2, 0, any));
+    }
+
+    #[test]
+    fn la_fusion_o_la_opacidad_de_una_coleccion_piden_componer_aparte() {
+        let mut p = layers_named(&["a", "b"]);
+        let ci = p.group_layer(0).unwrap();
+        assert!(!p.has_blend_at(0));
+        p.layers[ci].opacity = 0.5;
+        assert!(p.has_blend_at(0));
+        p.layers[ci].opacity = 1.0;
+        p.layers[ci].blend = Blend::Multiply;
+        assert!(p.has_blend_at(0));
+        // Una colección sin capas visibles no hace falta componerla.
+        p.layers[ci + 1].visible = false;
+        assert!(!p.has_blend_at(0));
+    }
+
+    #[test]
+    fn borrar_una_coleccion_suelta_sus_capas() {
+        let mut p = layers_named(&["a", "b"]);
+        let ci = p.group_layer(0).unwrap();
+        p.release_members(ci);
+        p.layers.remove(ci);
+        assert!(p.layers.iter().all(|l| l.group.is_none()));
     }
     #[test]
     fn xsheet_operations() {

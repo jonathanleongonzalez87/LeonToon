@@ -214,14 +214,31 @@ impl LeonApp {
         let mut vis = None;
         let mut lock = None;
         let mut plane = None;
+        // Colecciones: acciones del menú de cada capa y de la flecha de plegar.
+        enum LAct {
+            Group(usize),
+            MoveTo(usize, usize),
+            Leave(usize),
+            Ungroup(usize),
+            Fold(usize),
+        }
+        let mut lacts: Vec<LAct> = Vec::new();
+        let collections: Vec<(usize, String)> = self.project.layers.iter().enumerate().filter(|(_, l)| l.kind == LayerKind::Collection).map(|(i, l)| (i, l.name.clone())).collect();
         egui::ScrollArea::vertical().id_salt("layers_list").max_height(list_h).auto_shrink([false, false]).show(ui, |ui| {
             ui.add_space(4.0);
             for (i, l) in self.project.layers.iter().enumerate() {
                 if self.hide_shy && l.shy && i != self.cl {
                     continue;
                 }
+                // Las capas de una colección plegada no salen en la lista.
+                let member_of = self.project.collection_of(i);
+                if member_of.map_or(false, |ci| self.project.layers[ci].collapsed) {
+                    continue;
+                }
+                let is_col = l.kind == LayerKind::Collection;
                 let (r, resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 28.0), Sense::click());
                 let r = r.shrink2(Vec2::new(4.0, 1.0));
+                let r = if member_of.is_some() { Rect::from_min_max(r.min + Vec2::new(14.0, 0.0), r.max) } else { r };
                 let on = i == self.cl;
                 let p = ui.painter();
                 if on {
@@ -237,7 +254,17 @@ impl LeonApp {
                 if l.solo {
                     p.text(r.left_center() + Vec2::new(r.width() - 126.0, 0.0), Align2::CENTER_CENTER, "S", semi(9.5), KEY_GOLD);
                 }
-                p.text(r.left_center() + Vec2::new(10.0, 0.0), Align2::LEFT_CENTER, l.kind.badge(), FontId::proportional(10.0), kt);
+                if is_col {
+                    // Flecha para plegar y desplegar la colección.
+                    let c = r.left_center() + Vec2::new(11.0, 0.0);
+                    if l.collapsed {
+                        tri(p, c + Vec2::new(-2.0, -4.0), c + Vec2::new(-2.0, 4.0), c + Vec2::new(3.5, 0.0), kt);
+                    } else {
+                        tri(p, c + Vec2::new(-4.0, -2.0), c + Vec2::new(4.0, -2.0), c + Vec2::new(0.0, 3.5), kt);
+                    }
+                } else {
+                    p.text(r.left_center() + Vec2::new(10.0, 0.0), Align2::LEFT_CENTER, l.kind.badge(), FontId::proportional(10.0), kt);
+                }
                 p.text(r.left_center() + Vec2::new(26.0, 0.0), Align2::LEFT_CENTER, &l.name, FontId::proportional(12.5), if l.visible { TX } else { INK3 });
                 if !l.tracks.is_empty() {
                     let br = Rect::from_center_size(Pos2::new(r.max.x - 66.0, r.center().y), Vec2::new(22.0, 14.0));
@@ -246,7 +273,7 @@ impl LeonApp {
                 }
                 // Etiqueta de plano: 2D, BG, MG o FG (clic: activa el 3D o cambia de plano).
                 let chip = Rect::from_center_size(Pos2::new(r.max.x - 100.0, r.center().y), Vec2::new(28.0, 14.0));
-                if l.kind != LayerKind::Camera {
+                if l.kind != LayerKind::Camera && !is_col {
                     let (txt, col) = if l.is3d {
                         (crate::model::plane_name(l.plane), match l.plane { 0 => Color32::from_rgb(0x8f, 0xb3, 0xcf), 2 => Color32::from_rgb(0xa8, 0xcf, 0x8f), _ => Color32::from_rgb(0xf0, 0xb0, 0x80) })
                     } else {
@@ -263,10 +290,13 @@ impl LeonApp {
                     let at = resp.interact_pointer_pos().unwrap_or_default();
                     if eye.contains(at) {
                         vis = Some(i);
-                    } else if chip.contains(at) && l.kind != LayerKind::Camera {
+                    } else if chip.contains(at) && l.kind != LayerKind::Camera && !is_col {
                         plane = Some(i);
                     } else if lk.contains(at) {
                         lock = Some(i);
+                    } else if is_col && at.x < r.min.x + 24.0 {
+                        pick = Some(i);
+                        lacts.push(LAct::Fold(i));
                     } else {
                         pick = Some(i);
                     }
@@ -274,6 +304,36 @@ impl LeonApp {
                 if resp.double_clicked() {
                     self.renaming = None;
                 }
+                resp.context_menu(|ui| {
+                    ui.label(RichText::new(&l.name).strong());
+                    ui.separator();
+                    if !is_col && member_of.is_none() && ui.button("Agrupar en colección nueva   Ctrl+G").clicked() {
+                        lacts.push(LAct::Group(i));
+                        ui.close_menu();
+                    }
+                    if !is_col {
+                        for (ci, name) in &collections {
+                            if member_of != Some(*ci) && ui.button(format!("Mover a «{name}»")).clicked() {
+                                lacts.push(LAct::MoveTo(i, *ci));
+                                ui.close_menu();
+                            }
+                        }
+                    }
+                    if member_of.is_some() && ui.button("Sacar de la colección").clicked() {
+                        lacts.push(LAct::Leave(i));
+                        ui.close_menu();
+                    }
+                    if is_col {
+                        if ui.button(if l.collapsed { "Desplegar" } else { "Plegar" }).clicked() {
+                            lacts.push(LAct::Fold(i));
+                            ui.close_menu();
+                        }
+                        if ui.button("Desagrupar   Ctrl+Mayús+G").clicked() {
+                            lacts.push(LAct::Ungroup(i));
+                            ui.close_menu();
+                        }
+                    }
+                });
             }
         });
         if let Some(i) = vis {
@@ -287,6 +347,25 @@ impl LeonApp {
         }
         if let Some(i) = pick {
             self.cl = i;
+        }
+        for a in lacts {
+            match a {
+                LAct::Group(i) => {
+                    self.cl = i;
+                    self.group_current();
+                }
+                LAct::MoveTo(i, ci) => self.move_to_collection(i, ci),
+                LAct::Leave(i) => self.leave_collection(i),
+                LAct::Ungroup(i) => {
+                    self.cl = i;
+                    self.ungroup_current();
+                }
+                LAct::Fold(i) => {
+                    if let Some(l) = self.project.layers.get_mut(i) {
+                        l.collapsed = !l.collapsed;
+                    }
+                }
+            }
         }
         ui.horizontal(|ui| {
             ui.add_space(6.0);

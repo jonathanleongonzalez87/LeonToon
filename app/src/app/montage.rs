@@ -83,6 +83,11 @@ enum Act {
     BarOut(usize, u32),
     BarShift(usize, i32),
     Checkpoint,
+    Fold(usize),
+    Group(usize),
+    MoveTo(usize, usize),
+    Leave(usize),
+    Ungroup(usize),
 }
 
 /// Lo que se necesita saber de una capa para dibujar su fila sin tener el proyecto prestado.
@@ -100,14 +105,17 @@ struct Info {
     out_f: u32,
     animated: [bool; 5],
     key_frames: Vec<u32>,
+    is_col: bool,
+    member: bool,
+    collapsed: bool,
 }
 
-/// Qué filas salen. `animated[li][p]`: la propiedad `p` de la capa `li` tiene claves. Las capas tímidas se ocultan con el botón
+/// Qué filas salen. `hidden[li]`: la capa está en una colección plegada. `animated[li][p]`: la propiedad `p` de la capa `li` tiene claves. Las capas tímidas se ocultan con el botón
 /// maestro (menos la elegida).
-pub(super) fn build_rows(shy: &[bool], animated: &[[bool; 5]], cl: usize, hide_shy: bool, open: &[bool], reveal: &Option<Reveal>) -> Vec<Row> {
+pub(super) fn build_rows(shy: &[bool], hidden: &[bool], animated: &[[bool; 5]], cl: usize, hide_shy: bool, open: &[bool], reveal: &Option<Reveal>) -> Vec<Row> {
     let mut out = Vec::new();
     for li in 0..shy.len() {
-        if hide_shy && shy[li] && li != cl {
+        if (hide_shy && shy[li] && li != cl) || hidden.get(li).copied().unwrap_or(false) {
             continue;
         }
         out.push(Row::Layer(li));
@@ -186,7 +194,8 @@ impl LeonApp {
         self.mt.open.resize(n, false);
         let shy: Vec<bool> = self.project.layers.iter().map(|l| l.shy).collect();
         let animated: Vec<[bool; 5]> = self.project.layers.iter().map(|l| Prop::ALL.map(|p| l.tracks.has(p))).collect();
-        build_rows(&shy, &animated, self.cl, self.hide_shy, &self.mt.open, &self.mt.reveal)
+        let hidden: Vec<bool> = (0..n).map(|li| self.project.collection_of(li).map_or(false, |ci| self.project.layers[ci].collapsed)).collect();
+        build_rows(&shy, &hidden, &animated, self.cl, self.hide_shy, &self.mt.open, &self.mt.reveal)
     }
 
     /// Teclas de la línea de tiempo de montaje, con el puntero encima: A, P, S, R y T muestran esa propiedad (Mayús suma),
@@ -280,6 +289,9 @@ impl LeonApp {
                     out_f: l.out_frame(len),
                     animated: Prop::ALL.map(|p| l.tracks.has(p)),
                     key_frames: l.tracks.frames().into_iter().collect(),
+                    is_col: l.kind == LayerKind::Collection,
+                    member: self.project.collection_of(li).is_some(),
+                    collapsed: l.collapsed,
                 }
             })
             .collect();
@@ -494,26 +506,59 @@ impl LeonApp {
                     }
                     let r = cellr(W_NUM);
                     painter.text(r.center(), Align2::CENTER_CENTER, format!("{}", li + 1), FontId::proportional(11.0), MU);
-                    // Nombre: flecha para desplegar, tipo y nombre.
+                    // Nombre: flecha para desplegar, tipo y nombre. Las capas de una colección van sangradas; la flecha de una
+                    // colección pliega sus capas y la de las demás despliega sus propiedades.
                     let r = cellr(W_NAME);
                     let open = has_props[li];
-                    let arrow = Rect::from_min_size(r.min, Vec2::new(16.0, ROW_H));
+                    let ind = if inf.member { 14.0 } else { 0.0 };
+                    let arrow = Rect::from_min_size(r.min + Vec2::new(ind, 0.0), Vec2::new(16.0, ROW_H));
                     let c = arrow.center();
-                    if open {
+                    let down = if inf.is_col { !inf.collapsed } else { open };
+                    if down {
                         tri(&painter, c + Vec2::new(-3.5, -2.0), c + Vec2::new(3.5, -2.0), c + Vec2::new(0.0, 3.0), MU);
                     } else {
                         tri(&painter, c + Vec2::new(-2.0, -3.5), c + Vec2::new(-2.0, 3.5), c + Vec2::new(3.0, 0.0), MU);
                     }
-                    if ui.interact(arrow, ui.id().with(("mt_arrow", li)), Sense::click()).on_hover_text("Mostrar u ocultar sus propiedades").clicked() {
-                        acts.push(Act::ToggleOpen(li));
+                    if ui.interact(arrow, ui.id().with(("mt_arrow", li)), Sense::click()).on_hover_text(if inf.is_col { "Plegar o desplegar la colección" } else { "Mostrar u ocultar sus propiedades" }).clicked() {
+                        acts.push(if inf.is_col { Act::Fold(li) } else { Act::ToggleOpen(li) });
                     }
-                    painter.text(Pos2::new(r.min.x + 20.0, y + ROW_H / 2.0), Align2::LEFT_CENTER, inf.kind.badge(), FontId::proportional(9.5), c32(inf.kind.tint()));
-                    let name_r = Rect::from_min_max(Pos2::new(r.min.x + 32.0, y), r.max);
+                    painter.text(Pos2::new(r.min.x + ind + 20.0, y + ROW_H / 2.0), Align2::LEFT_CENTER, inf.kind.badge(), FontId::proportional(9.5), c32(inf.kind.tint()));
+                    let name_r = Rect::from_min_max(Pos2::new(r.min.x + ind + 32.0, y), r.max);
                     painter.with_clip_rect(name_r).text(Pos2::new(name_r.min.x, y + ROW_H / 2.0), Align2::LEFT_CENTER, &inf.name, semi(11.5), if inf.visible { TX } else { INK3 });
-                    if ui.interact(Rect::from_min_max(r.min + Vec2::new(16.0, 0.0), r.max), ui.id().with(("mt_name", li)), Sense::click()).clicked() {
+                    let name_resp = ui.interact(Rect::from_min_max(r.min + Vec2::new(ind + 16.0, 0.0), r.max), ui.id().with(("mt_name", li)), Sense::click());
+                    if name_resp.clicked() {
                         acts.push(Act::Select(li));
                     }
-                    if self.mt.cols != 2 {
+                    name_resp.context_menu(|ui| {
+                        ui.label(RichText::new(&inf.name).strong());
+                        ui.separator();
+                        if !inf.is_col && !inf.member && ui.button("Agrupar en colección nueva   Ctrl+G").clicked() {
+                            acts.push(Act::Group(li));
+                            ui.close_menu();
+                        }
+                        if !inf.is_col {
+                            for (ci, other) in infos.iter().enumerate().filter(|(_, o)| o.is_col) {
+                                if self.project.collection_of(li) != Some(ci) && ui.button(format!("Mover a «{}»", other.name)).clicked() {
+                                    acts.push(Act::MoveTo(li, ci));
+                                    ui.close_menu();
+                                }
+                            }
+                        }
+                        if inf.member && ui.button("Sacar de la colección").clicked() {
+                            acts.push(Act::Leave(li));
+                            ui.close_menu();
+                        }
+                        if inf.is_col {
+                            if ui.button(if inf.collapsed { "Desplegar" } else { "Plegar" }).clicked() {
+                                acts.push(Act::Fold(li));
+                                ui.close_menu();
+                            }
+                            if ui.button("Desagrupar   Ctrl+Mayús+G").clicked() {
+                                acts.push(Act::Ungroup(li));
+                                ui.close_menu();
+                            }
+                        }
+                    });                    if self.mt.cols != 2 {
                         let r = cellr(W_SHY);
                         if inf.shy {
                             painter.circle_stroke(r.center(), 4.5, stk(1.3, KEY_GOLD));
@@ -739,6 +784,22 @@ impl LeonApp {
             Act::BarShift(li, d) => {
                 self.project.layers[li].shift_time(d);
             }
+            Act::Fold(li) => {
+                if let Some(l) = self.project.layers.get_mut(li) {
+                    l.collapsed = !l.collapsed;
+                }
+                self.cl = li.min(n.saturating_sub(1));
+            }
+            Act::Group(li) => {
+                self.cl = li.min(n.saturating_sub(1));
+                self.group_current();
+            }
+            Act::MoveTo(li, ci) => self.move_to_collection(li, ci),
+            Act::Leave(li) => self.leave_collection(li),
+            Act::Ungroup(ci) => {
+                self.cl = ci.min(n.saturating_sub(1));
+                self.ungroup_current();
+            }
             _ => {}
         }
     }
@@ -761,10 +822,10 @@ mod tests {
     fn sin_desplegar_hay_una_fila_por_capa_y_al_desplegar_salen_el_grupo_y_las_cinco_propiedades() {
         let shy = [false, false, false];
         let mut open = vec![false; 3];
-        let rows = build_rows(&shy, &animated(3), 0, false, &open, &None);
+        let rows = build_rows(&shy, &[false; 3], &animated(3), 0, false, &open, &None);
         assert_eq!(rows, vec![Row::Layer(0), Row::Layer(1), Row::Layer(2)]);
         open[1] = true;
-        let rows = build_rows(&shy, &animated(3), 0, false, &open, &None);
+        let rows = build_rows(&shy, &[false; 3], &animated(3), 0, false, &open, &None);
         assert_eq!(rows.len(), 3 + 1 + 5);
         assert_eq!(rows[1], Row::Layer(1));
         assert_eq!(rows[2], Row::Group(1));
@@ -774,11 +835,20 @@ mod tests {
     }
 
     #[test]
+    fn las_capas_de_una_coleccion_plegada_no_salen_y_las_demas_siguen() {
+        let shy = [false; 4];
+        // La capa 1 y la 2 están en una colección plegada (la 0).
+        let hidden = [false, true, true, false];
+        let rows = build_rows(&shy, &hidden, &animated(4), 0, false, &[false; 4], &None);
+        assert_eq!(rows, vec![Row::Layer(0), Row::Layer(3)]);
+    }
+
+    #[test]
     fn las_capas_timidas_se_ocultan_menos_la_elegida() {
         let shy = [false, true, true];
-        let rows = build_rows(&shy, &animated(3), 2, true, &[false; 3], &None);
+        let rows = build_rows(&shy, &[false; 3], &animated(3), 2, true, &[false; 3], &None);
         assert_eq!(rows, vec![Row::Layer(0), Row::Layer(2)]);
-        let all = build_rows(&shy, &animated(3), 2, false, &[false; 3], &None);
+        let all = build_rows(&shy, &[false; 3], &animated(3), 2, false, &[false; 3], &None);
         assert_eq!(all.len(), 3);
     }
 
@@ -789,10 +859,10 @@ mod tests {
         an[0][Prop::Position as usize] = true;
         an[1][Prop::Opacity as usize] = true;
         // P en la capa elegida (1): solo su posición, ninguna fila de la otra capa.
-        let rows = build_rows(&shy, &an, 1, false, &[false; 2], &Some(Reveal::Props(vec![Prop::Position])));
+        let rows = build_rows(&shy, &[false; 2], &an, 1, false, &[false; 2], &Some(Reveal::Props(vec![Prop::Position])));
         assert_eq!(rows, vec![Row::Layer(0), Row::Layer(1), Row::Prop(1, Prop::Position)]);
         // U: las propiedades con claves de todas las capas, sin la fila «Transformar».
-        let rows = build_rows(&shy, &an, 0, false, &[false; 2], &Some(Reveal::Animated));
+        let rows = build_rows(&shy, &[false; 2], &an, 0, false, &[false; 2], &Some(Reveal::Animated));
         assert_eq!(rows, vec![Row::Layer(0), Row::Prop(0, Prop::Position), Row::Layer(1), Row::Prop(1, Prop::Opacity)]);
     }
 

@@ -144,25 +144,49 @@ pub fn render_frame_opts(p: &Project, frame: u32, scale: f32, transparent: bool)
     }
     let any_solo = p.layers.iter().any(|l| l.solo);
     for (li, layer) in p.layers.iter().enumerate().rev() {
-        let t = p.effective_at(li, frame);
-        let op = (layer.opacity * t.o).clamp(0.0, 1.0);
-        if !layer.shows_at(frame, any_solo) || op <= 0.0 {
-            continue;
-        }
-        if layer.kind == LayerKind::StopMotion {
-            draw_stopmotion(&mut pm, p, layer, frame, &t, scale, op, blend_mode(layer.blend));
-            continue;
-        }
-        if let Some(d) = layer.drawing_at(frame) {
-            let mut lp = Pixmap::new(w, h)?;
-            draw_drawing(&mut lp, d, layer_transform(&t, fw, fh, scale));
+        if layer.kind == LayerKind::Collection {
+            // Una colección se compone aparte y se mezcla como una unidad, con su opacidad y su modo de fusión.
+            if !layer.visible || !layer.active_at(frame) {
+                continue;
+            }
+            let op = (layer.opacity * p.effective_at(li, frame).o).clamp(0.0, 1.0);
+            if op <= 0.0 {
+                continue;
+            }
+            let mut gp = Pixmap::new(w, h)?;
+            for m in p.members_of(li).into_iter().rev() {
+                draw_layer(&mut gp, p, m, frame, scale, any_solo);
+            }
             let pp = PixmapPaint { opacity: op, blend_mode: blend_mode(layer.blend), ..Default::default() };
-            pm.draw_pixmap(0, 0, lp.as_ref(), &pp, Transform::identity(), None);
+            pm.draw_pixmap(0, 0, gp.as_ref(), &pp, Transform::identity(), None);
+        } else if p.collection_of(li).is_none() {
+            draw_layer(&mut pm, p, li, frame, scale, any_solo);
         }
-    }
-    Some(pm)
+    }    Some(pm)
 }
 
+/// Dibuja una capa (con su transformación, la de sus madres y la de su colección) sobre `pm`.
+fn draw_layer(pm: &mut Pixmap, p: &Project, li: usize, frame: u32, scale: f32, any_solo: bool) -> Option<()> {
+    let layer = &p.layers[li];
+    let (fw, fh) = (p.width as f32, p.height as f32);
+    let (w, h) = (pm.width(), pm.height());
+    let t = p.effective_at(li, frame);
+    let op = (layer.opacity * t.o).clamp(0.0, 1.0);
+    if !p.shows(li, frame, any_solo) || op <= 0.0 {
+        return Some(());
+    }
+    if layer.kind == LayerKind::StopMotion {
+        draw_stopmotion(pm, p, layer, frame, &t, scale, op, blend_mode(layer.blend));
+        return Some(());
+    }
+    if let Some(d) = layer.drawing_at(frame) {
+        let mut lp = Pixmap::new(w, h)?;
+        draw_drawing(&mut lp, d, layer_transform(&t, fw, fh, scale));
+        let pp = PixmapPaint { opacity: op, blend_mode: blend_mode(layer.blend), ..Default::default() };
+        pm.draw_pixmap(0, 0, lp.as_ref(), &pp, Transform::identity(), None);
+    }
+    Some(())
+}
 /// Dibuja la foto que toca en este cuadro de una capa Stop Motion, con el mismo cálculo de cuadros, ajuste y transformación
 /// que el visor. Se lee el **original** (reducido al tamaño que hace falta) y nunca se modifica. Si la carpeta, la foto o la
 /// secuencia faltan, la capa no dibuja nada (la exportación no falla por eso).

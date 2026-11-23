@@ -588,6 +588,12 @@ impl LeonApp {
             if item(ui, "Eliminar capa", "") {
                 self.delete_layer();
             }
+            if item(ui, "Agrupar en colección", "Ctrl+G") {
+                self.group_current();
+            }
+            if item(ui, "Desagrupar", "Ctrl+Mayús+G") {
+                self.ungroup_current();
+            }
             if item(ui, "Subir capa", "") {
                 self.move_layer(true);
             }

@@ -327,7 +327,7 @@ impl LeonApp {
         let mut order: Vec<(usize, f32)> = (0..self.project.layers.len())
             .filter(|&i| {
                 let l = &self.project.layers[i];
-                l.shows_at(f, any_solo) && !matches!(l.kind, LayerKind::Camera | LayerKind::Light)
+                self.project.shows(i, f, any_solo) && !matches!(l.kind, LayerKind::Camera | LayerKind::Light)
             })
             .map(|i| (i, v.p(pw / 2.0, ph / 2.0, self.project.layers[i].z()).2))
             .collect();
