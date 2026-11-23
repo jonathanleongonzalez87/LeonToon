@@ -976,6 +976,16 @@ impl LeonApp {
             self.frame = self.play_bounds().1;
         }
         if story {
+            // En la cuadrícula del storyboard se dibuja sobre las miniaturas: valen las teclas de las herramientas.
+            if self.main_toolhead() {
+                for t in Tool::ALL {
+                    if let Some(key) = t.key() {
+                        if k(none, key) {
+                            self.set_tool(t);
+                        }
+                    }
+                }
+            }
             return;
         }
         // Mayús+Tab sale de la precomposición. Tab entra si la capa actual es una; si no, cambia entre modo objeto y edición.

@@ -391,6 +391,12 @@ pub struct LeonApp {
     sb_detail: bool,
     /// Profundidad de la pila de composiciones al abrir un plano: «Cuadrícula» vuelve a ella.
     sb_base: usize,
+    /// Plano sobre cuya miniatura se está dibujando ahora (su composición está abierta mientras dura el trazo).
+    sb_live: Option<usize>,
+    /// El proyecto tal como estaba antes del trazo de la miniatura (para que Deshacer no deje el plano abierto).
+    sb_outer: Option<Project>,
+    /// Pedir que la cuadrícula ajuste el tamaño para que quepan todos los planos.
+    sb_fit: bool,
     sb_drag: Option<usize>,
     render_opts: RenderOpts,
 
@@ -779,6 +785,9 @@ impl LeonApp {
             sb_zoom: 260.0,
             sb_detail: false,
             sb_base: 0,
+            sb_live: None,
+            sb_outer: None,
+            sb_fit: false,
             sb_drag: None,
             render_opts: RenderOpts { a: 1, b: len, scale: 1.0, transparent: false, columns: 8, message: "Listo.".into() },
             gesture: None,
@@ -870,6 +879,15 @@ impl LeonApp {
         // Capturas: LEONTOON_PLANO=<n> abre ese plano del storyboard (en la sala Storyboard) para dibujarlo con el visor.
         if let Some(n) = std::env::var("LEONTOON_PLANO").ok().and_then(|v| v.parse::<usize>().ok()) {
             app.open_panel(n.saturating_sub(1));
+        }
+        // Capturas: LEONTOON_MINIATURA=<n> dibuja un garabato sobre la miniatura del plano n (como con el ratón en la cuadrícula).
+        if let Some(n) = std::env::var("LEONTOON_MINIATURA").ok().and_then(|v| v.parse::<usize>().ok()) {
+            app.tool = Tool::Brush;
+            app.begin_panel_stroke(n.saturating_sub(1), [120.0, 200.0], false, false);
+            for p in [[300.0, 120.0], [520.0, 260.0], [760.0, 130.0], [980.0, 240.0]] {
+                app.continue_gesture(p, false);
+            }
+            app.end_panel_stroke();
         }
         if let Ok(v) = std::env::var("LEONTOON_ONION") {
             app.onion = v != "0";

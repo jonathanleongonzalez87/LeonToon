@@ -56,7 +56,7 @@ El orden sigue la **experiencia de usuario**: primero lo que más se nota al dib
 | Fase | Qué se hace | Depende de |
 |---|---|---|
 | **S1. Plano como composición** (#132) | Modelo y migración del formato; el plano se abre en el Visor con las herramientas, las capas y las paletas reales; la cuadrícula se mantiene y entrar en un plano es un doble clic | Composiciones (M6, hecha) |
-| **S2. Línea de tiempo del storyboard** (#133) | Editor nuevo con tira de planos (miniaturas y duración arrastrable) y pista de cámara con claves; operaciones de plano | S1 |
+| **S2. Línea de tiempo del storyboard** (#133) | Editor nuevo con tira de planos (miniaturas y duración arrastrable) y pista de cámara con claves; operaciones de plano; **editor «Miniaturas» en vertical**, como el de Storyboard Pro (columna de planos junto al visor, con el mismo dibujo sobre miniaturas), para armar una disposición Visor grande + miniaturas verticales + línea de tiempo | S1 |
 | **S3. Datos del plano y PDF** (#134) | Numeración escena/plano editable, panel «Datos del plano», exportar el storyboard a PDF | S1 (S2 no hace falta) |
 | **A1. Sala Animatic** (#135) | Reproducción de los planos con sus duraciones, edición de bordes en la tira, transiciones elegibles (corte, fundido, otros) | S2 |
 | **A2. Audio del animatic** (#136) | Pista de audio, onda y reproducción sincronizada; exportar el MP4 con sonido | A1 y M8a (Issue de estudio #100) |
@@ -86,3 +86,5 @@ Valores por defecto asumidos, a corregir si no convienen:
 |---|---|
 | S1. Plano como composición | Hecha en el Issue #132: Panel.comp y Composition.panel; doble clic abre el plano en el visor con sus capas, las herramientas y las paletas; «< Cuadrícula», plano anterior y siguiente; la miniatura y el animatic se rehacen al salir; duplicar y borrar planos llevan su composición; los archivos antiguos conservan sus dibujos (capa «Dibujo»). La miniatura solo muestra capas vectoriales |
 | S2, S3, A1, A2 | Pendientes |
+
+**Ajuste tras probar S1 (Issue #139)**: la cuadrícula es ahora un lienzo para hacer *thumbnails*. Con el Lápiz, el Pincel, las formas, el Borrador o el Bote se dibuja directamente sobre cada miniatura; el número del plano es su asa (clic abre el plano, arrastrar reordena); el tamaño se ajusta a la medida con el deslizador, Ctrl+rueda o «Ajustar» (que haga caber todos los planos). Mientras dura el trazo el plano se abre por dentro y se cierra al soltar; Deshacer vuelve a la escena sin entrar en el plano.

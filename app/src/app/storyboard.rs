@@ -7,6 +7,9 @@ use super::shell::{muted, panel_header, pill};
 use super::*;
 use crate::model::Panel;
 
+/// Tamaño de las miniaturas de la cuadrícula (ancho en px): desde thumbnails diminutos hasta planos grandes con notas.
+const SB_ZOOM_MIN: f32 = 60.0;
+const SB_ZOOM_MAX: f32 = 800.0;
 const FIELDS: [&str; 5] = ["Acción", "Diálogo", "Cámara", "Transición", "Notas"];
 
 fn field_mut(p: &mut Panel, i: usize) -> &mut String {
@@ -81,8 +84,11 @@ impl LeonApp {
                 }
                 ui.separator();
                 muted(ui, "Miniaturas");
-                ui.add(egui::Slider::new(&mut self.sb_zoom, 80.0..=640.0).show_value(false));
+                ui.add(egui::Slider::new(&mut self.sb_zoom, SB_ZOOM_MIN..=SB_ZOOM_MAX).show_value(false));
                 muted(ui, "Detalle");
+                if pill(ui, "Ajustar", false).on_hover_text("El tamaño más grande en que caben todos los planos a la vez").clicked() {
+                    self.sb_fit = true;
+                }
                 let total: f32 = self.project.storyboard.iter().map(|p| p.dur).sum();
                 muted(ui, format!("· {} planos · {:.1} s", self.project.storyboard.len(), total));
             });
@@ -141,6 +147,35 @@ impl LeonApp {
 
     fn sb_grid(&mut self, ui: &mut egui::Ui) {
         let (w, h) = (self.project.width as f32, self.project.height as f32);
+        // Tamaño a la medida: Ctrl+rueda sobre la cuadrícula, o «Ajustar» para que quepan todos los planos.
+        if ui.rect_contains_pointer(ui.max_rect()) {
+            let (cmd, dy) = ui.input(|i| (i.modifiers.command, i.raw_scroll_delta.y));
+            if cmd && dy != 0.0 {
+                self.sb_zoom = (self.sb_zoom * (1.0 + dy.signum() * 0.1)).clamp(SB_ZOOM_MIN, SB_ZOOM_MAX);
+                ui.input_mut(|i| {
+                    i.smooth_scroll_delta = Vec2::ZERO;
+                    i.raw_scroll_delta = Vec2::ZERO;
+                });
+            }
+        }
+        if self.sb_fit {
+            self.sb_fit = false;
+            let avail = ui.available_size();
+            let n = self.project.storyboard.len().max(1);
+            let mut best = SB_ZOOM_MIN;
+            let mut cw = SB_ZOOM_MAX;
+            while cw >= SB_ZOOM_MIN {
+                let per_row = (((avail.x - 28.0 + 12.0) / (cw + 28.0)).floor() as usize).max(1);
+                let rows = n.div_ceil(per_row);
+                let extra = if cw < 110.0 { 16.0 } else if cw < 300.0 { 62.0 } else { 62.0 + 5.0 * 52.0 };
+                if rows as f32 * (cw * h / w + extra + 24.0) + 28.0 <= avail.y {
+                    best = cw;
+                    break;
+                }
+                cw -= 10.0;
+            }
+            self.sb_zoom = best;
+        }
         let cw = self.sb_zoom;
         let th = cw * h / w;
         let compact = cw < 110.0;
@@ -166,20 +201,60 @@ impl LeonApp {
                             ui.set_width(cw);
                             ui.spacing_mut().item_spacing.y = 5.0;
                             let (tr, tresp) = ui.allocate_exact_size(Vec2::new(cw, th), Sense::click_and_drag());
-                            let p = &self.project.storyboard[i];
-                            paint_thumb(ui.painter(), tr, &p.drawing, w, h, Color32::WHITE);
-                            ui.painter().rect_stroke(tr, 2.0, stk(1.0, Color32::BLACK), EStrokeKind::Outside);
-                            let badge = Rect::from_min_size(tr.min + Vec2::new(4.0, 4.0), Vec2::new(22.0, 16.0));
-                            ui.painter().rect_filled(badge, 3.0, ACCENT);
-                            ui.painter().text(badge.center(), Align2::CENTER_CENTER, format!("{}", i + 1), FontId::proportional(11.0), Color32::WHITE);
-                            if tresp.clicked() {
-                                select = Some(i);
+                            // Con una herramienta de dibujo, la miniatura es un lienzo (thumbnailing): se dibuja encima con el Lápiz,
+                            // el Pincel, las formas, el Borrador o el Bote. El plano se abre mientras dura el gesto y se cierra al soltar.
+                            let drawing_tool = matches!(self.tool, Tool::Brush | Tool::Vector | Tool::Shape | Tool::Eraser | Tool::Fill);
+                            if self.sb_live == Some(i) {
+                                self.paint_scene(&ui.painter_at(tr), tr.min, cw / w, 0, true, false);
+                            } else {
+                                paint_thumb(ui.painter(), tr, &self.project.storyboard[i].drawing, w, h, Color32::WHITE);
                             }
-                            if tresp.double_clicked() {
+                            ui.painter().rect_stroke(tr, 2.0, stk(1.0, Color32::BLACK), EStrokeKind::Outside);
+                            // El número es el asa del plano: clic lo abre, arrastrarlo lo reordena.
+                            let badge = Rect::from_min_size(tr.min + Vec2::new(4.0, 4.0), Vec2::new(22.0, 16.0));
+                            let bresp = ui.interact(badge, ui.id().with(("sb_badge", i)), Sense::click_and_drag());
+                            ui.painter().rect_filled(badge, 3.0, if bresp.hovered() { ACCENT2 } else { ACCENT });
+                            ui.painter().text(badge.center(), Align2::CENTER_CENTER, format!("{}", i + 1), FontId::proportional(11.0), Color32::WHITE);
+                            if bresp.hovered() {
+                                bresp.clone().on_hover_text("Clic: abrir el plano · arrastrar: reordenar");
+                            }
+                            if bresp.clicked() {
+                                select = Some(i);
                                 open = Some(i);
                             }
-                            if tresp.drag_started() {
+                            if bresp.drag_started() {
                                 self.sb_drag = Some(i);
+                            }
+                            if drawing_tool {
+                                let ctx = ui.ctx().clone();
+                                let on_thumb = !bresp.hovered() && !bresp.dragged();
+                                if tresp.is_pointer_button_down_on() && ctx.input(|i| i.pointer.primary_down()) && on_thumb {
+                                    if let Some(pp) = ctx.input(|i| i.pointer.interact_pos()) {
+                                        let z = cw / w;
+                                        let cp = [(pp.x - tr.min.x) / z, (pp.y - tr.min.y) / z];
+                                        let (shift, command) = ctx.input(|i| (i.modifiers.shift, i.modifiers.command));
+                                        if self.sb_live.is_none() && ctx.input(|i| i.pointer.primary_pressed()) {
+                                            self.begin_panel_stroke(i, cp, shift, command);
+                                        } else if self.sb_live == Some(i) {
+                                            self.continue_gesture(cp, shift);
+                                        }
+                                    }
+                                } else if self.sb_live == Some(i) {
+                                    self.end_panel_stroke();
+                                }
+                                if tresp.clicked() || tresp.drag_started() {
+                                    select = Some(i);
+                                }
+                            } else {
+                                if tresp.clicked() {
+                                    select = Some(i);
+                                }
+                                if tresp.double_clicked() {
+                                    open = Some(i);
+                                }
+                                if tresp.drag_started() {
+                                    self.sb_drag = Some(i);
+                                }
                             }
                             if !compact {
                                 let p = &mut self.project.storyboard[i];
@@ -206,7 +281,7 @@ impl LeonApp {
                 });
                 ui.add_space(12.0);
                 }
-                ui.label(RichText::new("Doble clic en un plano para dibujarlo con el visor y las capas · arrastra la imagen sobre otro plano para reordenar · mueve el deslizador para pasar de miniaturas a detalle con notas.").size(11.5).color(MU));
+                ui.label(RichText::new("Con el Lápiz, el Pincel o las formas se dibuja directamente sobre las miniaturas (thumbnails) · clic en el número abre el plano con el visor y las capas · arrastra el número sobre otro plano para reordenar · Ctrl+rueda o el deslizador cambian el tamaño.").size(11.5).color(MU));
             });
         });
         if let (Some(from), Some(to)) = (self.sb_drag, drop_on) {
@@ -251,6 +326,49 @@ impl LeonApp {
             self.need_fit = true;
             self.say(format!("Plano {}: dibuja con el visor y las capas. «Cuadrícula» vuelve a todos los planos", i + 1));
         }
+    }
+
+    /// Empieza un trazo sobre la miniatura del plano `i`: el plano se abre (sin tocar el historial) y el gesto sigue las herramientas
+    /// de dibujo de siempre. `cp` está en coordenadas del lienzo del plano.
+    pub(super) fn begin_panel_stroke(&mut self, i: usize, cp: [f32; 2], shift: bool, command: bool) {
+        let outer = self.project.clone();
+        self.sb_sel = i;
+        self.sb_base = self.project.stack.len();
+        if !self.project.open_panel(i, self.cl, self.frame) {
+            return;
+        }
+        self.reset_after_level_change();
+        self.frame = 0;
+        self.sb_outer = Some(outer);
+        self.sb_live = Some(i);
+        self.meta_skip = false;
+        self.begin_gesture(cp, shift, command);
+        if self.gesture.is_none() {
+            // Herramientas de un solo clic (Bote) o gestos que no empezaron: se cierra enseguida.
+            self.end_panel_stroke();
+        }
+    }
+
+    /// Termina el trazo de la miniatura: se confirma, se sale del plano (su miniatura se rehace) y Deshacer vuelve a la escena
+    /// tal como estaba antes del trazo, sin entrar en el plano.
+    pub(super) fn end_panel_stroke(&mut self) {
+        if self.gesture.is_some() {
+            self.finish_gesture();
+        }
+        let pushed = self.meta_skip;
+        if let Some((cl, frame)) = self.project.exit_comp() {
+            self.reset_after_level_change();
+            self.cl = cl.min(self.project.layers.len().saturating_sub(1));
+            self.frame = frame.min(self.project.length.saturating_sub(1));
+        }
+        if let Some(outer) = self.sb_outer.take() {
+            if pushed {
+                if let Some(last) = self.undo.last_mut() {
+                    *last = outer;
+                }
+            }
+        }
+        self.sb_live = None;
     }
 
     /// Sale del plano que se edita y vuelve a la cuadrícula.
@@ -317,7 +435,7 @@ impl LeonApp {
             panel_header(ui, "Paleta");
             self.palette_groups(ui);
         } else {
-            muted(ui, "Doble clic en un plano para dibujarlo con el visor y las capas.");
+            muted(ui, "Dibuja sobre las miniaturas o abre un plano (clic en su número) para usar el visor y las capas.");
         }
     }
 

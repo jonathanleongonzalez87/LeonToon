@@ -71,8 +71,8 @@ impl LeonApp {
     pub(super) fn main_toolhead(&self) -> bool {
         let room = self.room_kind();
         if room.def().story {
-            // Dentro de un plano, el hueco principal muestra el visor y trae su cabecera y su barra de herramientas.
-            return self.panel_canvas() && self.slot_editor(Slot::Main) == Editor::Storyboard;
+            // La cuadrícula (se dibuja sobre las miniaturas) y el plano abierto traen la cabecera y la barra de herramientas.
+            return self.slot_editor(Slot::Main) == Editor::Storyboard;
         }
         room == RoomKind::StopMotion || self.slot_editor(Slot::Main) == Editor::Viewer
     }
