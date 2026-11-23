@@ -403,7 +403,7 @@ fn shots() -> Vec<Shot> {
             action: "Rebotan juntos hacia la derecha mientras sube el sol.",
             dialogue: "A y B: ¡Boing!",
             camera: "Paneo suave a la derecha",
-            trans: "Fundido",
+            trans: "Fundido a negro",
             cam: Some(CamMove { s0: 1.12, x0: 20.0, y0: 0.0, s1: 1.12, x1: -60.0, y1: 0.0, ease: true }),
             a: Some(Pose { trail: 120.0, shadow: true, ..pose(480.0, 300.0, 72.0) }),
             b: Some(Pose { trail: 90.0, shadow: true, ..pose(790.0, 360.0, 58.0) }),
@@ -463,7 +463,8 @@ mod tests {
         assert_eq!(p.storyboard.len(), 6);
         assert!(p.in_comp(), "se abre dentro de la composición del animatic");
         assert_eq!(p.comp_path(), vec!["Escena".to_string(), "Animatic".to_string()]);
-        assert_eq!(p.layers.len(), 6, "un clip por plano");
+        assert_eq!(p.layers.iter().filter(|l| l.kind == LayerKind::Precomp).count(), 6, "un clip por plano");
+        assert_eq!(p.layers.iter().filter(|l| l.name == "Negro").count(), 1, "el último plano entra con fundido a negro");
         let root = p.root_clone();
         assert_eq!(root.layers.len(), 1);
         for pn in &root.storyboard {

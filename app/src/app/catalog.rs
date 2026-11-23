@@ -268,7 +268,7 @@ impl RoomKind {
             RoomKind::Comp => d("comp", "Composición 3D", true, 190.0, R::Comp, None, false, "Planos BG, MG y FG en profundidad"),
             RoomKind::Color => d("color", "Color", true, 160.0, R::Palettes, Some(Tool::Fill), false, "Paletas y relleno"),
             RoomKind::Story => d("story", "Storyboard", true, 280.0, R::StoryPdf, None, true, "Planos con textos y exportación a PDF"),
-            RoomKind::Animatic => d("animatic", "Animatic", true, 230.0, R::Animatic, None, false, "Planos en el tiempo con duración y transiciones"),
+            RoomKind::Animatic => d("animatic", "Animatic", true, 290.0, R::Animatic, None, false, "Planos en el tiempo con duración y transiciones"),
             RoomKind::StopMotion => d("stopmotion", "Stop Motion", true, 400.0, R::StopMotion, None, false, "Secuencia de fotos, Frame Browser y X-Sheet"),
             RoomKind::Exportar => d("exportar", "Exportar", true, 150.0, R::Export, None, false, "PNG, hoja de sprites, GIF y MP4"),
         }
@@ -531,8 +531,8 @@ impl RoomKind {
                 }
             }
             // Interpolación y Composición 3D son de motion graphics: su tiempo es la línea de tiempo de montaje.
-            Slot::Time if matches!(self, RoomKind::Interp | RoomKind::Comp | RoomKind::Animatic) => Editor::Montage,
-            Slot::Time if self == RoomKind::Story => Editor::PanelTimeline,
+            Slot::Time if matches!(self, RoomKind::Interp | RoomKind::Comp) => Editor::Montage,
+            Slot::Time if matches!(self, RoomKind::Story | RoomKind::Animatic) => Editor::PanelTimeline,
             Slot::Time => Editor::Timeline,
             Slot::Layers => Editor::Layers,
             Slot::Props => Editor::RoomProps,

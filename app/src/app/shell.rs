@@ -59,6 +59,8 @@ const TOOLHEAD_H: f32 = UiScale::TOOL_HEAD;
 
 impl LeonApp {
     pub(super) fn shell(&mut self, ctx: &egui::Context) {
+        // El animatic sigue a los planos: si cambiaron duraciones, transiciones, cámara u orden, se rehace.
+        self.sync_animatic();
         self.title_bar(ctx);
         self.status_bar(ctx);
         egui::CentralPanel::default()

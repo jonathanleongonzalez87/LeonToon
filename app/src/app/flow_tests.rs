@@ -460,10 +460,8 @@ fn mp4_export_works_when_ffmpeg_is_installed() {
     finish(&dir);
 }
 
-/// Hallazgo de esta revisión: el exportador no dibuja las capas de color sólido (el visor sí). Cuando se corrija,
-/// quitar `ignore` y esta prueba debe pasar.
+/// Las capas de color sólido se exportan igual que se ven en el visor (Issue #65).
 #[test]
-#[ignore = "pendiente (Issue #65): la exportación ignora las capas de color sólido"]
 fn solid_color_layers_are_exported_like_in_the_viewer() {
     let mut p = Project::demo();
     p.layers.clear();

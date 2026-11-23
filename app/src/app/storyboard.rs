@@ -420,16 +420,94 @@ impl LeonApp {
 
     // ---------- Línea de tiempo del storyboard (Issue #133, fase S2) ----------
 
-    fn sbt_total(&self) -> f32 {
-        self.project.storyboard.iter().map(|p| p.dur).sum()
+    /// Duración de un plano en segundos, medida en cuadros enteros (la que usa el animatic).
+    fn panel_secs(&self, i: usize) -> f32 {
+        let fps = self.project.fps.max(1);
+        crate::animatic::panel_frames(&self.project.storyboard[i], fps) as f32 / fps as f32
     }
 
-    /// Botones de la línea de tiempo del storyboard: operaciones de plano y zoom del tiempo.
-    fn sbt_bar(&mut self, ui: &mut egui::Ui) {
+    fn sbt_total(&self) -> f32 {
+        (0..self.project.storyboard.len()).map(|i| self.panel_secs(i)).sum()
+    }
+
+    /// Firma de lo que cambia el animatic (duraciones, transiciones, cámara, orden y composiciones de los planos).
+    fn animatic_signature(&self) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        (self.project.fps, self.project.width, self.project.storyboard.len()).hash(&mut h);
+        for p in &self.project.storyboard {
+            (p.dur.to_bits(), &p.trans, &p.title, p.comp).hash(&mut h);
+            match p.cam {
+                Some(c) => {
+                    for v in [c.s0, c.x0, c.y0, c.s1, c.x1, c.y1] {
+                        v.to_bits().hash(&mut h);
+                    }
+                    c.ease.hash(&mut h);
+                }
+                None => 0u8.hash(&mut h),
+            }
+        }
+        h.finish()
+    }
+
+    /// Mantiene el animatic al día: si hay una composición «Animatic» y los planos cambiaron (duración, transición, cámara, orden…),
+    /// la rehace. Un proyecto recién abierto solo toma nota de cómo está: no se toca lo que la persona hizo en la composición.
+    pub(super) fn sync_animatic(&mut self) {
+        let sig = self.animatic_signature();
+        match self.anim_sig {
+            Some(s) if s == sig => {}
+            Some(_) => {
+                self.anim_sig = Some(sig);
+                if self.project.refresh_animatic() {
+                    self.frame = self.frame.min(self.project.length.saturating_sub(1));
+                }
+            }
+            None => self.anim_sig = Some(sig),
+        }
+    }
+
+    /// Botones de la línea de tiempo del storyboard: el transporte (en la sala Animatic), las operaciones de plano y el zoom del tiempo.
+    fn sbt_bar(&mut self, ui: &mut egui::Ui, animatic: bool) {
         egui::Frame::default().fill(BG2).inner_margin(egui::Margin::symmetric(10, 4)).show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.horizontal_wrapped(|ui| {
                 ui.spacing_mut().item_spacing.x = 6.0;
+                if animatic {
+                    let n = self.project.length;
+                    ui.spacing_mut().item_spacing.x = 1.0;
+                    if icon_button(ui, 22.0, false, "Primer cuadro (Inicio)", draw_first).clicked() {
+                        self.playing = false;
+                        self.frame = 0;
+                    }
+                    if icon_button(ui, 22.0, false, "Cuadro anterior ( , )", draw_prev).clicked() {
+                        self.step(-1);
+                    }
+                    let playing = self.playing;
+                    let play = icon_button(ui, 22.0, playing, "Reproducir / pausa (Espacio)", move |p, r, c| {
+                        if playing {
+                            draw_pause(p, r, c)
+                        } else {
+                            draw_play(p, r, c)
+                        }
+                    });
+                    if play.clicked() {
+                        self.toggle_play();
+                    }
+                    if icon_button(ui, 22.0, false, "Cuadro siguiente ( . )", draw_next).clicked() {
+                        self.step(1);
+                    }
+                    if icon_button(ui, 22.0, false, "Último cuadro (Fin)", draw_last).clicked() {
+                        self.playing = false;
+                        self.frame = n.saturating_sub(1);
+                    }
+                    if icon_button(ui, 22.0, self.loop_play, "Bucle", draw_loop).clicked() {
+                        self.loop_play = !self.loop_play;
+                    }
+                    ui.spacing_mut().item_spacing.x = 6.0;
+                    let fps = self.project.fps.max(1) as f32;
+                    ui.label(RichText::new(format!("{:.1} / {:.1} s · cuadro {} de {}", self.frame as f32 / fps, n as f32 / fps, self.frame + 1, n)).size(12.0).color(TX));
+                    ui.separator();
+                }
                 let n = self.project.storyboard.len();
                 let i = self.sb_sel.min(n.saturating_sub(1));
                 if pill(ui, "+ Plano", false).clicked() {
@@ -474,8 +552,11 @@ impl LeonApp {
     /// Parte el plano `i` en dos por la cabeza de reproducción: la copia es el trozo de la derecha.
     fn split_panel(&mut self, i: usize) {
         let fps = self.project.fps.max(1) as f32;
-        let start: f32 = self.project.storyboard.iter().take(i).map(|p| p.dur).sum();
-        let dur = self.project.storyboard[i].dur;
+        if self.room_kind() == RoomKind::Animatic {
+            self.sbt_t = self.frame as f32 / fps;
+        }
+        let start: f32 = (0..i).map(|k| self.panel_secs(k)).sum();
+        let dur = self.panel_secs(i);
         let (off_f, dur_f) = (((self.sbt_t - start) * fps).round(), (dur * fps).round());
         if off_f < 1.0 || off_f > dur_f - 1.0 {
             self.say("Para dividir, pon la cabeza de reproducción dentro del plano (clic en la regla o en el plano), al menos un cuadro del borde");
@@ -492,9 +573,12 @@ impl LeonApp {
     }
 
     /// La línea de tiempo del storyboard: una regla en segundos, la tira de planos (miniatura, número, título y duración; se
-    /// arrastra el borde derecho para cambiar la duración y el cuerpo para reordenar) y la pista de cámara.
+    /// arrastra el borde derecho para cambiar la duración y el cuerpo para reordenar), la pista de cámara y la de transiciones.
+    /// En la sala Animatic la cabeza de reproducción es el cuadro actual (se reproduce y se arrastra por la regla) y el animatic
+    /// se rehace solo al cambiar los planos.
     pub(super) fn sb_timeline_editor(&mut self, ui: &mut egui::Ui) {
-        self.sbt_bar(ui);
+        let animatic = self.room_kind() == RoomKind::Animatic;
+        self.sbt_bar(ui, animatic);
         let n = self.project.storyboard.len();
         if n == 0 {
             muted(ui, "No hay planos todavía: pulsa «+ Plano».");
@@ -504,7 +588,10 @@ impl LeonApp {
         let (w, h) = (self.project.width as f32, self.project.height as f32);
         let pps = self.sbt_pps;
         let total = self.sbt_total();
-        self.sbt_t = self.sbt_t.clamp(0.0, total);
+        if !animatic {
+            self.sbt_t = self.sbt_t.clamp(0.0, total);
+        }
+        let head_t = if animatic { (self.frame as f32 / fps).min(total) } else { self.sbt_t };
         let mut select: Option<usize> = None;
         let mut open: Option<usize> = None;
         let mut cam_toggle: Option<usize> = None;
@@ -512,11 +599,13 @@ impl LeonApp {
         let mut resize: Option<(usize, f32)> = None;
         let mut resize_start = false;
         let mut drop_to: Option<(usize, usize)> = None;
+        let mut trans_set: Option<(usize, &'static str)> = None;
+        let playing = self.playing;
         egui::ScrollArea::horizontal().id_salt("sb_timeline").auto_shrink([false, false]).show(ui, |ui| {
-            let (ruler_h, cam_h) = (20.0, 20.0);
-            let clip_h = (ui.available_height() - ruler_h - cam_h - 16.0).clamp(46.0, 120.0);
+            let (ruler_h, cam_h, trans_h) = (20.0, 20.0, 24.0);
+            let clip_h = (ui.available_height() - ruler_h - cam_h - trans_h - 18.0).clamp(46.0, 120.0);
             let width = (total * pps + 120.0).max(ui.available_width());
-            let (rect, _) = ui.allocate_exact_size(Vec2::new(width, ruler_h + clip_h + cam_h + 10.0), Sense::hover());
+            let (rect, _) = ui.allocate_exact_size(Vec2::new(width, ruler_h + clip_h + cam_h + trans_h + 12.0), Sense::hover());
             let painter = ui.painter_at(rect);
             let id = ui.id();
             // Regla en segundos: clic o arrastre mueven la cabeza de reproducción.
@@ -538,13 +627,15 @@ impl LeonApp {
             }
             let top = rect.min.y + ruler_h + 3.0;
             let cam_top = top + clip_h + 4.0;
+            let trans_top = cam_top + cam_h + 3.0;
             let mut x = rect.min.x;
             let mut bounds: Vec<(f32, f32)> = Vec::with_capacity(n);
             for i in 0..n {
-                let (dur, drawing, title, cam) = {
+                let (drawing, title, cam, trans) = {
                     let p = &self.project.storyboard[i];
-                    (p.dur, p.drawing.clone(), p.title.clone(), p.cam)
+                    (p.drawing.clone(), p.title.clone(), p.cam, p.trans.clone())
                 };
+                let dur = self.panel_secs(i);
                 let cwid = (dur * pps).max(10.0);
                 let r = Rect::from_min_size(Pos2::new(x, top), Vec2::new(cwid, clip_h));
                 bounds.push((r.min.x, r.max.x));
@@ -614,6 +705,22 @@ impl LeonApp {
                     cam_toggle = Some(i);
                 }
                 cresp.on_hover_text("Cámara del plano. Doble clic: añadir o quitar un movimiento (zoom y desplazamiento); se edita en el panel «Plano»");
+                // Pista de transiciones: la que une este plano con el anterior (el primero no tiene).
+                if i > 0 && cwid >= 56.0 {
+                    let chip = Rect::from_min_size(Pos2::new(x + 2.0, trans_top), Vec2::new((cwid - 4.0).min(118.0), trans_h - 2.0));
+                    let cur = crate::animatic::kind(&trans);
+                    ui.scope_builder(egui::UiBuilder::new().max_rect(chip), |ui| {
+                        egui::ComboBox::from_id_salt(("sbt_trans", i)).selected_text(crate::animatic::trans_name(cur)).width(chip.width() - 22.0).show_ui(ui, |ui| {
+                            for (k, name) in crate::animatic::TRANSITIONS {
+                                if ui.selectable_label(k == cur, name).clicked() && k != cur {
+                                    trans_set = Some((i, name));
+                                }
+                            }
+                        });
+                    });
+                } else if i > 0 {
+                    painter.text(Pos2::new(x + 2.0, trans_top + 10.0), Align2::LEFT_CENTER, "·", FontId::proportional(11.0), MU);
+                }
                 x += cwid;
             }
             // Reordenar: el plano arrastrado se suelta antes o después de otro, según dónde esté el cursor.
@@ -634,12 +741,21 @@ impl LeonApp {
                 }
             }
             // Cabeza de reproducción.
-            let px = rect.min.x + self.sbt_t * pps;
+            let px = rect.min.x + head_t * pps;
             painter.line_segment([Pos2::new(px, rect.min.y), Pos2::new(px, rect.max.y)], stk(1.5, ACCENT));
             painter.add(egui::Shape::convex_polygon(vec![Pos2::new(px - 5.0, rect.min.y), Pos2::new(px + 5.0, rect.min.y), Pos2::new(px, rect.min.y + 8.0)], ACCENT, egui::Stroke::NONE));
+            // Al reproducir, la tira acompaña a la cabeza.
+            if animatic && playing {
+                ui.scroll_to_rect(Rect::from_center_size(Pos2::new(px, rect.center().y), Vec2::new(160.0, 10.0)), None);
+            }
         });
         if let Some(t) = set_t {
-            self.sbt_t = t;
+            if animatic {
+                self.playing = false;
+                self.frame = ((t * fps).floor().max(0.0) as u32).min(self.project.length.saturating_sub(1));
+            } else {
+                self.sbt_t = t;
+            }
         }
         if let Some(i) = select {
             self.sb_sel = i;
@@ -649,6 +765,11 @@ impl LeonApp {
         }
         if let Some((i, d)) = resize {
             self.project.storyboard[i].dur = d;
+        }
+        if let Some((i, name)) = trans_set {
+            self.checkpoint();
+            self.project.storyboard[i].trans = name.to_string();
+            self.sb_sel = i;
         }
         if let Some(i) = cam_toggle {
             self.checkpoint();
@@ -672,7 +793,6 @@ impl LeonApp {
             self.open_panel(i);
         }
     }
-
     /// Las miniaturas de los planos en una columna vertical (como en Storyboard Pro). Se dibuja sobre ellas igual que en la
     /// cuadrícula; el número abre el plano o, arrastrado, lo reordena.
     pub(super) fn sb_column_editor(&mut self, ui: &mut egui::Ui) {
@@ -815,16 +935,14 @@ impl LeonApp {
                     ui.label(RichText::new(format!("{}  {}", i + 1, p.title)).color(TX));
                     ui.horizontal(|ui| {
                         ui.add(egui::DragValue::new(&mut p.dur).range(0.1..=600.0).speed(0.05).max_decimals(1).suffix(" s"));
-                        let fade = crate::animatic::is_fade(&p.trans);
-                        egui::ComboBox::from_id_salt(("plano_trans", i)).selected_text(if fade { "Fundido" } else { "Corte" }).width(76.0).show_ui(ui, |ui| {
-                            if ui.selectable_label(!fade, "Corte").clicked() && fade {
-                                p.trans = "Corte".into();
+                        let cur = crate::animatic::kind(&p.trans);
+                        egui::ComboBox::from_id_salt(("plano_trans", i)).selected_text(crate::animatic::trans_name(cur)).width(112.0).show_ui(ui, |ui| {
+                            for (k, name) in crate::animatic::TRANSITIONS {
+                                if ui.selectable_label(k == cur, name).clicked() && k != cur {
+                                    p.trans = name.to_string();
+                                }
                             }
-                            if ui.selectable_label(fade, "Fundido").clicked() && !fade {
-                                p.trans = "Fundido".into();
-                            }
-                        });
-                        ui.label(RichText::new(format!("cuadro {}", (start * fps).round() as u32 + 1)).size(11.0).color(INK3));
+                        });                        ui.label(RichText::new(format!("cuadro {}", (start * fps).round() as u32 + 1)).size(11.0).color(INK3));
                     });
                 });
             });
@@ -841,6 +959,6 @@ impl LeonApp {
         {
             self.animatic_comp();
         }
-        muted(ui, "Fundido: el plano entra en fundido cruzado sobre el anterior (hasta medio segundo). Corte: sin transición.");
+        muted(ui, "Transiciones (hasta medio segundo): Fundido cruza los dos planos; Fundido a negro apaga uno y enciende el otro; Deslizar y Empujar mueven el plano nuevo desde la derecha (con movimiento de cámara en alguno de los dos se hace un fundido). Corte: sin transición. El animatic se rehace solo al cambiar los planos.");
     }
 }

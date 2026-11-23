@@ -401,6 +401,8 @@ pub struct LeonApp {
     sbt_pps: f32,
     sbt_t: f32,
     sbt_drag: Option<usize>,
+    /// Firma de los planos la última vez que se miró si había que rehacer el animatic (None = recién abierto: solo se anota).
+    anim_sig: Option<u64>,
     sb_drag: Option<usize>,
     render_opts: RenderOpts,
 
@@ -801,6 +803,7 @@ impl LeonApp {
             sbt_pps: 170.0,
             sbt_t: 0.0,
             sbt_drag: None,
+            anim_sig: None,
             sb_drag: None,
             render_opts: RenderOpts { a: 1, b: len, scale: 1.0, transparent: false, columns: 8, message: "Listo.".into() },
             gesture: None,
@@ -1177,6 +1180,7 @@ impl LeonApp {
         self.sel = None;
         self.sb_sel = 0;
         self.sb_detail = false;
+        self.anim_sig = None;
         self.picked.clear();
         self.pal_sel = self.pal_sel.min(self.project.palettes.len().saturating_sub(1));
         self.playing = false;

@@ -238,6 +238,15 @@ fn draw_layer(pm: &mut Pixmap, p: &Project, li: usize, frame: u32, scale: f32, a
         draw_stopmotion(pm, p, layer, frame, &t, scale, op, blend_mode(layer.blend));
         return Some(());
     }
+    // Capa de color sólido: llena todo el lienzo (como en el visor), con su opacidad y su modo de fusión.
+    if layer.kind == LayerKind::Solid {
+        let mut lp = Pixmap::new(w, h)?;
+        let c = layer.solid;
+        lp.fill(Color::from_rgba8(c[0], c[1], c[2], c[3]));
+        let pp = PixmapPaint { opacity: op, blend_mode: blend_mode(layer.blend), ..Default::default() };
+        pm.draw_pixmap(0, 0, lp.as_ref(), &pp, Transform::identity(), None);
+        return Some(());
+    }
     if let Some(d) = layer.drawing_at(frame) {
         let mut lp = Pixmap::new(w, h)?;
         draw_drawing(&mut lp, d, layer_transform(&t, fw, fh, scale));

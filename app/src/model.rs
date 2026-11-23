@@ -1772,7 +1772,30 @@ impl Project {
                 }
             }
         }
-        crate::animatic::build(&self.storyboard, fps)
+        crate::animatic::build_sized(&self.storyboard, fps, self.width as f32)
+    }
+
+    /// ¿Hay una composición «Animatic» en la que se está trabajando (abierta, o como capa de la composición actual)?
+    pub fn has_animatic(&self) -> bool {
+        let named = |id: u64| self.comp(id).map_or(false, |c| c.name == crate::animatic::NAME);
+        self.stack.last().map_or(false, |lv| named(lv.comp_id)) || self.layers.iter().any(|l| l.kind == LayerKind::Precomp && l.precomp.map_or(false, named))
+    }
+
+    /// Rehace las capas del animatic con los planos tal como están ahora (duraciones, transiciones, cámara y orden), tanto si está
+    /// abierto para editarlo como si es una capa de la composición actual. Devuelve false si no hay animatic que rehacer.
+    pub fn refresh_animatic(&mut self) -> bool {
+        if !self.has_animatic() {
+            return false;
+        }
+        let built = self.build_animatic();
+        let open = self.stack.last().map_or(false, |lv| self.comp(lv.comp_id).map_or(false, |c| c.name == crate::animatic::NAME));
+        if open {
+            self.layers = built.layers;
+            self.length = built.length;
+            true
+        } else {
+            self.set_animatic(built).is_some()
+        }
     }
 
     /// El proyecto tal como se guarda y se exporta: la composición principal, aunque se esté editando una precomposición.
@@ -2754,5 +2777,42 @@ mod panel_tests {
         p.storyboard[0].comp = Some(99);
         p.sanitize();
         assert!(p.storyboard[0].comp.is_none());
+    }
+}
+
+#[cfg(test)]
+mod animatic_sync_tests {
+    use super::*;
+
+    #[test]
+    fn refreshing_the_animatic_follows_the_panels_even_when_it_is_open() {
+        let mut p = Project::blank(1280, 720, 24, 24);
+        for i in 1..=2 {
+            let mut pn = Panel::new(i);
+            pn.dur = 1.0;
+            p.storyboard.push(pn);
+        }
+        assert!(!p.refresh_animatic(), "sin animatic no hay nada que rehacer");
+        let built = p.build_animatic();
+        p.set_animatic(built).unwrap();
+        assert!(p.has_animatic());
+        assert_eq!(p.layers[0].precomp.and_then(|id| p.comp(id)).map(|c| c.length), Some(48));
+        // Cerrado: se actualiza la composición.
+        p.storyboard[1].dur = 2.0;
+        assert!(p.refresh_animatic());
+        assert_eq!(p.layers[0].precomp.and_then(|id| p.comp(id)).map(|c| c.length), Some(72));
+        // Abierto: se actualizan las capas que se están editando y la duración.
+        assert!(p.enter_comp(0, 0, 0));
+        assert!(p.has_animatic());
+        p.storyboard[0].dur = 3.0;
+        p.storyboard[1].trans = "Fundido a negro".into();
+        assert!(p.refresh_animatic());
+        assert_eq!(p.length, 120);
+        assert!(p.layers.iter().any(|l| l.name == "Negro"), "la transición nueva se ve en las capas abiertas");
+        p.exit_comp().unwrap();
+        assert_eq!(p.layers[0].precomp.and_then(|id| p.comp(id)).map(|c| c.length), Some(120));
+        // Dentro de un plano no es «el animatic».
+        assert!(p.open_panel(0, 0, 0));
+        assert!(!p.has_animatic());
     }
 }
