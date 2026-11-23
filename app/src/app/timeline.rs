@@ -28,16 +28,35 @@ impl LeonApp {
         self.cell_op(op);
     }
 
+    /// Alto de las filas de capa (hoja en horizontal) o ancho de las columnas (hoja en vertical): el zoom del eje de las capas.
+    fn lane_h(&self) -> f32 {
+        LANE_H * self.xs_lane / XS_ZOOM_DEFAULT
+    }
+
+    fn col_w(&self) -> f32 {
+        COL_W * self.xs_lane / XS_ZOOM_DEFAULT
+    }
+
+    /// El zoom que mueve un eje de la pantalla: en la hoja en horizontal el tiempo va de lado y las capas, de arriba abajo; en la
+    /// hoja en vertical, al revés.
+    pub(super) fn xs_axis_mut(&mut self, horizontal: bool) -> &mut f32 {
+        if horizontal == self.xs_horizontal {
+            &mut self.xs_zoom
+        } else {
+            &mut self.xs_lane
+        }
+    }
+
     pub(super) fn xsheet(&mut self, ui: &mut egui::Ui) {
         let avail = ui.available_rect_before_wrap();
-        // Ctrl + rueda: zoom del Xsheet, un nivel por muesca (de 5 a 16).
+        // Ctrl + rueda: zoom horizontal; Alt + rueda: zoom vertical (un nivel por muesca). La rueda sola desplaza, y con Mayús, de lado.
         let hovered = ui.rect_contains_pointer(avail);
-        let (ctrl, dy) = ui.input(|i| (i.modifiers.command, i.raw_scroll_delta.y));
-        if hovered && ctrl && dy != 0.0 {
+        let (ctrl, alt, dy) = ui.input(|i| (i.modifiers.command, i.modifiers.alt, i.raw_scroll_delta.y));
+        if hovered && (ctrl || alt) && dy != 0.0 {
             self.wheel_acc += dy;
             while self.wheel_acc.abs() >= WHEEL_NOTCH {
                 let s = self.wheel_acc.signum();
-                self.xs_zoom = (self.xs_zoom + s).clamp(XS_ZOOM_MIN, XS_ZOOM_MAX);
+                *self.xs_axis_mut(!alt) = (*self.xs_axis_mut(!alt) + s).clamp(XS_ZOOM_MIN, XS_ZOOM_MAX);
                 self.wheel_acc -= WHEEL_NOTCH * s;
             }
             ui.input_mut(|i| {
@@ -112,14 +131,16 @@ impl LeonApp {
         // Zoom del Xsheet como el original: fila de 17 px a zoom 10 (de 5 a 16); fuente = fila − 5 px.
         let row_h = XS_ROW_BASE * self.xs_zoom / XS_ZOOM_DEFAULT;
         let cell_w = CELL_W_BASE * self.xs_zoom / XS_ZOOM_DEFAULT;
+        let lane_h = self.lane_h();
+        let col_w = self.col_w();
         let order = self.col_order();
         let nl = order.len();
         let len = self.project.length;
         let horiz = self.xs_horizontal;
         let size = if horiz {
-            Vec2::new(NAME_W + len as f32 * cell_w + 40.0, HEAD_H + nl as f32 * LANE_H)
+            Vec2::new(NAME_W + len as f32 * cell_w + 40.0, HEAD_H + nl as f32 * lane_h)
         } else {
-            Vec2::new((NUM_W + nl as f32 * COL_W).max(ui.available_width()), HEAD_H + len as f32 * row_h + 20.0)
+            Vec2::new((NUM_W + nl as f32 * col_w).max(ui.available_width()), HEAD_H + len as f32 * row_h + 20.0)
         };
         let (resp, painter) = ui.allocate_painter(size, Sense::click_and_drag());
         let o = resp.rect.min;
@@ -139,9 +160,9 @@ impl LeonApp {
         };
         let cell_rect = |c: usize, f: u32| -> Rect {
             if horiz {
-                Rect::from_min_size(Pos2::new(o.x + NAME_W + f as f32 * cell_w, o.y + HEAD_H + c as f32 * LANE_H), Vec2::new(cell_w, LANE_H))
+                Rect::from_min_size(Pos2::new(o.x + NAME_W + f as f32 * cell_w, o.y + HEAD_H + c as f32 * lane_h), Vec2::new(cell_w, lane_h))
             } else {
-                Rect::from_min_size(Pos2::new(o.x + NUM_W + c as f32 * COL_W, o.y + HEAD_H + f as f32 * row_h), Vec2::new(COL_W, row_h))
+                Rect::from_min_size(Pos2::new(o.x + NUM_W + c as f32 * col_w, o.y + HEAD_H + f as f32 * row_h), Vec2::new(col_w, row_h))
             }
         };
         painter.rect_filled(resp.rect, 0.0, BG);
@@ -199,11 +220,11 @@ impl LeonApp {
                 let col = if layer.label == 0 { with_alpha(MU, 0.7) } else { c32(LABELS[(layer.label as usize).min(LABELS.len() - 1)]) };
                 let br = if horiz {
                     let (x0, x1) = (o.x + NAME_W + bi as f32 * cell_w, o.x + NAME_W + (bo + 1) as f32 * cell_w);
-                    let y = o.y + HEAD_H + c as f32 * LANE_H + LANE_H - 5.0;
+                    let y = o.y + HEAD_H + c as f32 * lane_h + lane_h - 5.0;
                     Rect::from_min_max(Pos2::new(x0, y), Pos2::new(x1, y + 3.0))
                 } else {
                     let (y0, y1) = (o.y + HEAD_H + bi as f32 * row_h, o.y + HEAD_H + (bo + 1) as f32 * row_h);
-                    let x = o.x + NUM_W + c as f32 * COL_W;
+                    let x = o.x + NUM_W + c as f32 * col_w;
                     Rect::from_min_max(Pos2::new(x + 1.0, y0), Pos2::new(x + 4.0, y1))
                 };
                 painter.rect_filled(br, 1.0, col);
@@ -239,7 +260,7 @@ impl LeonApp {
 
         // Cabeceras de columna (pegajosas)
         for (c, &li) in order.iter().enumerate() {
-            let r = header_rect(horiz, c, o, sx, sy);
+            let r = header_rect(horiz, c, o, sx, sy, lane_h, col_w);
             let layer = &self.project.layers[li];
             let on = li == self.cl;
             painter.rect_filled(r, 0.0, if on { SEL_BG } else { BG3 });
@@ -270,8 +291,8 @@ impl LeonApp {
                 return Hit::Corner;
             }
             if horiz && p.y >= o.y + HEAD_H && p.x >= o.x + NAME_W {
-                let c = ((p.y - o.y - HEAD_H) / LANE_H).floor();
-                if c >= 0.0 && (c as usize) < nl && (p.y - o.y - HEAD_H) - c * LANE_H >= LANE_H - 8.0 {
+                let c = ((p.y - o.y - HEAD_H) / lane_h).floor();
+                if c >= 0.0 && (c as usize) < nl && (p.y - o.y - HEAD_H) - c * lane_h >= lane_h - 8.0 {
                     let li = order[c as usize];
                     let (bi, bo) = bars[li];
                     let (x0, x1) = (o.x + NAME_W + bi as f32 * cell_w, o.x + NAME_W + (bo + 1) as f32 * cell_w);
@@ -282,16 +303,16 @@ impl LeonApp {
                 }
             }
             for (c, &li) in order.iter().enumerate() {
-                let r = header_rect(horiz, c, o, sx, sy);
+                let r = header_rect(horiz, c, o, sx, sy, lane_h, col_w);
                 if r.contains(p) {
                     let part = if p.x >= r.max.x - 22.0 { 2 } else if p.x >= r.max.x - 44.0 { 1 } else { 0 };
                     return Hit::Header(li, part);
                 }
             }
             let (num_hit, f, c) = if horiz {
-                (p.y < sy + HEAD_H, ((p.x - o.x - NAME_W) / cell_w).floor(), ((p.y - o.y - HEAD_H) / LANE_H).floor())
+                (p.y < sy + HEAD_H, ((p.x - o.x - NAME_W) / cell_w).floor(), ((p.y - o.y - HEAD_H) / lane_h).floor())
             } else {
-                (p.x < sx + NUM_W, ((p.y - o.y - HEAD_H) / row_h).floor(), ((p.x - o.x - NUM_W) / COL_W).floor())
+                (p.x < sx + NUM_W, ((p.y - o.y - HEAD_H) / row_h).floor(), ((p.x - o.x - NUM_W) / col_w).floor())
             };
             if f < 0.0 || f as u32 >= len {
                 return Hit::None;
@@ -461,7 +482,7 @@ impl LeonApp {
     fn rename_box(&mut self, ui: &mut egui::Ui, order: &[usize], o: Pos2, sx: f32, sy: f32) {
         let Some((li, mut buf, first)) = self.renaming.take() else { return };
         let Some(c) = order.iter().position(|l| *l == li) else { return };
-        let r = header_rect(self.xs_horizontal, c, o, sx, sy);
+        let r = header_rect(self.xs_horizontal, c, o, sx, sy, self.lane_h(), self.col_w());
         let edit = Rect::from_min_max(r.min + Vec2::new(2.0, 2.0), Pos2::new(r.max.x - 46.0, r.max.y - 2.0));
         let resp = ui.put(edit, egui::TextEdit::singleline(&mut buf).font(FontId::proportional(12.0)));
         if first {
@@ -481,10 +502,10 @@ impl LeonApp {
     }
 }
 
-fn header_rect(horiz: bool, c: usize, o: Pos2, sx: f32, sy: f32) -> Rect {
+fn header_rect(horiz: bool, c: usize, o: Pos2, sx: f32, sy: f32, lane_h: f32, col_w: f32) -> Rect {
     if horiz {
-        Rect::from_min_size(Pos2::new(sx, o.y + HEAD_H + c as f32 * LANE_H), Vec2::new(NAME_W, LANE_H))
+        Rect::from_min_size(Pos2::new(sx, o.y + HEAD_H + c as f32 * lane_h), Vec2::new(NAME_W, lane_h))
     } else {
-        Rect::from_min_size(Pos2::new(o.x + NUM_W + c as f32 * COL_W, sy), Vec2::new(COL_W, HEAD_H))
+        Rect::from_min_size(Pos2::new(o.x + NUM_W + c as f32 * col_w, sy), Vec2::new(col_w, HEAD_H))
     }
 }

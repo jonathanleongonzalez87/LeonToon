@@ -13,7 +13,11 @@ use super::*;
 use crate::model::{Blend, XKey, LABELS};
 use crate::tracks::Prop;
 
-const ROW_H: f32 = 24.0;
+const ROW_H_DEFAULT: f32 = 24.0;
+const ROW_H_MIN: f32 = 14.0;
+const ROW_H_MAX: f32 = 56.0;
+const CELL_MIN: f32 = 4.0;
+const CELL_MAX: f32 = 64.0;
 const HEAD_H: f32 = 24.0;
 const W_EYE: f32 = 20.0;
 const W_SOLO: f32 = 20.0;
@@ -44,6 +48,8 @@ pub(super) struct MtState {
     cols: u8,
     /// Ancho de un cuadro en píxeles.
     cell: f32,
+    /// Alto de las filas de capa (zoom vertical).
+    row_h: f32,
     last_frame: Option<u32>,
 }
 
@@ -51,7 +57,7 @@ impl Default for MtState {
     fn default() -> Self {
         // Para capturas de pantalla: LEONTOON_MONTAJE=1 abre las propiedades de la primera capa.
         let open = if std::env::var("LEONTOON_MONTAJE").is_ok() { vec![true] } else { Vec::new() };
-        MtState { open, reveal: None, cols: 0, cell: 16.0, last_frame: None }
+        MtState { open, reveal: None, cols: 0, cell: 16.0, row_h: ROW_H_DEFAULT, last_frame: None }
     }
 }
 
@@ -259,6 +265,14 @@ impl LeonApp {
         h.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.spacing_mut().item_spacing.x = 4.0;
             ui.label(RichText::new(format!("{} / {}", self.frame + 1, self.project.length)).size(11.5).color(TX).strong());
+            // Zoom: vertical (↕) y horizontal (↔); Alt + rueda y Ctrl + rueda hacen lo mismo con el puntero encima de la línea de tiempo.
+            if ui.available_width() > 360.0 {
+                ui.spacing_mut().slider_width = 60.0;
+                ui.add(egui::Slider::new(&mut self.mt.row_h, ROW_H_MIN..=ROW_H_MAX).show_value(false)).on_hover_text("Zoom vertical (Alt + rueda)");
+                ui.label(RichText::new("↕").size(12.0).color(MU));
+                ui.add(egui::Slider::new(&mut self.mt.cell, CELL_MIN..=CELL_MAX).show_value(false)).on_hover_text("Zoom horizontal (Ctrl + rueda)");
+                ui.label(RichText::new("↔").size(12.0).color(MU));
+            }
             let playing = self.playing;
             if icon_button(ui, 20.0, playing, "Reproducir / pausa (Espacio)", move |p, r, c| if playing { draw_pause(p, r, c) } else { draw_play(p, r, c) }).clicked() {
                 self.toggle_play();
@@ -267,10 +281,14 @@ impl LeonApp {
         let rows = self.mt_rows();
         let left_w = self.mt_left_w();
         let avail = ui.available_rect_before_wrap();
-        // Ctrl + rueda: zoom del tiempo.
-        let (ctrl, dy) = ui.input(|i| (i.modifiers.command, i.raw_scroll_delta.y));
-        if ui.rect_contains_pointer(avail) && ctrl && dy != 0.0 {
-            self.mt.cell = (self.mt.cell * (1.0 + dy * 0.002)).clamp(6.0, 48.0);
+        // Ctrl + rueda: zoom horizontal (el tiempo); Alt + rueda: zoom vertical (el alto de las filas). La rueda sola desplaza.
+        let (ctrl, alt, dy) = ui.input(|i| (i.modifiers.command, i.modifiers.alt, i.raw_scroll_delta.y));
+        if ui.rect_contains_pointer(avail) && (ctrl || alt) && dy != 0.0 {
+            if alt {
+                self.mt.row_h = (self.mt.row_h * (1.0 + dy * 0.002)).clamp(ROW_H_MIN, ROW_H_MAX);
+            } else {
+                self.mt.cell = (self.mt.cell * (1.0 + dy * 0.002)).clamp(CELL_MIN, CELL_MAX);
+            }
             ui.input_mut(|i| {
                 i.smooth_scroll_delta = Vec2::ZERO;
                 i.raw_scroll_delta = Vec2::ZERO;
@@ -287,6 +305,7 @@ impl LeonApp {
     }
 
     fn mt_grid(&mut self, ui: &mut egui::Ui, rows: &[Row], left_w: f32, cell: f32, acts: &mut Vec<Act>) {
+        let rh = self.mt.row_h;
         let len = self.project.length;
         let n = self.project.layers.len();
         let infos: Vec<Info> = (0..n)
@@ -314,7 +333,7 @@ impl LeonApp {
                 }
             })
             .collect();
-        let size = Vec2::new(left_w + len as f32 * cell + 60.0, HEAD_H + rows.len() as f32 * ROW_H + 10.0);
+        let size = Vec2::new(left_w + len as f32 * cell + 60.0, HEAD_H + rows.len() as f32 * rh + 10.0);
         let (resp, painter) = ui.allocate_painter(size, Sense::click_and_drag());
         let o = resp.rect.min;
         let clip = ui.clip_rect();
@@ -327,7 +346,7 @@ impl LeonApp {
             let a = ((clip.min.x - o.x - left_w) / cell).floor().max(0.0) as u32;
             (a, (((clip.max.x - o.x - left_w) / cell).ceil().max(0.0) as u32 + 1).min(len))
         };
-        let row_y = |ri: usize| o.y + HEAD_H + ri as f32 * ROW_H;
+        let row_y = |ri: usize| o.y + HEAD_H + ri as f32 * rh;
         painter.rect_filled(resp.rect, 0.0, BG);
         // Qué capas tienen sus propiedades abiertas (si no, se dibujan sus claves en su propia fila).
         let mut has_props = vec![false; n];
@@ -347,12 +366,12 @@ impl LeonApp {
                 Row::Layer(_) => if ri % 2 == 0 { BG2 } else { BG3 },
                 _ => Color32::from_rgb(0x20, 0x1f, 0x1e),
             };
-            painter.rect_filled(Rect::from_min_size(Pos2::new(o.x + left_w, y), Vec2::new(len as f32 * cell + 60.0, ROW_H)), 0.0, bg);
+            painter.rect_filled(Rect::from_min_size(Pos2::new(o.x + left_w, y), Vec2::new(len as f32 * cell + 60.0, rh)), 0.0, bg);
         }
         for f in f0..f1 {
             let x = tx(f);
             let strong = f % fps == 0 && f != 0;
-            painter.vline(x, (o.y + HEAD_H)..=(o.y + HEAD_H + rows.len() as f32 * ROW_H), stk(1.0, Color32::from_black_alpha(if strong { 110 } else { 45 })));
+            painter.vline(x, (o.y + HEAD_H)..=(o.y + HEAD_H + rows.len() as f32 * rh), stk(1.0, Color32::from_black_alpha(if strong { 110 } else { 45 })));
         }
         let mut drag_state: Option<(usize, Prop, u32)> = ui.data(|d| d.get_temp(ui.id().with("mt_key_drag")));
         for (ri, row) in rows.iter().enumerate() {
@@ -362,7 +381,7 @@ impl LeonApp {
                     let inf = &infos[li];
                     let (x0, x1) = (tx(inf.in_f), tx(inf.out_f + 1));
                     let col = if inf.label == 0 { c32(inf.kind.tint()) } else { c32(LABELS[(inf.label as usize).min(LABELS.len() - 1)]) };
-                    let bar = Rect::from_min_max(Pos2::new(x0, y + 4.0), Pos2::new(x1, y + ROW_H - 4.0));
+                    let bar = Rect::from_min_max(Pos2::new(x0, y + 4.0), Pos2::new(x1, y + rh - 4.0));
                     painter.rect_filled(bar, 3.0, with_alpha(col, if inf.visible { 0.62 } else { 0.25 }));
                     if li == self.cl {
                         painter.rect_stroke(bar, 3.0, stk(1.0, with_alpha(col, 0.95)), EStrokeKind::Inside);
@@ -371,7 +390,7 @@ impl LeonApp {
                     if !has_props[li] {
                         for &kf in &inf.key_frames {
                             if kf >= f0.saturating_sub(1) && kf <= f1 {
-                                diamond(&painter, Pos2::new(tx(kf) + cell / 2.0, y + ROW_H / 2.0), 4.0, KEY_GOLD);
+                                diamond(&painter, Pos2::new(tx(kf) + cell / 2.0, y + rh / 2.0), 4.0, KEY_GOLD);
                             }
                         }
                     }
@@ -424,7 +443,7 @@ impl LeonApp {
                         if kf + 1 < f0 || kf > f1 {
                             continue;
                         }
-                        let c = Pos2::new(tx(kf) + cell / 2.0, y + ROW_H / 2.0);
+                        let c = Pos2::new(tx(kf) + cell / 2.0, y + rh / 2.0);
                         let r = ui.interact(Rect::from_center_size(c, Vec2::splat(12.0)), ui.id().with(("mt_key", li, p, kf)), Sense::click_and_drag());
                         let dragging = drag_state == Some((li, p, kf)) && r.dragged();
                         diamond(&painter, c, if r.hovered() { 5.5 } else { 4.5 }, if dragging { with_alpha(KEY_GOLD, 0.4) } else { KEY_GOLD });
@@ -445,7 +464,7 @@ impl LeonApp {
                         if dragging {
                             if let Some(pos) = r.interact_pointer_pos() {
                                 let f = ((pos.x - o.x - left_w) / cell).floor().max(0.0) as u32;
-                                diamond(&painter, Pos2::new(tx(f) + cell / 2.0, y + ROW_H / 2.0), 4.5, KEY_GOLD);
+                                diamond(&painter, Pos2::new(tx(f) + cell / 2.0, y + rh / 2.0), 4.5, KEY_GOLD);
                             }
                         }
                         if r.drag_stopped() {
@@ -466,7 +485,7 @@ impl LeonApp {
         // Clic en la zona de tiempo: elige la capa y lleva el cabezal; doble clic en una fila de propiedad crea una clave.
         if let Some(p) = resp.interact_pointer_pos() {
             if p.x >= o.x + left_w && p.y >= o.y + HEAD_H && (resp.clicked() || resp.double_clicked()) {
-                let ri = ((p.y - o.y - HEAD_H) / ROW_H).floor();
+                let ri = ((p.y - o.y - HEAD_H) / rh).floor();
                 let f = ((p.x - o.x - left_w) / cell).floor().max(0.0) as u32;
                 if ri >= 0.0 && (ri as usize) < rows.len() && f < len {
                     let row = rows[ri as usize];
@@ -486,7 +505,7 @@ impl LeonApp {
         let lx = sx;
         for (ri, row) in rows.iter().enumerate() {
             let y = row_y(ri);
-            let full = Rect::from_min_size(Pos2::new(lx, y), Vec2::new(left_w, ROW_H));
+            let full = Rect::from_min_size(Pos2::new(lx, y), Vec2::new(left_w, rh));
             match *row {
                 Row::Layer(li) => {
                     let inf = &infos[li];
@@ -494,7 +513,7 @@ impl LeonApp {
                     painter.rect_filled(full, 0.0, if sel { SEL_BG } else if ri % 2 == 0 { BG2 } else { BG3 });
                     let mut x = lx;
                     let mut cellr = |w: f32| {
-                        let r = Rect::from_min_size(Pos2::new(x, y), Vec2::new(w, ROW_H));
+                        let r = Rect::from_min_size(Pos2::new(x, y), Vec2::new(w, rh));
                         x += w;
                         r
                     };
@@ -531,7 +550,7 @@ impl LeonApp {
                     let r = cellr(W_NAME);
                     let open = has_props[li];
                     let ind = 14.0 * inf.depth as f32;
-                    let arrow = Rect::from_min_size(r.min + Vec2::new(ind, 0.0), Vec2::new(16.0, ROW_H));
+                    let arrow = Rect::from_min_size(r.min + Vec2::new(ind, 0.0), Vec2::new(16.0, rh));
                     let c = arrow.center();
                     let down = if inf.is_col { !inf.collapsed } else { open };
                     if down {
@@ -542,9 +561,9 @@ impl LeonApp {
                     if ui.interact(arrow, ui.id().with(("mt_arrow", li)), Sense::click()).on_hover_text(if inf.is_col { "Plegar o desplegar la colección" } else { "Mostrar u ocultar sus propiedades" }).clicked() {
                         acts.push(if inf.is_col { Act::Fold(li) } else { Act::ToggleOpen(li) });
                     }
-                    painter.text(Pos2::new(r.min.x + ind + 20.0, y + ROW_H / 2.0), Align2::LEFT_CENTER, inf.kind.badge(), FontId::proportional(9.5), c32(inf.kind.tint()));
+                    painter.text(Pos2::new(r.min.x + ind + 20.0, y + rh / 2.0), Align2::LEFT_CENTER, inf.kind.badge(), FontId::proportional(9.5), c32(inf.kind.tint()));
                     let name_r = Rect::from_min_max(Pos2::new(r.min.x + ind + 32.0, y), r.max);
-                    painter.with_clip_rect(name_r).text(Pos2::new(name_r.min.x, y + ROW_H / 2.0), Align2::LEFT_CENTER, &inf.name, semi(11.5), if inf.visible { TX } else { INK3 });
+                    painter.with_clip_rect(name_r).text(Pos2::new(name_r.min.x, y + rh / 2.0), Align2::LEFT_CENTER, &inf.name, semi(11.5), if inf.visible { TX } else { INK3 });
                     let name_resp = ui.interact(Rect::from_min_max(r.min + Vec2::new(ind + 16.0, 0.0), r.max), ui.id().with(("mt_name", li)), Sense::click_and_drag());
                     if name_resp.clicked() {
                         let (ctrl, shift) = ui.input(|i| (i.modifiers.command, i.modifiers.shift));
@@ -666,14 +685,14 @@ impl LeonApp {
                 }
                 Row::Group(_) => {
                     painter.rect_filled(full, 0.0, Color32::from_rgb(0x20, 0x1f, 0x1e));
-                    painter.text(Pos2::new(lx + W_EYE + W_SOLO + W_LOCK + W_LABEL + 28.0, y + ROW_H / 2.0), Align2::LEFT_CENTER, "Transformar", semi(11.0), MU);
+                    painter.text(Pos2::new(lx + W_EYE + W_SOLO + W_LOCK + W_LABEL + 28.0, y + rh / 2.0), Align2::LEFT_CENTER, "Transformar", semi(11.0), MU);
                 }
                 Row::Prop(li, p) => {
                     painter.rect_filled(full, 0.0, Color32::from_rgb(0x20, 0x1f, 0x1e));
                     let animated = infos[li].animated[p as usize];
                     let ix = lx + W_EYE + W_SOLO + W_LOCK + W_LABEL + 36.0;
                     // Cronómetro
-                    let sw = Rect::from_min_size(Pos2::new(ix, y), Vec2::new(20.0, ROW_H));
+                    let sw = Rect::from_min_size(Pos2::new(ix, y), Vec2::new(20.0, rh));
                     let resp_sw = ui.interact(sw, ui.id().with(("mt_sw", li, p)), Sense::click());
                     let col = if animated { ACCENT } else if resp_sw.hovered() { TX } else { MU };
                     let c = sw.center() + Vec2::new(0.0, 1.0);
@@ -683,13 +702,13 @@ impl LeonApp {
                     if resp_sw.on_hover_text(if animated { "Cronómetro activo: pulsa para dejar de animar esta propiedad (borra sus claves)" } else { "Pulsa para animar esta propiedad desde el cuadro actual" }).clicked() {
                         acts.push(Act::Stopwatch(li, p));
                     }
-                    painter.text(Pos2::new(ix + 26.0, y + ROW_H / 2.0), Align2::LEFT_CENTER, p.name(), FontId::proportional(11.5), TX);
-                    painter.text(Pos2::new(ix + 26.0 + 100.0, y + ROW_H / 2.0), Align2::LEFT_CENTER, prop_key(p), FontId::proportional(9.5), INK3);
+                    painter.text(Pos2::new(ix + 26.0, y + rh / 2.0), Align2::LEFT_CENTER, p.name(), FontId::proportional(11.5), TX);
+                    painter.text(Pos2::new(ix + 26.0 + 100.0, y + rh / 2.0), Align2::LEFT_CENTER, prop_key(p), FontId::proportional(9.5), INK3);
                     // Valor en este cuadro, editable.
                     let now = self.project.layers[li].transform_at(frame);
                     let mut v = p.of(&now);
                     let two = matches!(p, Prop::Anchor | Prop::Position);
-                    let vr = Rect::from_min_size(Pos2::new(lx + left_w - if two { 150.0 } else { 82.0 }, y + 2.0), Vec2::new(if two { 144.0 } else { 78.0 }, ROW_H - 4.0));
+                    let vr = Rect::from_min_size(Pos2::new(lx + left_w - if two { 150.0 } else { 82.0 }, y + 2.0), Vec2::new(if two { 144.0 } else { 78.0 }, rh - 4.0));
                     let mut changed = false;
                     ui.allocate_new_ui(egui::UiBuilder::new().max_rect(vr).layout(egui::Layout::left_to_right(egui::Align::Center)), |ui| {
                         ui.spacing_mut().item_spacing.x = 3.0;
@@ -718,7 +737,7 @@ impl LeonApp {
                     }
                 }
             }
-            painter.hline(lx..=(lx + left_w), y + ROW_H, stk(1.0, Color32::from_black_alpha(90)));
+            painter.hline(lx..=(lx + left_w), y + rh, stk(1.0, Color32::from_black_alpha(90)));
         }
         // Arrastrar una capa por su nombre: sobre una colección la mete dentro; entre filas, la coloca ahí.
         let ldrag_id = ui.id().with("mt_layer_drag");
@@ -726,7 +745,7 @@ impl LeonApp {
             let mut target = None;
             if let Some(p) = ui.input(|i| i.pointer.interact_pos()) {
                 painter.text(p + Vec2::new(12.0, -2.0), Align2::LEFT_CENTER, &infos[src.min(n.saturating_sub(1))].name, semi(11.5), ACCENT);
-                let ri = ((p.y - o.y - HEAD_H) / ROW_H).floor();
+                let ri = ((p.y - o.y - HEAD_H) / rh).floor();
                 if ri >= 0.0 && (ri as usize) < rows.len() {
                     let ri = ri as usize;
                     let (li, is_layer_row) = match rows[ri] {
@@ -734,7 +753,7 @@ impl LeonApp {
                         Row::Group(l) | Row::Prop(l, _) => (l, false),
                     };
                     let y0 = row_y(ri);
-                    let dy = (p.y - y0) / ROW_H;
+                    let dy = (p.y - y0) / rh;
                     let d = if !is_layer_row {
                         crate::model::LayerDrop::After(li)
                     } else if infos[li].is_col {
@@ -746,10 +765,10 @@ impl LeonApp {
                     };
                     if self.project.can_drop(src, d) {
                         target = Some(d);
-                        let band = Rect::from_min_size(Pos2::new(lx, y0), Vec2::new(left_w + len as f32 * cell, ROW_H));
+                        let band = Rect::from_min_size(Pos2::new(lx, y0), Vec2::new(left_w + len as f32 * cell, rh));
                         match d {
                             crate::model::LayerDrop::Before(_) => painter.hline(band.x_range(), y0, stk(2.0, ACCENT)),
-                            crate::model::LayerDrop::After(_) => painter.hline(band.x_range(), y0 + ROW_H, stk(2.0, ACCENT)),
+                            crate::model::LayerDrop::After(_) => painter.hline(band.x_range(), y0 + rh, stk(2.0, ACCENT)),
                             crate::model::LayerDrop::Into(_) => painter.rect_stroke(band.shrink(1.0), 3.0, stk(2.0, ACCENT), EStrokeKind::Inside),
                         };
                     }
@@ -793,7 +812,7 @@ impl LeonApp {
         }
         // Cabezal
         let hxp = tx(frame) + cell / 2.0;
-        painter.vline(hxp, (sy)..=(o.y + HEAD_H + rows.len() as f32 * ROW_H), stk(1.5, ACCENT));
+        painter.vline(hxp, (sy)..=(o.y + HEAD_H + rows.len() as f32 * rh), stk(1.5, ACCENT));
         let lab = Rect::from_center_size(Pos2::new(hxp, sy + HEAD_H / 2.0), Vec2::new(24.0, 15.0));
         painter.rect_filled(lab, 3.0, ACCENT);
         painter.text(lab.center(), Align2::CENTER_CENTER, format!("{}", frame + 1), FontId::proportional(10.0), ACCENT_INK);

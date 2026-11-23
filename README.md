@@ -36,6 +36,8 @@ tiene iconos con color y los ajustes de la herramienta elegida están en la barr
 
 ![Barra de herramientas con iconos de color y panel de la herramienta](docs/img/08-barra-de-herramientas-v2.png)
 
+Las líneas de tiempo (hoja de exposición, montaje y storyboard) tienen **zoom horizontal y vertical**, con un deslizador para cada uno en su cabecera y con la rueda: **Ctrl + rueda** acerca o aleja el tiempo, **Alt + rueda** cambia el alto de las filas, la rueda sola desplaza y **Mayús + rueda** desplaza de lado.
+
 Al abrir el programa, la pantalla de inicio ofrece un archivo nuevo según el tipo de animación (storyboard, animatic,
 animación tradicional, cutout, motion graphics o stop motion), cada uno con su conjunto de salas.
 

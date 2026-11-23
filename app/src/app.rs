@@ -108,8 +108,8 @@ const XS_ROW_BASE: f32 = 17.0;
 /// Una muesca de la rueda en puntos de egui; el original da un paso cada 2×WHEEL_ZOOM_THRESHOLD = 100 unidades Qt (una muesca = 120).
 const WHEEL_NOTCH: f32 = 40.0;
 const XS_ZOOM_DEFAULT: f32 = 10.0;
-const XS_ZOOM_MIN: f32 = 5.0;
-const XS_ZOOM_MAX: f32 = 16.0;
+const XS_ZOOM_MIN: f32 = 3.0;
+const XS_ZOOM_MAX: f32 = 30.0;
 
 fn c32(c: Rgba) -> Color32 {
     Color32::from_rgba_unmultiplied(c[0], c[1], c[2], c[3])
@@ -383,6 +383,10 @@ pub struct LeonApp {
     tb_drag: u8,
     /// Zoom del Xsheet (5–16, 10 = normal).
     xs_zoom: f32,
+    /// Zoom del Xsheet en el eje de las capas (alto de las filas de capa, o ancho de las columnas); `xs_zoom` es el del tiempo.
+    xs_lane: f32,
+    /// Zoom vertical (alto de los planos) de la línea de tiempo del storyboard.
+    sbt_vz: f32,
     /// Rueda acumulada para dar un paso de zoom por muesca.
     wheel_acc: f32,
 
@@ -792,6 +796,8 @@ impl LeonApp {
             tb_start: 0.0,
             tb_drag: 0,
             xs_zoom: XS_ZOOM_DEFAULT,
+            xs_lane: XS_ZOOM_DEFAULT,
+            sbt_vz: 1.0,
             wheel_acc: 0.0,
             sb_sel: 0,
             sb_zoom: 260.0,

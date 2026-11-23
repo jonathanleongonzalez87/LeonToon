@@ -52,6 +52,14 @@ impl LeonApp {
             }
             if wide {
                 ui.add(egui::DragValue::new(&mut self.project.fps).range(1..=120).suffix(" fps"));
+                // Zoom de la hoja: horizontal (↔) y vertical (↕). Ctrl + rueda y Alt + rueda hacen lo mismo con el puntero encima.
+                ui.spacing_mut().slider_width = 64.0;
+                let v = self.xs_axis_mut(false);
+                ui.add(egui::Slider::new(v, XS_ZOOM_MIN..=XS_ZOOM_MAX).show_value(false)).on_hover_text("Zoom vertical (Alt + rueda)");
+                ui.label(RichText::new("↕").size(12.0).color(MU));
+                let h = self.xs_axis_mut(true);
+                ui.add(egui::Slider::new(h, XS_ZOOM_MIN..=XS_ZOOM_MAX).show_value(false)).on_hover_text("Zoom horizontal (Ctrl + rueda)");
+                ui.label(RichText::new("↔").size(12.0).color(MU));
             }
             ui.label(RichText::new(format!("{} / {}", self.frame + 1, n)).size(12.0).color(TX).strong());
             ui.spacing_mut().item_spacing.x = 1.0;

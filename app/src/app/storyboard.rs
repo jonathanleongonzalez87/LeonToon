@@ -542,8 +542,10 @@ impl LeonApp {
                     self.sb_sel = i + 1;
                 }
                 ui.separator();
-                muted(ui, "Tiempo");
-                ui.add(egui::Slider::new(&mut self.sbt_pps, 20.0..=400.0).show_value(false));
+                muted(ui, "Zoom ↔");
+                ui.add(egui::Slider::new(&mut self.sbt_pps, 20.0..=400.0).show_value(false)).on_hover_text("Zoom horizontal: segundos por pantalla (Ctrl + rueda)");
+                muted(ui, "↕");
+                ui.add(egui::Slider::new(&mut self.sbt_vz, 0.5..=3.0).show_value(false)).on_hover_text("Zoom vertical: alto de los planos (Alt + rueda)");
                 muted(ui, format!("· {} planos · {:.1} s", n, self.sbt_total()));
             });
         });
@@ -586,7 +588,6 @@ impl LeonApp {
         }
         let fps = self.project.fps.max(1) as f32;
         let (w, h) = (self.project.width as f32, self.project.height as f32);
-        let pps = self.sbt_pps;
         let total = self.sbt_total();
         if !animatic {
             self.sbt_t = self.sbt_t.clamp(0.0, total);
@@ -601,9 +602,25 @@ impl LeonApp {
         let mut drop_to: Option<(usize, usize)> = None;
         let mut trans_set: Option<(usize, &'static str)> = None;
         let playing = self.playing;
-        egui::ScrollArea::horizontal().id_salt("sb_timeline").auto_shrink([false, false]).show(ui, |ui| {
+        // Ctrl + rueda: zoom horizontal; Alt + rueda: zoom vertical. La rueda sola desplaza (con Mayús, de lado).
+        let area = ui.available_rect_before_wrap();
+        let (ctrl, alt, dy) = ui.input(|i| (i.modifiers.command, i.modifiers.alt, i.raw_scroll_delta.y));
+        if ui.rect_contains_pointer(area) && (ctrl || alt) && dy != 0.0 {
+            if alt {
+                self.sbt_vz = (self.sbt_vz * (1.0 + dy * 0.002)).clamp(0.5, 3.0);
+            } else {
+                self.sbt_pps = (self.sbt_pps * (1.0 + dy * 0.002)).clamp(20.0, 400.0);
+            }
+            ui.input_mut(|i| {
+                i.smooth_scroll_delta = Vec2::ZERO;
+                i.raw_scroll_delta = Vec2::ZERO;
+            });
+        }
+        let pps = self.sbt_pps;
+        let vz = self.sbt_vz;
+        egui::ScrollArea::both().id_salt("sb_timeline").auto_shrink([false, false]).show(ui, |ui| {
             let (ruler_h, cam_h, trans_h) = (20.0, 20.0, 24.0);
-            let clip_h = (ui.available_height() - ruler_h - cam_h - trans_h - 18.0).clamp(46.0, 120.0);
+            let clip_h = ((ui.available_height() - ruler_h - cam_h - trans_h - 18.0).clamp(46.0, 120.0) * vz).clamp(30.0, 360.0);
             let width = (total * pps + 120.0).max(ui.available_width());
             let (rect, _) = ui.allocate_exact_size(Vec2::new(width, ruler_h + clip_h + cam_h + trans_h + 12.0), Sense::hover());
             let painter = ui.painter_at(rect);
