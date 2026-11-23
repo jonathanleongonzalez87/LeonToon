@@ -267,7 +267,7 @@ impl RoomKind {
             RoomKind::Rig => d("rig", "Rigging", true, 220.0, R::Rig, None, false, "Esqueletos y piezas para cutout"),
             RoomKind::Comp => d("comp", "Composición 3D", true, 190.0, R::Comp, None, false, "Planos BG, MG y FG en profundidad"),
             RoomKind::Color => d("color", "Color", true, 160.0, R::Palettes, Some(Tool::Fill), false, "Paletas y relleno"),
-            RoomKind::Story => d("story", "Storyboard", true, 0.0, R::StoryPdf, None, true, "Planos con textos y exportación a PDF"),
+            RoomKind::Story => d("story", "Storyboard", true, 280.0, R::StoryPdf, None, true, "Planos con textos y exportación a PDF"),
             RoomKind::Animatic => d("animatic", "Animatic", true, 230.0, R::Animatic, None, false, "Planos en el tiempo con duración y transiciones"),
             RoomKind::StopMotion => d("stopmotion", "Stop Motion", true, 400.0, R::StopMotion, None, false, "Secuencia de fotos, Frame Browser y X-Sheet"),
             RoomKind::Exportar => d("exportar", "Exportar", true, 150.0, R::Export, None, false, "PNG, hoja de sprites, GIF y MP4"),
@@ -377,10 +377,14 @@ pub(crate) enum Editor {
     SmStage,
     /// La tira de fotos y el Frame Browser de Stop Motion.
     SmStrip,
+    /// La línea de tiempo del storyboard: tira de planos con duración arrastrable y pista de cámara.
+    PanelTimeline,
+    /// Las miniaturas de los planos en una columna vertical (se puede dibujar sobre ellas).
+    PanelColumn,
 }
 
 impl Editor {
-    pub(crate) const ALL: [Editor; 16] = [
+    pub(crate) const ALL: [Editor; 18] = [
         Editor::Viewer,
         Editor::SmStage,
         Editor::Preview,
@@ -396,6 +400,8 @@ impl Editor {
         Editor::Palettes,
         Editor::Substitution,
         Editor::Storyboard,
+        Editor::PanelTimeline,
+        Editor::PanelColumn,
         Editor::Camera,
     ];
     pub(crate) fn name(self) -> &'static str {
@@ -416,6 +422,8 @@ impl Editor {
             Editor::Storyboard => "Storyboard",
             Editor::SmStage => "Escenario de Stop Motion",
             Editor::SmStrip => "Tira de fotos",
+            Editor::PanelTimeline => "Línea de tiempo del storyboard",
+            Editor::PanelColumn => "Miniaturas",
         }
     }
     /// Identificador estable para guardarlo en el archivo de ajustes (no cambia aunque cambie el nombre).
@@ -437,6 +445,8 @@ impl Editor {
             Editor::Storyboard => "storyboard",
             Editor::SmStage => "sm_stage",
             Editor::SmStrip => "sm_strip",
+            Editor::PanelTimeline => "sb_timeline",
+            Editor::PanelColumn => "sb_column",
         }
     }
     pub(crate) fn from_id(id: &str) -> Option<Editor> {
@@ -445,9 +455,9 @@ impl Editor {
     pub(crate) fn group(self) -> EditorGroup {
         match self {
             Editor::Viewer | Editor::SmStage | Editor::Preview => EditorGroup::Visores,
-            Editor::Timeline | Editor::Montage | Editor::SmStrip | Editor::SmXSheet | Editor::Curves => EditorGroup::Tiempo,
+            Editor::Timeline | Editor::Montage | Editor::SmStrip | Editor::SmXSheet | Editor::Curves | Editor::PanelTimeline => EditorGroup::Tiempo,
             Editor::Layers | Editor::RoomProps | Editor::Schematic | Editor::Explorer | Editor::Palettes | Editor::Substitution => EditorGroup::Datos,
-            Editor::Storyboard | Editor::Camera => EditorGroup::Produccion,
+            Editor::Storyboard | Editor::PanelColumn | Editor::Camera => EditorGroup::Produccion,
         }
     }
     /// Editores que traen su propia cabecera: ellos mismos piden el selector de editor (`slot_head`).
@@ -456,7 +466,7 @@ impl Editor {
     }
     /// Editores que reparten su espacio y su desplazamiento ellos mismos: no van dentro del marco con margen del hueco.
     pub(crate) fn scrolls_itself(self) -> bool {
-        matches!(self, Editor::SmXSheet | Editor::Camera | Editor::Viewer | Editor::Storyboard | Editor::SmStage)
+        matches!(self, Editor::SmXSheet | Editor::Camera | Editor::Viewer | Editor::Storyboard | Editor::SmStage | Editor::PanelTimeline | Editor::PanelColumn)
     }
 }
 
@@ -506,7 +516,7 @@ impl RoomKind {
     pub(crate) fn slots(self) -> &'static [Slot] {
         match self {
             RoomKind::StopMotion => &[Slot::SmLeft, Slot::SmStage, Slot::SmRight, Slot::SmBottom, Slot::Layers, Slot::Props],
-            RoomKind::Story => &[Slot::Main, Slot::Layers, Slot::Props],
+            RoomKind::Story => &[Slot::Main, Slot::Time, Slot::Layers, Slot::Props],
             _ => &[Slot::Main, Slot::Time, Slot::Layers, Slot::Props],
         }
     }
@@ -522,6 +532,7 @@ impl RoomKind {
             }
             // Interpolación y Composición 3D son de motion graphics: su tiempo es la línea de tiempo de montaje.
             Slot::Time if matches!(self, RoomKind::Interp | RoomKind::Comp | RoomKind::Animatic) => Editor::Montage,
+            Slot::Time if self == RoomKind::Story => Editor::PanelTimeline,
             Slot::Time => Editor::Timeline,
             Slot::Layers => Editor::Layers,
             Slot::Props => Editor::RoomProps,
@@ -564,7 +575,7 @@ mod editor_tests {
         }
         // Un editor que se añada a la enumeración pero no a ALL no saldría en el menú: esta comprobación lo detecta.
         let sample = |e: Editor| match e {
-            Editor::RoomProps | Editor::Palettes | Editor::Curves | Editor::Explorer | Editor::Schematic | Editor::Substitution | Editor::Preview | Editor::Layers | Editor::SmXSheet | Editor::Camera | Editor::Viewer | Editor::Timeline | Editor::Montage | Editor::Storyboard | Editor::SmStage | Editor::SmStrip => true,
+            Editor::RoomProps | Editor::Palettes | Editor::Curves | Editor::Explorer | Editor::Schematic | Editor::Substitution | Editor::Preview | Editor::Layers | Editor::SmXSheet | Editor::Camera | Editor::Viewer | Editor::Timeline | Editor::Montage | Editor::Storyboard | Editor::SmStage | Editor::SmStrip | Editor::PanelTimeline | Editor::PanelColumn => true,
         };
         assert!(Editor::ALL.iter().all(|e| sample(*e)));
     }

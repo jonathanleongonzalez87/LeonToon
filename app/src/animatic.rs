@@ -52,6 +52,17 @@ pub fn build(panels: &[Panel], fps: u32) -> Built {
             l.tracks.set(Prop::Opacity, in_f, [0.0, 0.0], Interp::Linear);
             l.tracks.set(Prop::Opacity, in_f + overlap, [1.0, 0.0], Interp::Linear);
         }
+        // Movimiento de cámara del plano: zoom y desplazamiento de la imagen entre el primer y el último cuadro.
+        if let Some(c) = p.cam {
+            let (a, z) = (start, start + len - 1);
+            let i = if c.ease { Interp::Ease } else { Interp::Linear };
+            l.tracks.set(Prop::Scale, a, [c.s0.max(0.1), 0.0], i);
+            l.tracks.set(Prop::Position, a, [c.x0, c.y0], i);
+            if z > a {
+                l.tracks.set(Prop::Scale, z, [c.s1.max(0.1), 0.0], i);
+                l.tracks.set(Prop::Position, z, [c.x1, c.y1], i);
+            }
+        }
         clips.push(l);
         start += len;
         prev_len = len;
@@ -116,4 +127,21 @@ mod tests {
         let e = build(&[], 24);
         assert!(e.layers.is_empty() && e.length == 1);
     }
-}
+
+    #[test]
+    fn a_panel_camera_move_becomes_scale_and_position_keys_over_the_panel() {
+        let mut ps = vec![panel("A", 1.0, ""), panel("B", 2.0, "")];
+        ps[1].cam = Some(crate::model::CamMove { s0: 1.0, x0: 0.0, y0: 0.0, s1: 1.5, x1: -60.0, y1: 20.0, ease: false });
+        let b = build(&ps, 24);
+        // De arriba abajo: el último plano arriba. B empieza en el cuadro 24 y acaba en el 71.
+        let clip_b = &b.layers[0];
+        assert_eq!(clip_b.name, "B");
+        let start = clip_b.tracks.eval(24);
+        assert_eq!((start.s, start.x, start.y), (1.0, 0.0, 0.0));
+        let end = clip_b.tracks.eval(71);
+        assert_eq!((end.s, end.x, end.y), (1.5, -60.0, 20.0));
+        let mid = clip_b.tracks.eval(47);
+        assert!(mid.s > 1.2 && mid.s < 1.3, "zoom lineal a mitad del plano: {}", mid.s);
+        // Un plano sin movimiento no gana claves.
+        assert!(b.layers[1].tracks.is_empty());
+    }}

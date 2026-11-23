@@ -514,6 +514,26 @@ pub fn ease(t: f32) -> f32 {
     }
 }
 
+/// Movimiento de cámara de un plano: acercar (zoom) y desplazar la imagen del principio al final del plano. Se aplica en el
+/// animatic y al exportarlo.
+#[derive(Clone, Copy, PartialEq, Serialize, Deserialize, Debug)]
+pub struct CamMove {
+    pub s0: f32,
+    pub x0: f32,
+    pub y0: f32,
+    pub s1: f32,
+    pub x1: f32,
+    pub y1: f32,
+    /// Arranque y frenado suaves (si no, velocidad constante).
+    pub ease: bool,
+}
+
+impl Default for CamMove {
+    fn default() -> Self {
+        CamMove { s0: 1.0, x0: 0.0, y0: 0.0, s1: 1.2, x1: 0.0, y1: 0.0, ease: true }
+    }
+}
+
 /// Plano del StoryBoard.
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct Panel {
@@ -535,6 +555,9 @@ pub struct Panel {
     /// Composición del plano (sus capas), en `Project::comps`. Se crea al abrir el plano por primera vez.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub comp: Option<u64>,
+    /// Movimiento de la cámara durante el plano (pista de cámara del storyboard).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cam: Option<CamMove>,
 }
 
 impl Panel {

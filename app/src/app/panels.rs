@@ -504,6 +504,8 @@ impl LeonApp {
             Editor::Timeline => self.timeline_area(ui),
             Editor::Montage => self.montage_area(ui),
             Editor::Storyboard => self.storyboard_room(ui),
+            Editor::PanelTimeline => self.sb_timeline_editor(ui),
+            Editor::PanelColumn => self.sb_column_editor(ui),
             Editor::SmStage => self.sm_stage_editor(ui),
             Editor::SmStrip => self.sm_bottom(ui),
         }

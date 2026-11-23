@@ -397,6 +397,10 @@ pub struct LeonApp {
     sb_outer: Option<Project>,
     /// Pedir que la cuadrícula ajuste el tamaño para que quepan todos los planos.
     sb_fit: bool,
+    /// Línea de tiempo del storyboard: píxeles por segundo, cabeza de reproducción (s) y plano que se arrastra para reordenarlo.
+    sbt_pps: f32,
+    sbt_t: f32,
+    sbt_drag: Option<usize>,
     sb_drag: Option<usize>,
     render_opts: RenderOpts,
 
@@ -571,7 +575,13 @@ impl LeonApp {
                     }
                 }
             }
-        }        // Para capturas del animatic: LEONTOON_ANIMATIC=1 crea la composición «Animatic» (el segundo plano con fundido) y entra en ella.
+        }        // Capturas: LEONTOON_CAMPLANO=<n> pone un movimiento de cámara (zoom y desplazamiento) en el plano n del storyboard.
+        if let Some(n) = std::env::var("LEONTOON_CAMPLANO").ok().and_then(|v| v.parse::<usize>().ok()) {
+            if let Some(p) = project.storyboard.get_mut(n.saturating_sub(1)) {
+                p.cam = Some(crate::model::CamMove { s0: 1.0, x0: 0.0, y0: 0.0, s1: 1.35, x1: -90.0, y1: 30.0, ease: true });
+            }
+        }
+        // Para capturas del animatic: LEONTOON_ANIMATIC=1 crea la composición «Animatic» (el segundo plano con fundido) y entra en ella.
         if std::env::var("LEONTOON_ANIMATIC").is_ok() && project.storyboard.len() >= 2 {
             project.storyboard[1].trans = "Fundido".into();
             let built = crate::animatic::build(&project.storyboard, project.fps);
@@ -788,6 +798,9 @@ impl LeonApp {
             sb_live: None,
             sb_outer: None,
             sb_fit: false,
+            sbt_pps: 170.0,
+            sbt_t: 0.0,
+            sbt_drag: None,
             sb_drag: None,
             render_opts: RenderOpts { a: 1, b: len, scale: 1.0, transparent: false, columns: 8, message: "Listo.".into() },
             gesture: None,

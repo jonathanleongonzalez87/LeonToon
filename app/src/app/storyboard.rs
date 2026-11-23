@@ -145,6 +145,68 @@ impl LeonApp {
         self.say(format!("Columna «Animatic» creada: {f} fotogramas. Mírala en la sala Xsheet o Timing."));
     }
 
+    /// La miniatura de un plano como lienzo (la usan la cuadrícula y la columna de miniaturas): con una herramienta de dibujo se
+    /// dibuja encima; el número es el asa (clic abre el plano, arrastrarlo lo reordena). Devuelve por select y open lo que se pidió.
+    fn panel_thumb(&mut self, ui: &mut egui::Ui, i: usize, cw: f32, select: &mut Option<usize>, open: &mut Option<usize>) {
+        let (w, h) = (self.project.width as f32, self.project.height as f32);
+        let th = cw * h / w;
+                            let (tr, tresp) = ui.allocate_exact_size(Vec2::new(cw, th), Sense::click_and_drag());
+                            // Con una herramienta de dibujo, la miniatura es un lienzo (thumbnailing): se dibuja encima con el Lápiz,
+                            // el Pincel, las formas, el Borrador o el Bote. El plano se abre mientras dura el gesto y se cierra al soltar.
+                            let drawing_tool = matches!(self.tool, Tool::Brush | Tool::Vector | Tool::Shape | Tool::Eraser | Tool::Fill);
+                            if self.sb_live == Some(i) {
+                                self.paint_scene(&ui.painter_at(tr), tr.min, cw / w, 0, true, false);
+                            } else {
+                                paint_thumb(ui.painter(), tr, &self.project.storyboard[i].drawing, w, h, Color32::WHITE);
+                            }
+                            ui.painter().rect_stroke(tr, 2.0, stk(1.0, Color32::BLACK), EStrokeKind::Outside);
+                            // El número es el asa del plano: clic lo abre, arrastrarlo lo reordena.
+                            let badge = Rect::from_min_size(tr.min + Vec2::new(4.0, 4.0), Vec2::new(22.0, 16.0));
+                            let bresp = ui.interact(badge, ui.id().with(("sb_badge", i)), Sense::click_and_drag());
+                            ui.painter().rect_filled(badge, 3.0, if bresp.hovered() { ACCENT2 } else { ACCENT });
+                            ui.painter().text(badge.center(), Align2::CENTER_CENTER, format!("{}", i + 1), FontId::proportional(11.0), Color32::WHITE);
+                            if bresp.hovered() {
+                                bresp.clone().on_hover_text("Clic: abrir el plano · arrastrar: reordenar");
+                            }
+                            if bresp.clicked() {
+                                *select = Some(i);
+                                *open = Some(i);
+                            }
+                            if bresp.drag_started() {
+                                self.sb_drag = Some(i);
+                            }
+                            if drawing_tool {
+                                let ctx = ui.ctx().clone();
+                                let on_thumb = !bresp.hovered() && !bresp.dragged();
+                                if tresp.is_pointer_button_down_on() && ctx.input(|i| i.pointer.primary_down()) && on_thumb {
+                                    if let Some(pp) = ctx.input(|i| i.pointer.interact_pos()) {
+                                        let z = cw / w;
+                                        let cp = [(pp.x - tr.min.x) / z, (pp.y - tr.min.y) / z];
+                                        let (shift, command) = ctx.input(|i| (i.modifiers.shift, i.modifiers.command));
+                                        if self.sb_live.is_none() && ctx.input(|i| i.pointer.primary_pressed()) {
+                                            self.begin_panel_stroke(i, cp, shift, command);
+                                        } else if self.sb_live == Some(i) {
+                                            self.continue_gesture(cp, shift);
+                                        }
+                                    }
+                                } else if self.sb_live == Some(i) {
+                                    self.end_panel_stroke();
+                                }
+                                if tresp.clicked() || tresp.drag_started() {
+                                    *select = Some(i);
+                                }
+                            } else {
+                                if tresp.clicked() {
+                                    *select = Some(i);
+                                }
+                                if tresp.double_clicked() {
+                                    *open = Some(i);
+                                }
+                                if tresp.drag_started() {
+                                    self.sb_drag = Some(i);
+                                }
+                            }
+    }
     fn sb_grid(&mut self, ui: &mut egui::Ui) {
         let (w, h) = (self.project.width as f32, self.project.height as f32);
         // Tamaño a la medida: Ctrl+rueda sobre la cuadrícula, o «Ajustar» para que quepan todos los planos.
@@ -177,7 +239,6 @@ impl LeonApp {
             self.sb_zoom = best;
         }
         let cw = self.sb_zoom;
-        let th = cw * h / w;
         let compact = cw < 110.0;
         let detail = cw >= 300.0;
         let mut select = None;
@@ -200,62 +261,7 @@ impl LeonApp {
                         let card = frame.show(ui, |ui| ui.vertical(|ui| {
                             ui.set_width(cw);
                             ui.spacing_mut().item_spacing.y = 5.0;
-                            let (tr, tresp) = ui.allocate_exact_size(Vec2::new(cw, th), Sense::click_and_drag());
-                            // Con una herramienta de dibujo, la miniatura es un lienzo (thumbnailing): se dibuja encima con el Lápiz,
-                            // el Pincel, las formas, el Borrador o el Bote. El plano se abre mientras dura el gesto y se cierra al soltar.
-                            let drawing_tool = matches!(self.tool, Tool::Brush | Tool::Vector | Tool::Shape | Tool::Eraser | Tool::Fill);
-                            if self.sb_live == Some(i) {
-                                self.paint_scene(&ui.painter_at(tr), tr.min, cw / w, 0, true, false);
-                            } else {
-                                paint_thumb(ui.painter(), tr, &self.project.storyboard[i].drawing, w, h, Color32::WHITE);
-                            }
-                            ui.painter().rect_stroke(tr, 2.0, stk(1.0, Color32::BLACK), EStrokeKind::Outside);
-                            // El número es el asa del plano: clic lo abre, arrastrarlo lo reordena.
-                            let badge = Rect::from_min_size(tr.min + Vec2::new(4.0, 4.0), Vec2::new(22.0, 16.0));
-                            let bresp = ui.interact(badge, ui.id().with(("sb_badge", i)), Sense::click_and_drag());
-                            ui.painter().rect_filled(badge, 3.0, if bresp.hovered() { ACCENT2 } else { ACCENT });
-                            ui.painter().text(badge.center(), Align2::CENTER_CENTER, format!("{}", i + 1), FontId::proportional(11.0), Color32::WHITE);
-                            if bresp.hovered() {
-                                bresp.clone().on_hover_text("Clic: abrir el plano · arrastrar: reordenar");
-                            }
-                            if bresp.clicked() {
-                                select = Some(i);
-                                open = Some(i);
-                            }
-                            if bresp.drag_started() {
-                                self.sb_drag = Some(i);
-                            }
-                            if drawing_tool {
-                                let ctx = ui.ctx().clone();
-                                let on_thumb = !bresp.hovered() && !bresp.dragged();
-                                if tresp.is_pointer_button_down_on() && ctx.input(|i| i.pointer.primary_down()) && on_thumb {
-                                    if let Some(pp) = ctx.input(|i| i.pointer.interact_pos()) {
-                                        let z = cw / w;
-                                        let cp = [(pp.x - tr.min.x) / z, (pp.y - tr.min.y) / z];
-                                        let (shift, command) = ctx.input(|i| (i.modifiers.shift, i.modifiers.command));
-                                        if self.sb_live.is_none() && ctx.input(|i| i.pointer.primary_pressed()) {
-                                            self.begin_panel_stroke(i, cp, shift, command);
-                                        } else if self.sb_live == Some(i) {
-                                            self.continue_gesture(cp, shift);
-                                        }
-                                    }
-                                } else if self.sb_live == Some(i) {
-                                    self.end_panel_stroke();
-                                }
-                                if tresp.clicked() || tresp.drag_started() {
-                                    select = Some(i);
-                                }
-                            } else {
-                                if tresp.clicked() {
-                                    select = Some(i);
-                                }
-                                if tresp.double_clicked() {
-                                    open = Some(i);
-                                }
-                                if tresp.drag_started() {
-                                    self.sb_drag = Some(i);
-                                }
-                            }
+                            self.panel_thumb(ui, i, cw, &mut select, &mut open);
                             if !compact {
                                 let p = &mut self.project.storyboard[i];
                                 ui.add(egui::TextEdit::singleline(&mut p.title).desired_width(cw).font(FontId::proportional(12.5)));
@@ -408,6 +414,316 @@ impl LeonApp {
             self.open_panel(j);
         }
     }
+    // ---------- Línea de tiempo del storyboard (Issue #133, fase S2) ----------
+
+    fn sbt_total(&self) -> f32 {
+        self.project.storyboard.iter().map(|p| p.dur).sum()
+    }
+
+    /// Botones de la línea de tiempo del storyboard: operaciones de plano y zoom del tiempo.
+    fn sbt_bar(&mut self, ui: &mut egui::Ui) {
+        egui::Frame::default().fill(BG2).inner_margin(egui::Margin::symmetric(10, 4)).show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.horizontal_wrapped(|ui| {
+                ui.spacing_mut().item_spacing.x = 6.0;
+                let n = self.project.storyboard.len();
+                let i = self.sb_sel.min(n.saturating_sub(1));
+                if pill(ui, "+ Plano", false).clicked() {
+                    self.checkpoint();
+                    let at = if n == 0 { 0 } else { (i + 1).min(n) };
+                    self.project.storyboard.insert(at, Panel::new(n + 1));
+                    self.sb_sel = at;
+                }
+                if pill(ui, "Duplicar", false).clicked() && n > 0 {
+                    self.checkpoint();
+                    if let Some(j) = self.project.duplicate_panel(i) {
+                        self.sb_sel = j;
+                    }
+                }
+                if pill(ui, "Dividir", false).on_hover_text("Parte el plano en dos por la cabeza de reproducción (clic en la regla o en el plano)").clicked() && n > 0 {
+                    self.split_panel(i);
+                }
+                if pill(ui, "Eliminar", false).clicked() && n > 0 {
+                    self.checkpoint();
+                    if self.project.remove_panel(i) {
+                        self.sb_sel = i.saturating_sub(1);
+                    }
+                }
+                if pill(ui, "◀ Mover", false).on_hover_text("Intercambia el plano con el anterior").clicked() && i > 0 {
+                    self.checkpoint();
+                    self.project.storyboard.swap(i, i - 1);
+                    self.sb_sel = i - 1;
+                }
+                if pill(ui, "Mover ▶", false).on_hover_text("Intercambia el plano con el siguiente").clicked() && i + 1 < n {
+                    self.checkpoint();
+                    self.project.storyboard.swap(i, i + 1);
+                    self.sb_sel = i + 1;
+                }
+                ui.separator();
+                muted(ui, "Tiempo");
+                ui.add(egui::Slider::new(&mut self.sbt_pps, 20.0..=400.0).show_value(false));
+                muted(ui, format!("· {} planos · {:.1} s", n, self.sbt_total()));
+            });
+        });
+    }
+
+    /// Parte el plano `i` en dos por la cabeza de reproducción: la copia es el trozo de la derecha.
+    fn split_panel(&mut self, i: usize) {
+        let fps = self.project.fps.max(1) as f32;
+        let start: f32 = self.project.storyboard.iter().take(i).map(|p| p.dur).sum();
+        let dur = self.project.storyboard[i].dur;
+        let (off_f, dur_f) = (((self.sbt_t - start) * fps).round(), (dur * fps).round());
+        if off_f < 1.0 || off_f > dur_f - 1.0 {
+            self.say("Para dividir, pon la cabeza de reproducción dentro del plano (clic en la regla o en el plano), al menos un cuadro del borde");
+            return;
+        }
+        self.checkpoint();
+        if let Some(j) = self.project.duplicate_panel(i) {
+            let title = self.project.storyboard[i].title.clone();
+            self.project.storyboard[i].dur = off_f / fps;
+            self.project.storyboard[j].dur = (dur_f - off_f) / fps;
+            self.project.storyboard[j].title = format!("{title} (2)");
+            self.sb_sel = j;
+        }
+    }
+
+    /// La línea de tiempo del storyboard: una regla en segundos, la tira de planos (miniatura, número, título y duración; se
+    /// arrastra el borde derecho para cambiar la duración y el cuerpo para reordenar) y la pista de cámara.
+    pub(super) fn sb_timeline_editor(&mut self, ui: &mut egui::Ui) {
+        self.sbt_bar(ui);
+        let n = self.project.storyboard.len();
+        if n == 0 {
+            muted(ui, "No hay planos todavía: pulsa «+ Plano».");
+            return;
+        }
+        let fps = self.project.fps.max(1) as f32;
+        let (w, h) = (self.project.width as f32, self.project.height as f32);
+        let pps = self.sbt_pps;
+        let total = self.sbt_total();
+        self.sbt_t = self.sbt_t.clamp(0.0, total);
+        let mut select: Option<usize> = None;
+        let mut open: Option<usize> = None;
+        let mut cam_toggle: Option<usize> = None;
+        let mut set_t: Option<f32> = None;
+        let mut resize: Option<(usize, f32)> = None;
+        let mut resize_start = false;
+        let mut drop_to: Option<(usize, usize)> = None;
+        egui::ScrollArea::horizontal().id_salt("sb_timeline").auto_shrink([false, false]).show(ui, |ui| {
+            let (ruler_h, cam_h) = (20.0, 20.0);
+            let clip_h = (ui.available_height() - ruler_h - cam_h - 16.0).clamp(46.0, 120.0);
+            let width = (total * pps + 120.0).max(ui.available_width());
+            let (rect, _) = ui.allocate_exact_size(Vec2::new(width, ruler_h + clip_h + cam_h + 10.0), Sense::hover());
+            let painter = ui.painter_at(rect);
+            let id = ui.id();
+            // Regla en segundos: clic o arrastre mueven la cabeza de reproducción.
+            let ruler = Rect::from_min_size(rect.min, Vec2::new(width, ruler_h));
+            painter.rect_filled(ruler, 0.0, BG3);
+            let step = if pps < 40.0 { 5 } else { 1 };
+            let mut s = 0;
+            while (s as f32) <= total + 1.0 {
+                let x = rect.min.x + s as f32 * pps;
+                painter.line_segment([Pos2::new(x, ruler.max.y - 7.0), Pos2::new(x, ruler.max.y)], stk(1.0, MU));
+                painter.text(Pos2::new(x + 3.0, ruler.min.y + 8.0), Align2::LEFT_CENTER, format!("{s} s"), FontId::proportional(10.0), MU);
+                s += step;
+            }
+            let rresp = ui.interact(ruler, id.with("sbt_ruler"), Sense::click_and_drag());
+            if rresp.clicked() || rresp.dragged() {
+                if let Some(pp) = rresp.interact_pointer_pos() {
+                    set_t = Some(((pp.x - rect.min.x) / pps).clamp(0.0, total));
+                }
+            }
+            let top = rect.min.y + ruler_h + 3.0;
+            let cam_top = top + clip_h + 4.0;
+            let mut x = rect.min.x;
+            let mut bounds: Vec<(f32, f32)> = Vec::with_capacity(n);
+            for i in 0..n {
+                let (dur, drawing, title, cam) = {
+                    let p = &self.project.storyboard[i];
+                    (p.dur, p.drawing.clone(), p.title.clone(), p.cam)
+                };
+                let cwid = (dur * pps).max(10.0);
+                let r = Rect::from_min_size(Pos2::new(x, top), Vec2::new(cwid, clip_h));
+                bounds.push((r.min.x, r.max.x));
+                let on = i == self.sb_sel;
+                painter.rect_filled(r.shrink(1.0), 4.0, BG3);
+                let (avail_w, avail_h) = ((cwid - 10.0).max(6.0), (clip_h - 26.0).max(10.0));
+                let tw = (avail_h * w / h).min(avail_w);
+                let tr = Rect::from_min_size(r.min + Vec2::new(5.0, 5.0), Vec2::new(tw, tw * h / w));
+                paint_thumb(&painter, tr, &drawing, w, h, Color32::WHITE);
+                painter.rect_stroke(tr, 1.0, stk(1.0, Color32::BLACK), EStrokeKind::Outside);
+                let badge = Rect::from_min_size(tr.min + Vec2::new(2.0, 2.0), Vec2::new(18.0, 13.0));
+                painter.rect_filled(badge, 3.0, ACCENT);
+                painter.text(badge.center(), Align2::CENTER_CENTER, format!("{}", i + 1), FontId::proportional(10.0), Color32::WHITE);
+                painter.with_clip_rect(r.shrink(2.0)).text(Pos2::new(r.min.x + 6.0, r.max.y - 11.0), Align2::LEFT_CENTER, format!("{title} · {dur:.1} s"), FontId::proportional(11.0), TX);
+                painter.rect_stroke(r.shrink(1.0), 4.0, stk(2.0, if on { ACCENT } else { LINE }), EStrokeKind::Inside);
+                // Cuerpo del plano (clic elige y pone la cabeza, doble clic abre, arrastrar reordena) y borde derecho (duración).
+                let edge = Rect::from_min_max(Pos2::new(r.max.x - 7.0, r.min.y), r.max);
+                let body = Rect::from_min_max(r.min, Pos2::new(r.max.x - 7.0, r.max.y));
+                let br = ui.interact(body, id.with(("sbt_clip", i)), Sense::click_and_drag());
+                let er = ui.interact(edge, id.with(("sbt_edge", i)), Sense::drag());
+                if er.hovered() || er.dragged() {
+                    ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+                    painter.rect_filled(edge.shrink2(Vec2::new(1.0, 4.0)), 2.0, ACCENT);
+                }
+                if er.drag_started() {
+                    resize_start = true;
+                    select = Some(i);
+                }
+                if er.dragged() {
+                    if let Some(pp) = er.interact_pointer_pos() {
+                        let frames = (((pp.x - r.min.x) / pps) * fps).round().max(1.0);
+                        resize = Some((i, frames / fps));
+                    }
+                }
+                if br.clicked() {
+                    select = Some(i);
+                    if let Some(pp) = br.interact_pointer_pos() {
+                        set_t = Some(((pp.x - rect.min.x) / pps).clamp(0.0, total));
+                    }
+                }
+                if br.double_clicked() {
+                    open = Some(i);
+                }
+                if br.drag_started() {
+                    select = Some(i);
+                    self.sbt_drag = Some(i);
+                }
+                // Pista de cámara: una barra por plano con una clave al principio y otra al final si tiene movimiento.
+                let cr = Rect::from_min_size(Pos2::new(x, cam_top), Vec2::new(cwid, cam_h));
+                let bar = cr.shrink2(Vec2::new(1.0, 5.0));
+                if cam.is_some() {
+                    painter.rect_filled(bar, 3.0, ACCENT.gamma_multiply(0.55));
+                    for kx in [bar.min.x + 2.0, bar.max.x - 2.0] {
+                        let c = Pos2::new(kx, bar.center().y);
+                        let d = 5.0;
+                        painter.add(egui::Shape::convex_polygon(vec![c + Vec2::new(0.0, -d), c + Vec2::new(d, 0.0), c + Vec2::new(0.0, d), c + Vec2::new(-d, 0.0)], Color32::from_rgb(0xff, 0xd2, 0x66), stk(1.0, Color32::BLACK)));
+                    }
+                } else {
+                    painter.rect_filled(bar, 3.0, BG3.gamma_multiply(0.7));
+                }
+                let cresp = ui.interact(cr, id.with(("sbt_cam", i)), Sense::click());
+                if cresp.clicked() {
+                    select = Some(i);
+                }
+                if cresp.double_clicked() {
+                    cam_toggle = Some(i);
+                }
+                cresp.on_hover_text("Cámara del plano. Doble clic: añadir o quitar un movimiento (zoom y desplazamiento); se edita en el panel «Plano»");
+                x += cwid;
+            }
+            // Reordenar: el plano arrastrado se suelta antes o después de otro, según dónde esté el cursor.
+            if let Some(from) = self.sbt_drag {
+                if let Some(pp) = ui.input(|i| i.pointer.interact_pos()) {
+                    let mut to = 0;
+                    let mut mx = bounds.first().map_or(rect.min.x, |b| b.0);
+                    for (k, (x0, x1)) in bounds.iter().enumerate() {
+                        if pp.x > (x0 + x1) * 0.5 {
+                            to = k + 1;
+                            mx = *x1;
+                        }
+                    }
+                    painter.line_segment([Pos2::new(mx, top - 2.0), Pos2::new(mx, top + clip_h + 2.0)], stk(3.0, Color32::WHITE));
+                    if ui.input(|i| i.pointer.any_released()) {
+                        drop_to = Some((from, to));
+                    }
+                }
+            }
+            // Cabeza de reproducción.
+            let px = rect.min.x + self.sbt_t * pps;
+            painter.line_segment([Pos2::new(px, rect.min.y), Pos2::new(px, rect.max.y)], stk(1.5, ACCENT));
+            painter.add(egui::Shape::convex_polygon(vec![Pos2::new(px - 5.0, rect.min.y), Pos2::new(px + 5.0, rect.min.y), Pos2::new(px, rect.min.y + 8.0)], ACCENT, egui::Stroke::NONE));
+        });
+        if let Some(t) = set_t {
+            self.sbt_t = t;
+        }
+        if let Some(i) = select {
+            self.sb_sel = i;
+        }
+        if resize_start {
+            self.checkpoint();
+        }
+        if let Some((i, d)) = resize {
+            self.project.storyboard[i].dur = d;
+        }
+        if let Some(i) = cam_toggle {
+            self.checkpoint();
+            let p = &mut self.project.storyboard[i];
+            p.cam = if p.cam.is_some() { None } else { Some(crate::model::CamMove::default()) };
+            self.sb_sel = i;
+        }
+        if let Some((from, to)) = drop_to {
+            let dest = if to > from { to - 1 } else { to };
+            if dest != from {
+                self.checkpoint();
+                let p = self.project.storyboard.remove(from);
+                self.project.storyboard.insert(dest, p);
+                self.sb_sel = dest;
+            }
+        }
+        if ui.input(|i| i.pointer.any_released()) {
+            self.sbt_drag = None;
+        }
+        if let Some(i) = open {
+            self.open_panel(i);
+        }
+    }
+
+    /// Las miniaturas de los planos en una columna vertical (como en Storyboard Pro). Se dibuja sobre ellas igual que en la
+    /// cuadrícula; el número abre el plano o, arrastrado, lo reordena.
+    pub(super) fn sb_column_editor(&mut self, ui: &mut egui::Ui) {
+        let n = self.project.storyboard.len();
+        if n == 0 {
+            muted(ui, "No hay planos todavía.");
+            return;
+        }
+        let cw = (ui.available_width() - 28.0).clamp(60.0, 600.0);
+        let mut select: Option<usize> = None;
+        let mut open: Option<usize> = None;
+        let mut drop_on: Option<usize> = None;
+        egui::ScrollArea::vertical().id_salt("sb_column").auto_shrink([false, false]).show(ui, |ui| {
+            ui.add_space(4.0);
+            for i in 0..n {
+                let on = i == self.sb_sel;
+                let frame = egui::Frame::default().fill(BG3).corner_radius(6.0).inner_margin(egui::Margin::same(6)).stroke(stk(2.0, if on { ACCENT } else { BG3 }));
+                let card = frame.show(ui, |ui| {
+                    ui.set_width(cw);
+                    ui.spacing_mut().item_spacing.y = 4.0;
+                    self.panel_thumb(ui, i, cw, &mut select, &mut open);
+                    let (title, dur) = {
+                        let p = &self.project.storyboard[i];
+                        (p.title.clone(), p.dur)
+                    };
+                    ui.label(RichText::new(format!("{title} · {dur:.1} s")).size(11.5).color(TX));
+                });
+                if self.sb_drag.is_some() {
+                    if card.response.contains_pointer() {
+                        ui.painter().rect_stroke(card.response.rect, 6.0, stk(2.0, Color32::WHITE), EStrokeKind::Outside);
+                        if ui.input(|i| i.pointer.any_released()) {
+                            drop_on = Some(i);
+                        }
+                    }
+                }
+                ui.add_space(6.0);
+            }
+        });
+        if let (Some(from), Some(to)) = (self.sb_drag, drop_on) {
+            if from != to {
+                self.checkpoint();
+                let p = self.project.storyboard.remove(from);
+                self.project.storyboard.insert(to, p);
+                self.sb_sel = to;
+            }
+        }
+        if ui.input(|i| i.pointer.any_released()) {
+            self.sb_drag = None;
+        }
+        if let Some(i) = select {
+            self.sb_sel = i;
+        }
+        if let Some(i) = open {
+            self.open_panel(i);
+        }
+    }
     /// Panel derecho de la sala Storyboard: datos del plano elegido y exportación a PDF.
     pub(super) fn story_side(&mut self, ui: &mut egui::Ui) {
         if self.project.storyboard.is_empty() {
@@ -429,7 +745,27 @@ impl LeonApp {
             ui.add(egui::TextEdit::multiline(field_mut(p, k)).desired_rows(2).desired_width(f32::INFINITY));
         }
         ui.separator();
+        ui.label(RichText::new("Cámara").color(MU));
+        let mut on = p.cam.is_some();
+        if ui.checkbox(&mut on, "Mover la cámara en este plano").on_hover_text("Zoom y desplazamiento de la imagen del principio al final del plano; se ve en el animatic y al exportarlo").changed() {
+            p.cam = if on { Some(crate::model::CamMove::default()) } else { None };
+        }
+        if let Some(c) = &mut p.cam {
+            let row = |ui: &mut egui::Ui, name: &str, s: &mut f32, x: &mut f32, y: &mut f32| {
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new(name).color(MU));
+                    ui.add(egui::DragValue::new(s).range(0.2..=5.0).speed(0.01).max_decimals(2).prefix("zoom "));
+                    ui.add(egui::DragValue::new(x).speed(1.0).max_decimals(0).prefix("x "));
+                    ui.add(egui::DragValue::new(y).speed(1.0).max_decimals(0).prefix("y "));
+                });
+            };
+            row(ui, "Inicio", &mut c.s0, &mut c.x0, &mut c.y0);
+            row(ui, "Final", &mut c.s1, &mut c.x1, &mut c.y1);
+            ui.checkbox(&mut c.ease, "Arranque y frenado suaves");
+        }
+        ui.separator();
         ui.add_enabled(false, egui::Button::new("Exportar storyboard a PDF (pendiente)"));
+
         if self.panel_canvas() {
             ui.add_space(6.0);
             panel_header(ui, "Paleta");

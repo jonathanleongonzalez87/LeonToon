@@ -478,6 +478,18 @@ pub(super) fn draw_editor_icon(e: Editor, p: &egui::Painter, r: Rect, c: Color32
                 boxr(s(x, 0.3), s(x + 0.26, 0.7));
             }
         }
+        Editor::PanelTimeline => {
+            for (x0, x1) in [(0.06f32, 0.34f32), (0.37, 0.7), (0.73, 0.94)] {
+                boxr(s(x0, 0.28), s(x1, 0.62));
+            }
+            p.line_segment([s(0.06, 0.78), s(0.94, 0.78)], st);
+            p.line_segment([s(0.52, 0.12), s(0.52, 0.9)], stk(1.8, Color32::from_rgb(0xfd, 0x67, 0x24)));
+        }
+        Editor::PanelColumn => {
+            for y in [0.06f32, 0.38, 0.7] {
+                boxr(s(0.2, y), s(0.8, y + 0.24));
+            }
+        }
         Editor::SmXSheet => {
             boxr(s(0.14, 0.1), s(0.86, 0.9));
             p.line_segment([s(0.14, 0.37), s(0.86, 0.37)], st);
