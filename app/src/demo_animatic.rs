@@ -475,14 +475,14 @@ struct Piece {
 /// Cada «boing» está recortado al justo momento: el archivo trae varios botes seguidos, y de cada uno se toma solo su trozo (con una
 /// brizna de silencio antes) y se coloca en el cuadro en que la pelota toca el suelo o habla. A suena a la izquierda y B a la derecha.
 const PIECES: [Piece; 8] = [
-    Piece { name: "Boing A 1", file: "boing_a.mp3", at: 3.5, offset: 0.22, len: 0.35, pan: -0.45, gain_db: 9.0, echo: 0.0 },
-    Piece { name: "Boing A 2", file: "boing_a.mp3", at: 6.7, offset: 1.33, len: 0.38, pan: -0.45, gain_db: 9.0, echo: 0.0 },
-    Piece { name: "Boing A 3", file: "boing_a.mp3", at: 8.7, offset: 2.58, len: 0.34, pan: -0.45, gain_db: 9.0, echo: 0.0 },
-    Piece { name: "Boing A 4", file: "boing_a.mp3", at: 9.5, offset: 3.69, len: 0.30, pan: -0.45, gain_db: 9.0, echo: 0.0 },
-    Piece { name: "Boing B 1", file: "boing_b.mp3", at: 5.0, offset: 0.06, len: 0.78, pan: 0.45, gain_db: 3.0, echo: 0.2 },
-    Piece { name: "Boing B 2", file: "boing_b.mp3", at: 7.6, offset: 1.10, len: 0.85, pan: 0.45, gain_db: 3.0, echo: 0.2 },
-    Piece { name: "Boing B 3", file: "boing_b.mp3", at: 8.86, offset: 0.06, len: 0.78, pan: 0.45, gain_db: 3.0, echo: 0.2 },
-    Piece { name: "Boing B 4", file: "boing_b.mp3", at: 9.66, offset: 1.10, len: 0.84, pan: 0.45, gain_db: 3.0, echo: 0.2 },
+    Piece { name: "Boing A 1", file: "boing_a.mp3", at: 3.5, offset: 0.22, len: 0.35, pan: -0.45, gain_db: 7.0, echo: 0.0 },
+    Piece { name: "Boing A 2", file: "boing_a.mp3", at: 6.7, offset: 1.33, len: 0.38, pan: -0.45, gain_db: 7.0, echo: 0.0 },
+    Piece { name: "Boing A 3", file: "boing_a.mp3", at: 8.7, offset: 2.58, len: 0.34, pan: -0.45, gain_db: 7.0, echo: 0.0 },
+    Piece { name: "Boing A 4", file: "boing_a.mp3", at: 9.5, offset: 3.69, len: 0.30, pan: -0.45, gain_db: 7.0, echo: 0.0 },
+    Piece { name: "Boing B 1", file: "boing_b.mp3", at: 5.0, offset: 0.06, len: 0.78, pan: 0.45, gain_db: 0.0, echo: 0.2 },
+    Piece { name: "Boing B 2", file: "boing_b.mp3", at: 7.6, offset: 1.10, len: 0.85, pan: 0.45, gain_db: 0.0, echo: 0.2 },
+    Piece { name: "Boing B 3", file: "boing_b.mp3", at: 8.86, offset: 0.06, len: 0.78, pan: 0.45, gain_db: 0.0, echo: 0.2 },
+    Piece { name: "Boing B 4", file: "boing_b.mp3", at: 9.66, offset: 1.10, len: 0.84, pan: 0.45, gain_db: 0.0, echo: 0.2 },
 ];
 
 /// Escribe en `dir` los sonidos del ejemplo (si no están ya) y devuelve las rutas.
@@ -651,6 +651,8 @@ mod tests {
         assert!(side(3.52, 3.8, 0) > side(0.6, 1.2, 0) * 1.5, "el boing se oye por encima del ambiente");
         assert!(side(3.52, 3.8, 0) > side(3.52, 3.8, 1), "A suena más a la izquierda");
         assert!(side(5.02, 5.6, 1) > side(5.02, 5.6, 0), "B suena más a la derecha");
+        let top = m.iter().fold(0.0f32, |x, v| x.max(v.abs()));
+        assert!(top <= 1.0, "la mezcla de ejemplo no debe sobremodular: pico {top}");
         // Al cambiar los planos, el audio se conserva en la composición rehecha.
         let mut q = p.clone();
         q.storyboard[0].dur = 3.0;
