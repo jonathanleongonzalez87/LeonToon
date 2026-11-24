@@ -651,8 +651,6 @@ impl Meter {
     pub const SILENCE: f32 = 0.003_162_3;
     /// A partir de aquí (−3 dBFS) el piloto pasa a amarillo.
     pub const WARN: f32 = 0.707_9;
-    /// El 0 VU de la escala está en −12 dBFS eficaces: así la música normal mueve la aguja por la zona media.
-    pub const VU_REF_DB: f32 = -12.0;
 
     /// Lee las muestras estéreo `from..to` (en cuadros) de la mezcla, que acaban de sonar.
     pub fn feed(&mut self, mix: &[f32], from: usize, to: usize, rate: u32) {
@@ -710,12 +708,12 @@ impl Meter {
         }
     }
 
-    /// La lectura de la aguja en unidades VU (0 VU = −12 dBFS eficaces), de −20 a +3.
-    pub fn needle_vu(&self, ch: usize) -> f32 {
+    /// La lectura de la aguja en dBFS eficaces, de −18 (reposo) a 0.
+    pub fn needle_db(&self, ch: usize) -> f32 {
         if self.vu[ch] <= 1e-6 {
-            return -20.0;
+            return -18.0;
         }
-        (20.0 * self.vu[ch].log10() - Self::VU_REF_DB).clamp(-20.0, 3.0)
+        (20.0 * self.vu[ch].log10()).clamp(-18.0, 0.0)
     }
 
     pub fn is_moving(&self) -> bool {
@@ -1085,15 +1083,15 @@ mod tests {
         // Silencio: piloto apagado y aguja en reposo.
         m.feed(&tone(0.0, 100), 0, 100, rate);
         assert_eq!(m.lamp(0), Lamp::Off);
-        assert_eq!(m.needle_vu(0), -20.0);
+        assert_eq!(m.needle_db(0), -18.0);
         // Sonido normal: verde, y la aguja sube con el promedio (no de golpe).
         let quiet = tone(0.25, 1000);
         m.feed(&quiet, 0, 100, rate);
         assert_eq!(m.lamp(0), Lamp::Green);
-        let early = m.needle_vu(0);
+        let early = m.needle_db(0);
         m.feed(&quiet, 100, 1000, rate);
-        assert!(m.needle_vu(0) > early, "la aguja sigue subiendo con el tiempo");
-        assert!((m.needle_vu(0) - (20.0 * 0.25f32.log10() + 12.0)).abs() < 1.0, "se acerca a −12+12 dB");
+        assert!(m.needle_db(0) > early, "la aguja sigue subiendo con el tiempo");
+        assert!((m.needle_db(0) - 20.0 * 0.25f32.log10()).abs() < 1.0, "se acerca al nivel eficaz de la señal (−12 dBFS)");
         // Cerca del tope (entre −3 y 0 dBFS): amarillo.
         m.feed(&tone(0.85, 100), 0, 100, rate);
         assert_eq!(m.lamp(0), Lamp::Yellow);

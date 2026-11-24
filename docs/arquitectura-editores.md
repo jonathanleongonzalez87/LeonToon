@@ -164,8 +164,17 @@ Respuestas de la persona a las seis preguntas de la primera versión de este doc
 
 ## Monitor «VU de audio»
 
-Editor del grupo Monitores (`Editor::AudioVu`, id `audio_vu`, `app/vumeter.rs`). Mide la **mezcla final** que suena, no las capas sueltas, y solo se mueve al reproducir (en pausa la aguja vuelve a reposo). Dos medidores de aguja (L y R) sobre papel crema con luz cálida, como la mesa de luz; en un hueco estrecho se apilan.
+Editor del grupo Monitores (`Editor::AudioVu`, id `audio_vu`, `app/vumeter.rs`). Mide la **mezcla final** que suena, no las capas sueltas, y solo se mueve al reproducir (en pausa la aguja vuelve a reposo). Es un panel pequeño y centrado con dos medidores de aguja lado a lado, L a la izquierda y R a la derecha, de estilo minimalista: cara oscura con el resplandor cálido de una bombilla detrás de la aguja (el mismo degradado radial de la mesa de luz, `canvas::glow`), que se intensifica con el nivel.
 
-- **Aguja**: nivel eficaz con balística de VU (constante de 300 ms). 0 VU = −12 dBFS eficaces; la escala va de −20 a +3, con la zona roja de 0 a +3.
-- **Piloto de recorte** por canal: apagado con silencio (< −50 dBFS), verde con sonido, amarillo de −3 a 0 dBFS de pico, rojo al pasar de 0 dBFS. El rojo se retiene 2 s; un clic en el monitor lo borra.
+- **Escala** en dBFS con los números −12, −9, −6 y −3; de −3 a 0 en ámbar y una marca roja en 0.
+- **Aguja**: nivel eficaz con balística de VU (constante de 300 ms), de −18 (reposo) a 0 dBFS.
+- **Piloto de recorte** por canal: apagado con silencio (< −50 dBFS), verde con sonido, amarillo de −3 a 0 dBFS de pico, rojo al pasar de 0 dBFS. El rojo se retiene 2 s; un clic en el monitor lo borra. El tooltip da el pico de cada canal.
 - `audio::Meter` lee de la mezcla ya calculada la ventana que acaba de sonar (`Player::frames`), por lo que mide lo mismo que se oye y se exporta. Capturas: `LEONTOON_HUECO=animatic/props=audio_vu` pone el editor en un hueco y `LEONTOON_VU=izq,der,pico_izq,pico_der` fija el medidor.
+
+## Cuchilla en la línea de tiempo de montaje
+
+Cuando una capa es muy larga y su borde queda lejos, se corta en vez de arrastrar el extremo:
+
+- **Herramienta ✂ Cuchilla** (cabecera del montaje): un clic en una barra la corta en ese cuadro; una línea muestra dónde cortaría. Esc sale.
+- **Ctrl + Mayús + D** (como en After Effects, con el puntero sobre el montaje): corta las capas elegidas (o la actual) en el cabezal.
+- `Project::split_layer`: la capa conserva lo anterior (hasta el cuadro anterior al corte) y una copia, encima, lo siguiente. En un audio, la segunda parte sigue desde el mismo punto del archivo (`offset`). Las claves son absolutas, así que ambas partes se ven y suenan igual que antes. Es un solo paso de deshacer.

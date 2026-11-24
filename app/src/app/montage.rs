@@ -51,13 +51,15 @@ pub(super) struct MtState {
     /// Alto de las filas de capa (zoom vertical).
     row_h: f32,
     last_frame: Option<u32>,
+    /// Herramienta Cuchilla activa: un clic en una barra la corta en ese cuadro.
+    blade: bool,
 }
 
 impl Default for MtState {
     fn default() -> Self {
         // Para capturas de pantalla: LEONTOON_MONTAJE=1 abre las propiedades de la primera capa.
         let open = if std::env::var("LEONTOON_MONTAJE").is_ok() { vec![true] } else { Vec::new() };
-        MtState { open, reveal: None, cols: 0, cell: 16.0, row_h: ROW_H_DEFAULT, last_frame: None }
+        MtState { open, reveal: None, cols: 0, cell: 16.0, row_h: ROW_H_DEFAULT, last_frame: None, blade: false }
     }
 }
 
@@ -91,6 +93,8 @@ enum Act {
     BarIn(usize, u32),
     BarOut(usize, u32),
     BarShift(usize, i32),
+    /// Cuchilla: corta la capa en ese cuadro.
+    Split(usize, u32),
     Checkpoint,
     /// Clic en el nombre de una capa, con Ctrl y Mayús para la selección múltiple.
     Click(usize, bool, bool),
@@ -250,6 +254,15 @@ impl LeonApp {
             return false;
         }
         use egui::{Key, Modifiers};
+        // Ctrl + Mayús + D (como en After Effects): corta las capas elegidas en el cabezal.
+        if ctx.input_mut(|i| i.consume_key(Modifiers::COMMAND | Modifiers::SHIFT, Key::D)) {
+            self.mt_split(self.frame, None);
+            return true;
+        }
+        if self.mt.blade && ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Escape)) {
+            self.mt.blade = false;
+            return true;
+        }
         let table = [(Key::A, Prop::Anchor), (Key::P, Prop::Position), (Key::S, Prop::Scale), (Key::R, Prop::Rotation), (Key::T, Prop::Opacity)];
         for (key, p) in table {
             if ctx.input_mut(|i| i.consume_key(Modifiers::SHIFT, key)) {
@@ -272,6 +285,42 @@ impl LeonApp {
         false
     }
 
+    /// Corta capas en el cuadro `at`: solo la capa `only` (cuchilla) o, sin ella, las capas elegidas (Ctrl+Mayús+D en el cabezal).
+    /// La segunda parte queda encima de la primera y es la que queda elegida.
+    pub(super) fn mt_split(&mut self, at: u32, only: Option<usize>) {
+        let len = self.project.length;
+        let mut targets: Vec<usize> = match only {
+            Some(li) => vec![li],
+            None => {
+                let mut v = self.selected_layers();
+                if v.is_empty() {
+                    v.push(self.cl);
+                }
+                v
+            }
+        };
+        targets.sort_unstable();
+        targets.dedup();
+        targets.retain(|&li| self.project.layers.get(li).map_or(false, |l| l.kind != LayerKind::Collection && at > l.in_f && at <= l.out_frame(len)));
+        if targets.is_empty() {
+            self.say("Para cortar, el cuadro tiene que estar dentro de la barra de la capa");
+            return;
+        }
+        self.checkpoint();
+        self.lsel.clear();
+        let mut cl = self.cl;
+        for &li in targets.iter().rev() {
+            if self.project.split_layer(li, at).is_some() {
+                self.mt.open.insert(li.min(self.mt.open.len()), false);
+                if li < cl {
+                    cl += 1;
+                }
+            }
+        }
+        self.cl = cl;
+        self.say(format!("Capa cortada en el cuadro {}", at + 1));
+    }
+
     /// El editor «Línea de tiempo de montaje».
     pub(super) fn montage_area(&mut self, ui: &mut egui::Ui) {
         let hr = self.slot_head(ui);
@@ -279,6 +328,9 @@ impl LeonApp {
         h.spacing_mut().item_spacing.x = 4.0;
         if pill(&mut h, "Tímidas", self.hide_shy).on_hover_text("Oculta de las listas las capas marcadas como tímidas").clicked() {
             self.hide_shy = !self.hide_shy;
+        }
+        if pill(&mut h, "✂ Cuchilla", self.mt.blade).on_hover_text("Cuchilla: clic en una barra para cortarla en ese cuadro (Esc para salir). Ctrl + Mayús + D corta las capas elegidas en el cabezal").clicked() {
+            self.mt.blade = !self.mt.blade;
         }
         let cols = ["Interruptores y modos", "Interruptores", "Modos"][self.mt.cols as usize % 3];
         if pill(&mut h, cols, false).on_hover_text("Alterna las columnas (F4 con el puntero encima)").clicked() {
@@ -473,6 +525,20 @@ impl LeonApp {
                     }
                     if r_body.drag_stopped() {
                         ui.data_mut(|dd| dd.insert_temp(ui.id().with(("mt_acc", li)), 0.0f32));
+                    }
+                    // Cuchilla: se interpone sobre la barra; una línea marca dónde cortaría y el clic corta.
+                    if self.mt.blade {
+                        let r_cut = ui.interact(bar, id.with("blade"), Sense::click());
+                        if let Some(p) = r_cut.hover_pos() {
+                            ui.ctx().set_cursor_icon(egui::CursorIcon::Crosshair);
+                            let cut = ((p.x - o.x - left_w) / cell).floor().max(0.0) as u32;
+                            let inside = cut > inf.in_f && cut <= inf.out_f;
+                            let x = tx(cut);
+                            painter.line_segment([Pos2::new(x, y + 1.0), Pos2::new(x, y + rh - 1.0)], stk(if inside { 2.0 } else { 1.0 }, if inside { Color32::from_rgb(0xff, 0xf0, 0xd0) } else { Color32::from_white_alpha(60) }));
+                            if r_cut.clicked() {
+                                acts.push(Act::Split(li, cut));
+                            }
+                        }
                     }
                 }
                 Row::Prop(li, p) => {
@@ -1005,6 +1071,7 @@ impl LeonApp {
                 let o = f.clamp(l.in_f, last);
                 l.out_f = if o >= last { None } else { Some(o) };
             }
+            Act::Split(li, f) => self.mt_split(f, Some(li)),
             Act::BarShift(li, d) => {
                 self.project.layers[li].shift_time(d);
             }

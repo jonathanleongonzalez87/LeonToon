@@ -1840,6 +1840,28 @@ impl Project {
     }
 
     /// Duplica el plano `i` con una copia propia de su composición. Devuelve el índice de la copia.
+    /// Corta la capa `li` en el cuadro `at`: la capa se queda con lo anterior (hasta `at - 1`) y una copia, encima, con lo que
+    /// sigue (desde `at`). En un audio, la segunda parte sigue sonando desde el mismo punto del archivo. Devuelve el sitio de la
+    /// segunda parte, o `None` si el cuadro no está dentro de la barra (o es una colección).
+    pub fn split_layer(&mut self, li: usize, at: u32) -> Option<usize> {
+        let len = self.length;
+        let fps = self.fps.max(1) as f32;
+        let l = self.layers.get(li)?;
+        let (in_f, out) = (l.in_f, l.out_frame(len));
+        if l.kind == LayerKind::Collection || at <= in_f || at > out {
+            return None;
+        }
+        let mut second = l.clone();
+        second.uid = 0;
+        second.in_f = at;
+        if let Some(a) = second.audio.as_mut() {
+            a.offset += (at - in_f) as f32 / fps;
+        }
+        self.layers[li].out_f = Some(at - 1);
+        self.layers.insert(li, second);
+        Some(li)
+    }
+
     pub fn duplicate_panel(&mut self, i: usize) -> Option<usize> {
         let id = self.ensure_panel_comp(i)?;
         if self.stack.iter().any(|l| l.comp_id == id) {
@@ -2949,5 +2971,36 @@ mod animatic_sync_tests {
         // Dentro de un plano no es «el animatic».
         assert!(p.open_panel(0, 0, 0));
         assert!(!p.has_animatic());
+    }
+    #[test]
+    fn cortar_una_capa_la_divide_en_dos_sin_cambiar_lo_que_se_ve() {
+        let mut p = Project::blank(320, 180, 24, 100);
+        p.layers[0].in_f = 10;
+        // Fuera de la barra o en su primer cuadro no se corta.
+        assert!(p.split_layer(0, 10).is_none() && p.split_layer(0, 5).is_none() && p.split_layer(0, 100).is_none());
+        let n = p.layers.len();
+        assert_eq!(p.split_layer(0, 40), Some(0));
+        assert_eq!(p.layers.len(), n + 1);
+        // La segunda parte (encima) empieza en el corte y llega al final; la primera acaba justo antes.
+        assert_eq!((p.layers[0].in_f, p.layers[0].out_f), (40, None));
+        assert_eq!((p.layers[1].in_f, p.layers[1].out_f), (10, Some(39)));
+        // Cada cuadro lo ve una sola de las dos.
+        for f in [10, 39, 40, 99] {
+            assert_eq!([&p.layers[0], &p.layers[1]].iter().filter(|l| l.active_at(f)).count(), 1, "cuadro {f}");
+        }
+    }
+
+    #[test]
+    fn cortar_un_audio_hace_que_la_segunda_parte_siga_desde_el_mismo_punto_del_archivo() {
+        let mut p = Project::blank(320, 180, 25, 100);
+        let mut l = Layer::new("Música");
+        l.kind = LayerKind::Audio;
+        l.audio = Some(AudioRef { offset: 1.0, ..Default::default() });
+        l.in_f = 5;
+        p.layers.insert(0, l);
+        assert_eq!(p.split_layer(0, 55), Some(0));
+        // 50 cuadros a 25 fps = 2 s más adentro del archivo.
+        assert!((p.layers[0].audio.as_ref().unwrap().offset - 3.0).abs() < 1e-4);
+        assert!((p.layers[1].audio.as_ref().unwrap().offset - 1.0).abs() < 1e-4);
     }
 }
