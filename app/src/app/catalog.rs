@@ -328,7 +328,7 @@ pub(crate) fn room_set(id: &str) -> &'static RoomSet {
 /// Grupo de un editor en el menú de tipo de editor (docs/arquitectura-editores.md).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum EditorGroup {
-    Visores,
+    Monitores,
     Tiempo,
     Datos,
     Produccion,
@@ -336,10 +336,10 @@ pub(crate) enum EditorGroup {
 }
 
 impl EditorGroup {
-    pub(crate) const ALL: [EditorGroup; 5] = [EditorGroup::Visores, EditorGroup::Tiempo, EditorGroup::Datos, EditorGroup::Produccion, EditorGroup::Sistema];
+    pub(crate) const ALL: [EditorGroup; 5] = [EditorGroup::Monitores, EditorGroup::Tiempo, EditorGroup::Datos, EditorGroup::Produccion, EditorGroup::Sistema];
     pub(crate) fn name(self) -> &'static str {
         match self {
-            EditorGroup::Visores => "Visores",
+            EditorGroup::Monitores => "Monitores",
             EditorGroup::Tiempo => "Tiempo",
             EditorGroup::Datos => "Datos",
             EditorGroup::Produccion => "Producción",
@@ -381,10 +381,13 @@ pub(crate) enum Editor {
     PanelTimeline,
     /// Las miniaturas de los planos en una columna vertical (se puede dibujar sobre ellas).
     PanelColumn,
+    /// El VU de audio: dos agujas (izquierdo y derecho) con piloto de recorte, sobre la mezcla que suena.
+    AudioVu,
 }
 
 impl Editor {
-    pub(crate) const ALL: [Editor; 18] = [
+    pub(crate) const ALL: [Editor; 19] = [
+        Editor::AudioVu,
         Editor::Viewer,
         Editor::SmStage,
         Editor::Preview,
@@ -424,6 +427,7 @@ impl Editor {
             Editor::SmStrip => "Tira de fotos",
             Editor::PanelTimeline => "Línea de tiempo del storyboard",
             Editor::PanelColumn => "Miniaturas",
+            Editor::AudioVu => "VU de audio",
         }
     }
     /// Identificador estable para guardarlo en el archivo de ajustes (no cambia aunque cambie el nombre).
@@ -447,6 +451,7 @@ impl Editor {
             Editor::SmStrip => "sm_strip",
             Editor::PanelTimeline => "sb_timeline",
             Editor::PanelColumn => "sb_column",
+            Editor::AudioVu => "audio_vu",
         }
     }
     pub(crate) fn from_id(id: &str) -> Option<Editor> {
@@ -454,7 +459,7 @@ impl Editor {
     }
     pub(crate) fn group(self) -> EditorGroup {
         match self {
-            Editor::Viewer | Editor::SmStage | Editor::Preview => EditorGroup::Visores,
+            Editor::Viewer | Editor::SmStage | Editor::Preview | Editor::AudioVu => EditorGroup::Monitores,
             Editor::Timeline | Editor::Montage | Editor::SmStrip | Editor::SmXSheet | Editor::Curves | Editor::PanelTimeline => EditorGroup::Tiempo,
             Editor::Layers | Editor::RoomProps | Editor::Schematic | Editor::Explorer | Editor::Palettes | Editor::Substitution => EditorGroup::Datos,
             Editor::Storyboard | Editor::PanelColumn | Editor::Camera => EditorGroup::Produccion,
@@ -466,7 +471,7 @@ impl Editor {
     }
     /// Editores que reparten su espacio y su desplazamiento ellos mismos: no van dentro del marco con margen del hueco.
     pub(crate) fn scrolls_itself(self) -> bool {
-        matches!(self, Editor::SmXSheet | Editor::Camera | Editor::Viewer | Editor::Storyboard | Editor::SmStage | Editor::PanelTimeline | Editor::PanelColumn)
+        matches!(self, Editor::SmXSheet | Editor::Camera | Editor::Viewer | Editor::Storyboard | Editor::SmStage | Editor::PanelTimeline | Editor::PanelColumn | Editor::AudioVu)
     }
 }
 
@@ -579,7 +584,7 @@ mod editor_tests {
         }
         // Un editor que se añada a la enumeración pero no a ALL no saldría en el menú: esta comprobación lo detecta.
         let sample = |e: Editor| match e {
-            Editor::RoomProps | Editor::Palettes | Editor::Curves | Editor::Explorer | Editor::Schematic | Editor::Substitution | Editor::Preview | Editor::Layers | Editor::SmXSheet | Editor::Camera | Editor::Viewer | Editor::Timeline | Editor::Montage | Editor::Storyboard | Editor::SmStage | Editor::SmStrip | Editor::PanelTimeline | Editor::PanelColumn => true,
+            Editor::RoomProps | Editor::Palettes | Editor::Curves | Editor::Explorer | Editor::Schematic | Editor::Substitution | Editor::Preview | Editor::Layers | Editor::SmXSheet | Editor::Camera | Editor::Viewer | Editor::Timeline | Editor::Montage | Editor::Storyboard | Editor::SmStage | Editor::SmStrip | Editor::PanelTimeline | Editor::PanelColumn | Editor::AudioVu => true,
         };
         assert!(Editor::ALL.iter().all(|e| sample(*e)));
     }

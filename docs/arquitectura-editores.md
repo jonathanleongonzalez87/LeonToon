@@ -74,7 +74,7 @@ Con la clasificación de Blender no alcanza, porque Blender no tiene producción
 
 | Grupo | Editores | Notas |
 |---|---|---|
-| **Visores** | Visor 2D (mesa de luz), Visor de composición (planos BG/MG/FG), Visor Stop Motion (Live View), Vista previa | Comparten zoom, guías y marco de cámara; cada uno pinta su tipo de capa |
+| **Monitores** (antes «Visores») | Visor 2D (mesa de luz), Visor de composición (planos BG/MG/FG), Visor Stop Motion (Live View), Vista previa, **VU de audio** | Comparten zoom, guías y marco de cámara; cada uno pinta su tipo de capa |
 | **Tiempo** | Línea de tiempo, Editor de curvas | La línea de tiempo tiene modos (ver 3.4) |
 | **Datos** | Capas (con modo Esquema), Propiedades, Explorador (modos: Proyecto, Fotos, Paletas, Biblioteca) | Reúne los duplicados de la tabla anterior |
 | **Producción** | Storyboard, Animatic, Cámara y captura, Exportar | Lo que en Blender no existe |
@@ -144,7 +144,7 @@ Orden recomendado: **A → D → C → B → E → F**. A y D se ven poco pero p
 
 Respuestas de la persona a las seis preguntas de la primera versión de este documento:
 
-1. **Grupos**: Visores, Tiempo, Datos, Producción y Sistema, aceptados provisionalmente.
+1. **Grupos**: Monitores (antes Visores), Tiempo, Datos, Producción y Sistema, aceptados provisionalmente.
 2. **Flexibilidad**: cambiar el editor de cada área **y** dividir y unir áreas con el ratón (la fase G entra en el plan).
 3. **Entrar en la capa**: ambos gestos, Tab y doble clic.
 4. **Modo objeto / edición**: **por capa**, como en Blender (cada capa recuerda su modo).
@@ -161,3 +161,11 @@ Respuestas de la persona a las seis preguntas de la primera versión de este doc
 | B, E, F, G | Pendientes |
 
 **Ajuste (Issue #151)**: la elección de editores de los huecos ya no es global (editores.json), sino **de cada proyecto**: se guarda en el .ltoon (campo slots, «sala/hueco» → editor), así que un proyecto nuevo siempre arranca con los presets de fábrica y cada archivo conserva su disposición. «Restablecer los editores de la sala» (menú Ventana y menú del selector de cada hueco) borra las elecciones de la sala actual. El archivo editores.json de versiones anteriores se ignora. Además, al entrar en la sala Animatic con planos y sin animatic se crea la composición y se entra en ella, y el botón «Crear animatic» abre la sala Animatic dentro de la composición.
+
+## Monitor «VU de audio»
+
+Editor del grupo Monitores (`Editor::AudioVu`, id `audio_vu`, `app/vumeter.rs`). Mide la **mezcla final** que suena, no las capas sueltas, y solo se mueve al reproducir (en pausa la aguja vuelve a reposo). Dos medidores de aguja (L y R) sobre papel crema con luz cálida, como la mesa de luz; en un hueco estrecho se apilan.
+
+- **Aguja**: nivel eficaz con balística de VU (constante de 300 ms). 0 VU = −12 dBFS eficaces; la escala va de −20 a +3, con la zona roja de 0 a +3.
+- **Piloto de recorte** por canal: apagado con silencio (< −50 dBFS), verde con sonido, amarillo de −3 a 0 dBFS de pico, rojo al pasar de 0 dBFS. El rojo se retiene 2 s; un clic en el monitor lo borra.
+- `audio::Meter` lee de la mezcla ya calculada la ventana que acaba de sonar (`Player::frames`), por lo que mide lo mismo que se oye y se exporta. Capturas: `LEONTOON_HUECO=animatic/props=audio_vu` pone el editor en un hueco y `LEONTOON_VU=izq,der,pico_izq,pico_der` fija el medidor.

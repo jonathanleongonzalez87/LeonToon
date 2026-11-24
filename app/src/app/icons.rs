@@ -417,7 +417,7 @@ pub(super) fn draw_tool_icon(t: Tool, p: &egui::Painter, r: Rect, c: Color32) {
 /// producción y salmón el sistema.
 pub(super) fn group_tint(g: EditorGroup) -> Color32 {
     match g {
-        EditorGroup::Visores => Color32::from_rgb(0x8f, 0xb3, 0xcf),
+        EditorGroup::Monitores => Color32::from_rgb(0x8f, 0xb3, 0xcf),
         EditorGroup::Tiempo => Color32::from_rgb(0xf2, 0xd2, 0x7a),
         EditorGroup::Datos => Color32::from_rgb(0xa8, 0xcf, 0x8f),
         EditorGroup::Produccion => Color32::from_rgb(0xb7, 0xa2, 0xe6),
@@ -484,6 +484,12 @@ pub(super) fn draw_editor_icon(e: Editor, p: &egui::Painter, r: Rect, c: Color32
             }
             p.line_segment([s(0.06, 0.78), s(0.94, 0.78)], st);
             p.line_segment([s(0.52, 0.12), s(0.52, 0.9)], stk(1.8, Color32::from_rgb(0xfd, 0x67, 0x24)));
+        }
+        Editor::AudioVu => {
+            let pts: Vec<Pos2> = (0..=14).map(|i| { let a = (-55.0 + i as f32 * 110.0 / 14.0).to_radians(); s(0.5 + a.sin() * 0.42, 0.88 - a.cos() * 0.62) }).collect();
+            p.add(Shape::line(pts, st));
+            p.line_segment([s(0.5, 0.9), s(0.68, 0.3)], stk(1.8, Color32::from_rgb(0xe0, 0x40, 0x30)));
+            p.circle_filled(s(0.5, 0.9), r.width() * 0.07, c);
         }
         Editor::PanelColumn => {
             for y in [0.06f32, 0.38, 0.7] {

@@ -612,6 +612,115 @@ impl Player {
     pub fn playing(&self) -> bool {
         self.shared.lock().map_or(false, |s| s.playing)
     }
+
+    /// Por dónde va el sonido, en cuadros de muestras estéreo.
+    pub fn frames(&self) -> usize {
+        self.shared.lock().map_or(0, |s| s.pos)
+    }
+}
+
+// ---------- Medidor (VU) ----------
+
+/// Los pilotos de cada canal: apagado con silencio, verde con sonido, amarillo cerca del tope (−3 a 0 dBFS) y rojo al pasarse.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Lamp {
+    Off,
+    Green,
+    Yellow,
+    Red,
+}
+
+/// El medidor de la mezcla final, por canal (0 = izquierdo, 1 = derecho). La aguja sigue el promedio suave (balística de VU,
+/// unos 300 ms), el piloto sigue el pico, y el rojo se retiene un par de segundos para no perder un recorte.
+#[derive(Clone, Copy, Default, Debug)]
+pub struct Meter {
+    /// Nivel eficaz suavizado (lineal, 1.0 = fondo de escala).
+    pub vu: [f32; 2],
+    /// Pico reciente (lineal) con caída lenta, para el piloto.
+    pub peak: [f32; 2],
+    /// Segundos que le quedan al rojo retenido.
+    pub clip: [f32; 2],
+}
+
+impl Meter {
+    /// Cuánto se retiene el rojo tras un recorte.
+    pub const CLIP_HOLD: f32 = 2.0;
+    /// Constante de tiempo de la aguja.
+    pub const VU_TIME: f32 = 0.3;
+    /// Por debajo de esto (−50 dBFS) se considera silencio.
+    pub const SILENCE: f32 = 0.003_162_3;
+    /// A partir de aquí (−3 dBFS) el piloto pasa a amarillo.
+    pub const WARN: f32 = 0.707_9;
+    /// El 0 VU de la escala está en −12 dBFS eficaces: así la música normal mueve la aguja por la zona media.
+    pub const VU_REF_DB: f32 = -12.0;
+
+    /// Lee las muestras estéreo `from..to` (en cuadros) de la mezcla, que acaban de sonar.
+    pub fn feed(&mut self, mix: &[f32], from: usize, to: usize, rate: u32) {
+        let to = to.min(mix.len() / 2);
+        let from = from.min(to);
+        let n = to - from;
+        if n == 0 {
+            return;
+        }
+        let dt = n as f32 / rate.max(1) as f32;
+        let a = 1.0 - (-dt / Self::VU_TIME).exp();
+        for ch in 0..2 {
+            let (mut sq, mut pk) = (0.0f32, 0.0f32);
+            for i in from..to {
+                let v = mix[i * 2 + ch];
+                sq += v * v;
+                pk = pk.max(v.abs());
+            }
+            let rms = (sq / n as f32).sqrt();
+            self.vu[ch] += a * (rms - self.vu[ch]);
+            self.peak[ch] = pk.max(self.peak[ch] * (-dt / 0.15).exp());
+            self.clip[ch] = if pk > 1.0 { Self::CLIP_HOLD } else { (self.clip[ch] - dt).max(0.0) };
+        }
+    }
+
+    /// Sin sonido: la aguja y el piloto vuelven al reposo (el rojo retenido sigue su cuenta).
+    pub fn idle(&mut self, dt: f32) {
+        for ch in 0..2 {
+            self.vu[ch] *= (-dt / 0.12).exp();
+            self.peak[ch] *= (-dt / 0.15).exp();
+            self.clip[ch] = (self.clip[ch] - dt).max(0.0);
+            if self.vu[ch] < 1e-5 {
+                self.vu[ch] = 0.0;
+            }
+            if self.peak[ch] < 1e-5 {
+                self.peak[ch] = 0.0;
+            }
+        }
+    }
+
+    /// Borra los rojos retenidos (clic en el medidor).
+    pub fn clear_clip(&mut self) {
+        self.clip = [0.0; 2];
+    }
+
+    pub fn lamp(&self, ch: usize) -> Lamp {
+        if self.clip[ch] > 0.0 {
+            Lamp::Red
+        } else if self.peak[ch] >= Self::WARN {
+            Lamp::Yellow
+        } else if self.peak[ch] >= Self::SILENCE {
+            Lamp::Green
+        } else {
+            Lamp::Off
+        }
+    }
+
+    /// La lectura de la aguja en unidades VU (0 VU = −12 dBFS eficaces), de −20 a +3.
+    pub fn needle_vu(&self, ch: usize) -> f32 {
+        if self.vu[ch] <= 1e-6 {
+            return -20.0;
+        }
+        (20.0 * self.vu[ch].log10() - Self::VU_REF_DB).clamp(-20.0, 3.0)
+    }
+
+    pub fn is_moving(&self) -> bool {
+        (0..2).any(|c| self.vu[c] > 0.0 || self.peak[c] > 0.0 || self.clip[c] > 0.0)
+    }
 }
 
 /// Todo el estado de audio de la aplicación.
@@ -629,6 +738,11 @@ pub struct State {
     pub warned: bool,
     /// Audios que no se pudieron leer (no se reintenta en cada fotograma).
     pub failed: std::collections::HashSet<PathBuf>,
+    /// El medidor de la mezcla y hasta dónde se ha leído (en cuadros de muestras).
+    pub meter: Meter,
+    pub meter_pos: usize,
+    /// Solo para capturas: deja el medidor fijo en el valor pedido (`LEONTOON_VU`).
+    pub meter_frozen: bool,
 }
 
 /// Una firma de los audios y su colocación: cambia si cambia cualquier cosa que afecte a la mezcla.
@@ -962,5 +1076,50 @@ mod tests {
         let frozen = pl.secs();
         std::thread::sleep(std::time::Duration::from_millis(100));
         assert_eq!(pl.secs(), frozen, "al parar, el reloj se detiene");
+    }
+    #[test]
+    fn el_medidor_apaga_en_silencio_enciende_verde_amarillo_y_rojo_con_retencion() {
+        let rate = 1000;
+        let tone = |amp: f32, n: usize| -> Vec<f32> { (0..n * 2).map(|i| if (i / 2) % 2 == 0 { amp } else { -amp }).collect() };
+        let mut m = Meter::default();
+        // Silencio: piloto apagado y aguja en reposo.
+        m.feed(&tone(0.0, 100), 0, 100, rate);
+        assert_eq!(m.lamp(0), Lamp::Off);
+        assert_eq!(m.needle_vu(0), -20.0);
+        // Sonido normal: verde, y la aguja sube con el promedio (no de golpe).
+        let quiet = tone(0.25, 1000);
+        m.feed(&quiet, 0, 100, rate);
+        assert_eq!(m.lamp(0), Lamp::Green);
+        let early = m.needle_vu(0);
+        m.feed(&quiet, 100, 1000, rate);
+        assert!(m.needle_vu(0) > early, "la aguja sigue subiendo con el tiempo");
+        assert!((m.needle_vu(0) - (20.0 * 0.25f32.log10() + 12.0)).abs() < 1.0, "se acerca a −12+12 dB");
+        // Cerca del tope (entre −3 y 0 dBFS): amarillo.
+        m.feed(&tone(0.85, 100), 0, 100, rate);
+        assert_eq!(m.lamp(0), Lamp::Yellow);
+        // Sobremodulación: rojo, que se retiene aunque vuelva el silencio y se apaga con el tiempo o con un clic.
+        m.feed(&tone(1.4, 100), 0, 100, rate);
+        assert_eq!(m.lamp(1), Lamp::Red);
+        m.feed(&tone(0.0, 1000), 0, 1000, rate);
+        assert_eq!(m.lamp(1), Lamp::Red, "el rojo se retiene");
+        m.clear_clip();
+        assert_ne!(m.lamp(1), Lamp::Red);
+        m.feed(&tone(1.4, 100), 0, 100, rate);
+        m.idle(Meter::CLIP_HOLD + 0.1);
+        assert_ne!(m.lamp(0), Lamp::Red, "tras la retención se apaga");
+        for _ in 0..40 {
+            m.idle(0.1);
+        }
+        assert_eq!(m.lamp(0), Lamp::Off);
+        assert!(!m.is_moving());
+    }
+
+    #[test]
+    fn cada_canal_se_mide_por_separado() {
+        let mut m = Meter::default();
+        let mix: Vec<f32> = (0..2000).map(|i| if i % 2 == 0 { 0.5 } else { 0.0 }).collect();
+        m.feed(&mix, 0, 1000, 1000);
+        assert_eq!(m.lamp(0), Lamp::Green);
+        assert_eq!(m.lamp(1), Lamp::Off);
     }
 }

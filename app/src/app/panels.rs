@@ -508,6 +508,7 @@ impl LeonApp {
             Editor::PanelColumn => self.sb_column_editor(ui),
             Editor::SmStage => self.sm_stage_editor(ui),
             Editor::SmStrip => self.sm_bottom(ui),
+            Editor::AudioVu => self.audio_vu_editor(ui),
         }
     }
     fn room_props(&mut self, ui: &mut egui::Ui, k: RightKind) {

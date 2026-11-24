@@ -14,6 +14,7 @@ mod select;
 mod shell;
 mod audioui;
 mod exportjob;
+mod vumeter;
 mod storyboard;
 mod abrui;
 mod brushui;
@@ -910,6 +911,22 @@ impl LeonApp {
             // Abrir un ejemplo vuelve al primer cuadro: se respeta LEONTOON_CUADRO si se pidió.
             if let Some(n) = std::env::var("LEONTOON_CUADRO").ok().and_then(|v| v.parse::<u32>().ok()) {
                 app.frame = n.min(app.project.length.saturating_sub(1));
+            }
+        }
+        // Capturas: LEONTOON_HUECO=sala/hueco=editor pone ese editor en el hueco del proyecto (p. ej. animatic/props=audio_vu) y
+        // LEONTOON_VU=izq,der,pico_izq,pico_der deja el medidor de audio fijo (lineal; un pico por encima de 1 enciende el rojo).
+        if let Ok(v) = std::env::var("LEONTOON_HUECO") {
+            if let Some((k, e)) = v.split_once('=') {
+                app.project.slots.insert(k.to_string(), e.to_string());
+            }
+        }
+        if let Ok(v) = std::env::var("LEONTOON_VU") {
+            let n: Vec<f32> = v.split(',').filter_map(|x| x.trim().parse().ok()).collect();
+            if n.len() == 4 {
+                app.audio.meter.vu = [n[0], n[1]];
+                app.audio.meter.peak = [n[2], n[3]];
+                app.audio.meter.clip = [if n[2] > 1.0 { 2.0 } else { 0.0 }, if n[3] > 1.0 { 2.0 } else { 0.0 }];
+                app.audio.meter_frozen = true;
             }
         }
         // Capturas: LEONTOON_PLANO=<n> abre ese plano del storyboard (en la sala Storyboard) para dibujarlo con el visor.

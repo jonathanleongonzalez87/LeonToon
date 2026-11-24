@@ -222,6 +222,26 @@ impl LeonApp {
         self.audio.last_frame = self.frame;
     }
 
+    /// Pone al día el medidor con lo que acaba de sonar de la mezcla (o lo deja caer si no suena nada).
+    pub(super) fn audio_meter_tick(&mut self, ctx: &egui::Context) {
+        let dt = ctx.input(|i| i.stable_dt).clamp(0.0, 0.25);
+        let live = self.audio.player.as_ref().filter(|p| p.playing()).map(|p| (p.frames(), p.rate));
+        match (live, &self.audio.mix) {
+            (Some((pos, rate)), Some((_, mix))) => {
+                // Si se salta (búsqueda, bucle) o hace mucho que no se lee, se mide solo la última ventana.
+                let max_win = (rate as f32 * 0.25) as usize;
+                let from = if pos < self.audio.meter_pos || pos - self.audio.meter_pos > max_win { pos.saturating_sub((rate as f32 * dt) as usize) } else { self.audio.meter_pos };
+                self.audio.meter.feed(mix, from, pos, rate);
+                self.audio.meter_pos = pos;
+            }
+            _ if self.audio.meter_frozen => {}
+            _ => self.audio.meter.idle(dt),
+        }
+        if self.audio.meter.is_moving() || live.is_some() {
+            ctx.request_repaint();
+        }
+    }
+
     pub(super) fn audio_stop(&mut self) {
         if let Some(p) = &self.audio.player {
             p.stop();
