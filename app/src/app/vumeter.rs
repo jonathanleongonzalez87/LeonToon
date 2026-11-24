@@ -144,22 +144,23 @@ impl LeonApp {
         // Cada cara tiene proporción 3:2 y no pasa de cierto tamaño: es un monitor, no un panel de control.
         let fw = ((rect.width() - pad * 2.0 - gap) / 2.0).min((rect.height() - pad * 2.0) * 1.5).clamp(40.0, 150.0);
         let fh = fw / 1.5;
-        let text_h = 15.0;
+        let text_h = 30.0;
         let panel = Rect::from_center_size(rect.center(), Vec2::new(fw * 2.0 + gap + pad * 2.0, fh + text_h + pad * 2.0));
         p.rect_filled(panel, 7.0, Color32::from_rgb(0x2a, 0x29, 0x27));
         p.rect_stroke(panel, 7.0, stk(1.0, Color32::from_rgb(0x3e, 0x3c, 0x39)), StrokeKind::Inside);
         for ch in 0..2 {
             let f = Rect::from_min_size(Pos2::new(panel.min.x + pad + ch as f32 * (fw + gap), panel.min.y + pad), Vec2::new(fw, fh));
             paint_face(&p, f, &m, ch);
-            // El detalle de la medición, debajo de cada medidor: pico y nivel eficaz (dBFS y porcentaje).
-            let detail = format!("{} · {:.0} %", dbfs(m.peak[ch]), m.percent(ch));
+            // El detalle de la medición, debajo de cada medidor: el nivel exacto de ahora (dBFS y % de la escala) y, en gris, el máximo.
             let col = match m.lamp(ch) {
                 Lamp::Red => Color32::from_rgb(0xe8, 0x4a, 0x3c),
-                _ => Color32::from_rgb(0xb8, 0xb0, 0xa0),
+                _ => Color32::from_rgb(0xc8, 0xc0, 0xb0),
             };
-            p.text(Pos2::new(f.center().x, f.max.y + text_h * 0.55), Align2::CENTER_CENTER, detail, FontId::proportional(10.5), col);
+            p.text(Pos2::new(f.center().x, f.max.y + 9.0), Align2::CENTER_CENTER, format!("{} · {:.0} %", dbfs(m.level[ch]), m.percent(ch)), FontId::proportional(10.5), col);
+            let maxcol = if m.maxp[ch] > 1.0 { Color32::from_rgb(0xe8, 0x4a, 0x3c) } else { Color32::from_rgb(0x8a, 0x84, 0x78) };
+            p.text(Pos2::new(f.center().x, f.max.y + 23.0), Align2::CENTER_CENTER, format!("máx {}", dbfs(m.maxp[ch])), FontId::proportional(9.5), maxcol);
         }
-        if resp.on_hover_text(format!("Mide la mezcla final que suena (dBFS). Pico: L {} · R {}. Clic: borrar el rojo retenido", dbfs(m.peak[0]), dbfs(m.peak[1]))).clicked() {
+        if resp.on_hover_text(format!("Mide la mezcla final que suena (dBFS). Máximo: L {} · R {}. Clic: borrar el máximo", dbfs(m.maxp[0]), dbfs(m.maxp[1]))).clicked() {
             self.audio.meter.clear_clip();
         }
     }
@@ -190,10 +191,8 @@ mod tests {
         let ctx = egui::Context::default();
         let mut m = crate::audio::Meter::default();
         for level in [0.0f32, 0.2, 0.9, 1.5] {
-            m.peak = [level; 2];
-            if level > 1.0 {
-                m.hold = [2.0; 2];
-            }
+            m.level = [level; 2];
+            m.maxp = [level; 2];
             let _ = ctx.run(Default::default(), |ctx| {
                 egui::CentralPanel::default().show(ctx, |ui| {
                     let p = ui.painter().clone();

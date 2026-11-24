@@ -629,19 +629,21 @@ pub enum Lamp {
     Red,
 }
 
-/// El medidor de la mezcla final, por canal (0 = izquierdo, 1 = derecho). Mide la salida exacta (el pico de las muestras, sin
-/// promediar): la aguja, el piloto y los números leen el mismo pico, que se sostiene un instante (`PEAK_HOLD`) y luego cae.
+/// El medidor de la mezcla final, por canal (0 = izquierdo, 1 = derecho). Mide la salida exacta en cada momento (el nivel de pico de
+/// lo que acaba de sonar, sin promediar ni sostener) para ver las dinámicas: la aguja, el piloto y los números leen ese mismo nivel,
+/// que solo cae con una cola corta (`RELEASE`) para poder seguirlo a la vista. Aparte guarda el máximo alcanzado (`maxp`) hasta que
+/// se borre con un clic.
 #[derive(Clone, Copy, Default, Debug)]
 pub struct Meter {
-    /// Pico reciente (lineal), sostenido un instante y con caída después; lo usan el piloto y el número.
-    pub peak: [f32; 2],
-    /// Segundos que le quedan al pico sostenido.
-    pub hold: [f32; 2],
+    /// Nivel actual (lineal, 1.0 = 0 dBFS).
+    pub level: [f32; 2],
+    /// El máximo desde el último borrado.
+    pub maxp: [f32; 2],
 }
 
 impl Meter {
-    /// Cuánto se sostiene un pico antes de empezar a caer.
-    pub const PEAK_HOLD: f32 = 0.6;
+    /// Cuánto tarda en caer el nivel mostrado (constante de tiempo): lo justo para seguirlo a la vista sin esconder los golpes.
+    pub const RELEASE: f32 = 0.07;
     /// Por debajo de esto (−50 dBFS) se considera silencio.
     pub const SILENCE: f32 = 0.003_162_3;
     /// A partir de aquí (−3 dBFS) el piloto pasa a amarillo.
@@ -651,87 +653,87 @@ impl Meter {
     pub fn feed(&mut self, mix: &[f32], from: usize, to: usize, rate: u32) {
         let to = to.min(mix.len() / 2);
         let from = from.min(to);
-        let n = to - from;
-        if n == 0 {
+        if to == from {
             return;
         }
-        let dt = n as f32 / rate.max(1) as f32;
+        let dt = (to - from) as f32 / rate.max(1) as f32;
         for ch in 0..2 {
             let pk = (from..to).fold(0.0f32, |x, i| x.max(mix[i * 2 + ch].abs()));
-            self.hold_peak(ch, pk, dt);
+            self.follow(ch, pk, dt);
         }
     }
 
-    /// Un pico nuevo mayor lo sustituye y reinicia la espera; si no, se espera y luego cae.
-    fn hold_peak(&mut self, ch: usize, pk: f32, dt: f32) {
-        if pk >= self.peak[ch] {
-            self.peak[ch] = pk;
-            self.hold[ch] = Self::PEAK_HOLD;
-        } else if self.hold[ch] > 0.0 {
-            self.hold[ch] -= dt;
-        } else {
-            self.peak[ch] *= (-dt / 0.25).exp();
+    /// El nivel sube de golpe y baja con la cola corta; el máximo solo sube.
+    fn follow(&mut self, ch: usize, pk: f32, dt: f32) {
+        self.level[ch] = pk.max(self.level[ch] * (-dt / Self::RELEASE).exp());
+        if self.level[ch] < 1e-5 {
+            self.level[ch] = 0.0;
         }
-        if self.peak[ch] < 1e-5 {
-            self.peak[ch] = 0.0;
-        }
+        self.maxp[ch] = self.maxp[ch].max(pk);
     }
 
-    /// Sin sonido: la aguja y el piloto vuelven al reposo.
+    /// Sin sonido: el nivel cae a cero (el máximo se conserva).
     pub fn idle(&mut self, dt: f32) {
         for ch in 0..2 {
-            self.hold_peak(ch, 0.0, dt);
+            self.follow(ch, 0.0, dt);
         }
     }
 
-    /// Borra el pico sostenido (clic en el medidor).
+    /// Borra el máximo (clic en el medidor).
     pub fn clear_clip(&mut self) {
-        self.peak = [0.0; 2];
-        self.hold = [0.0; 2];
+        self.maxp = self.level;
     }
 
     /// Rojo al pasar de 0 dBFS, amarillo desde −3 dBFS, verde con señal (desde −50 dBFS) y apagado en silencio.
     pub fn lamp(&self, ch: usize) -> Lamp {
-        if self.peak[ch] > 1.0 {
+        if self.level[ch] > 1.0 {
             Lamp::Red
-        } else if self.peak[ch] >= Self::WARN {
+        } else if self.level[ch] >= Self::WARN {
             Lamp::Yellow
-        } else if self.peak[ch] >= Self::SILENCE {
+        } else if self.level[ch] >= Self::SILENCE {
             Lamp::Green
         } else {
             Lamp::Off
         }
     }
 
-    /// La lectura de la aguja en dBFS: el mismo pico exacto que el número (de −21 en reposo a +6 al tope de la escala).
-    pub fn needle_db(&self, ch: usize) -> f32 {
-        self.peak_db(ch).clamp(-21.0, 6.0)
-    }
-
-    /// El pico reciente en dBFS (−∞ se da como −99).
-    pub fn peak_db(&self, ch: usize) -> f32 {
-        if self.peak[ch] <= 1e-5 {
+    fn db(lin: f32) -> f32 {
+        if lin <= 1e-5 {
             -99.0
         } else {
-            20.0 * self.peak[ch].log10()
+            20.0 * lin.log10()
         }
     }
 
-    /// Qué tan encendido está el piloto, de 0 a 1: crece con el pico (de −50 a +3 dBFS).
-    pub fn lamp_intensity(&self, ch: usize) -> f32 {
-        ((self.peak_db(ch) + 50.0) / 53.0).clamp(0.0, 1.0)
+    /// El nivel actual en dBFS (−∞ se da como −99).
+    pub fn level_db(&self, ch: usize) -> f32 {
+        Self::db(self.level[ch])
     }
 
-    /// El pico en porcentaje de la escala completa (100 % = 0 dBFS).
+    /// El máximo alcanzado en dBFS.
+    pub fn max_db(&self, ch: usize) -> f32 {
+        Self::db(self.maxp[ch])
+    }
+
+    /// La lectura de la aguja en dBFS: el mismo nivel exacto que el número (de −21 en reposo a +6 al tope de la escala).
+    pub fn needle_db(&self, ch: usize) -> f32 {
+        self.level_db(ch).clamp(-21.0, 6.0)
+    }
+
+    /// Qué tan encendido está el piloto, de 0 a 1: crece con el nivel (de −50 a +3 dBFS).
+    pub fn lamp_intensity(&self, ch: usize) -> f32 {
+        ((self.level_db(ch) + 50.0) / 53.0).clamp(0.0, 1.0)
+    }
+
+    /// El nivel actual en porcentaje de la escala completa (100 % = 0 dBFS).
     pub fn percent(&self, ch: usize) -> f32 {
-        self.peak[ch] * 100.0
+        self.level[ch] * 100.0
     }
 
     pub fn is_moving(&self) -> bool {
-        (0..2).any(|c| self.peak[c] > 0.0)
+        (0..2).any(|c| self.level[c] > 0.0)
     }
 }
-
 /// Todo el estado de audio de la aplicación.
 #[derive(Default)]
 pub struct State {
@@ -1087,7 +1089,7 @@ mod tests {
         assert_eq!(pl.secs(), frozen, "al parar, el reloj se detiene");
     }
     #[test]
-    fn el_medidor_apaga_en_silencio_enciende_verde_amarillo_y_rojo_con_retencion() {
+    fn el_medidor_sigue_el_nivel_exacto_en_cada_momento_y_los_pilotos_siguen_ese_nivel() {
         let rate = 1000;
         let tone = |amp: f32, n: usize| -> Vec<f32> { (0..n * 2).map(|i| if (i / 2) % 2 == 0 { amp } else { -amp }).collect() };
         let mut m = Meter::default();
@@ -1095,40 +1097,37 @@ mod tests {
         m.feed(&tone(0.0, 100), 0, 100, rate);
         assert_eq!(m.lamp(0), Lamp::Off);
         assert_eq!(m.needle_db(0), -21.0);
-        // Sonido normal: verde, y la aguja marca de inmediato el nivel exacto (sin promediar): −12 dBFS, el 25 %.
-        let quiet = tone(0.25, 1000);
-        m.feed(&quiet, 0, 100, rate);
+        // Sonido normal: verde, y la aguja marca de inmediato el nivel exacto, el mismo que el número: −12 dBFS, el 25 %.
+        m.feed(&tone(0.25, 100), 0, 100, rate);
         assert_eq!(m.lamp(0), Lamp::Green);
-        assert!((m.needle_db(0) - 20.0 * 0.25f32.log10()).abs() < 0.05 && (m.needle_db(0) - m.peak_db(0)).abs() < 1e-4, "aguja = número de pico");
+        assert!((m.needle_db(0) - 20.0 * 0.25f32.log10()).abs() < 0.05 && (m.needle_db(0) - m.level_db(0)).abs() < 1e-4);
         assert!((m.percent(0) - 25.0).abs() < 0.1);
-        // Cerca del tope (entre −3 y 0 dBFS): amarillo.
+        // Dinámicas: un golpe fuerte sube la aguja de golpe y, en cuanto vuelve lo suave, baja a ese nivel.
+        m.feed(&tone(0.9, 20), 0, 20, rate);
+        assert!(m.needle_db(0) > -1.0, "el golpe se ve al instante");
+        for _ in 0..8 {
+            m.feed(&tone(0.1, 100), 0, 100, rate);
+        }
+        assert!((m.needle_db(0) + 20.0).abs() < 0.5, "vuelve al nivel suave: {}", m.needle_db(0));
+        // Amarillo desde −3 dBFS; rojo solo por encima de 0 dBFS.
         m.feed(&tone(0.85, 100), 0, 100, rate);
-        assert_eq!(m.lamp(0), Lamp::Yellow);
-        // Justo por debajo de 0 dBFS sigue amarillo; solo por encima de 0 dBFS es rojo.
+        assert_eq!(m.lamp(1), Lamp::Yellow);
         m.feed(&tone(0.999, 100), 0, 100, rate);
         assert_eq!(m.lamp(1), Lamp::Yellow);
         m.feed(&tone(1.4, 100), 0, 100, rate);
         assert_eq!(m.lamp(1), Lamp::Red);
-        // El pico se sostiene un instante (la lámpara y el número coinciden) y luego cae: el rojo no se queda pegado.
-        m.idle(0.3);
-        assert_eq!(m.lamp(1), Lamp::Red, "dentro de la espera");
-        assert!(m.peak_db(1) > 0.0, "el número dice lo mismo que el piloto");
-        m.idle(Meter::PEAK_HOLD);
-        for _ in 0..10 {
-            m.idle(0.1);
-        }
-        assert_ne!(m.lamp(1), Lamp::Red, "pasada la espera, el piloto sigue a la señal");
-        m.feed(&tone(1.4, 100), 0, 100, rate);
+        // El nivel cae con una cola corta y el piloto lo sigue; el máximo se queda hasta que un clic lo borra.
+        m.idle(0.5);
+        assert_ne!(m.lamp(1), Lamp::Red);
+        assert!(m.max_db(1) > 2.0, "el máximo se conserva");
         m.clear_clip();
-        assert_eq!(m.lamp(1), Lamp::Off, "un clic borra el pico");
-        m.feed(&tone(1.4, 100), 0, 100, rate);
+        assert!(m.max_db(1) < -20.0, "un clic lo borra");
         for _ in 0..40 {
             m.idle(0.1);
         }
         assert_eq!(m.lamp(0), Lamp::Off);
         assert!(!m.is_moving());
     }
-
     #[test]
     fn cada_canal_se_mide_por_separado() {
         let mut m = Meter::default();

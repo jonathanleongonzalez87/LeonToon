@@ -923,8 +923,8 @@ impl LeonApp {
         if let Ok(v) = std::env::var("LEONTOON_VU") {
             let n: Vec<f32> = v.split(',').filter_map(|x| x.trim().parse().ok()).collect();
             if n.len() >= 2 {
-                app.audio.meter.peak = [n[n.len() - 2], n[n.len() - 1]];
-                app.audio.meter.hold = [1e9; 2];
+                app.audio.meter.level = [n[n.len() - 2], n[n.len() - 1]];
+                app.audio.meter.maxp = app.audio.meter.level;
                 app.audio.meter_frozen = true;
             }
         }
