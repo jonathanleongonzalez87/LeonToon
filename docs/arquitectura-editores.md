@@ -164,11 +164,14 @@ Respuestas de la persona a las seis preguntas de la primera versión de este doc
 
 ## Monitor «VU de audio»
 
-Editor del grupo Monitores (`Editor::AudioVu`, id `audio_vu`, `app/vumeter.rs`). Mide la **mezcla final** que suena, no las capas sueltas, y solo se mueve al reproducir (en pausa la aguja vuelve a reposo). Es un panel pequeño y centrado con dos medidores de aguja lado a lado, L a la izquierda y R a la derecha, de estilo minimalista: cara oscura con la luz cálida de un foco que cae desde el borde de arriba (degradado vertical más el radial de la mesa de luz, `canvas::glow`), que se intensifica con el nivel. La escala, las marcas y la aguja son neutras (sin brillo): lo único que se enciende es el piloto.
+Editor del grupo Monitores (`Editor::AudioVu`, id `audio_vu`, `app/vumeter.rs`). Mide la **mezcla final** que suena, no las capas sueltas, y solo se mueve al reproducir (en pausa la aguja vuelve a reposo). Es un panel pequeño y centrado con dos medidores de aguja lado a lado, L a la izquierda y R a la derecha, de estilo minimalista: cara oscura con la luz cálida de un foco que cae desde el borde de arriba (degradado vertical más el radial de la mesa de luz, `canvas::glow`), que se intensifica con el nivel. La aguja es neutra (sin brillo); lo que se enciende es el piloto.
 
-- **Escala** lineal en dBFS, de −21 a 0, con una marca por dB (cada marca separa lo mismo) y números cada 3 dB: −21, −18, −15, −12, −9, −6 y −3.
-- **Aguja**: nivel eficaz con balística de VU (constante de 300 ms), de −21 (reposo) a 0 dBFS.
-- **Piloto de recorte** por canal: apagado con silencio (< −50 dBFS), verde con sonido, amarillo de −3 a 0 dBFS de pico, rojo al pasar de 0 dBFS. El rojo se retiene 2 s; un clic en el monitor lo borra. El tooltip da el pico de cada canal.
+- **Escala** lineal en dBFS, de −21 a +3, con una marca por dB (cada marca separa lo mismo) y números cada 3 dB. Neutra hasta −3, **ámbar de −3 a 0 y roja de 0 a +3** (marcas, números y tramo del arco).
+- **Escala en porcentaje** debajo (10, 20 … 100 %, 120 y 140 %; 100 % = 0 dBFS), roja por encima de 100 %.
+- **Aguja**: nivel eficaz con balística de VU (constante de 300 ms), de −21 (reposo) a +3 dBFS.
+- **Detalle bajo cada medidor**: pico en dBFS y nivel eficaz en %, en rojo si hay recorte.
+- La mezcla (`audio::mix`) ya no se recorta a ±1: el recorte lo hacen el dispositivo y `write_wav`. Así el medidor ve la sobremodulación real (antes la mezcla se recortaba antes de medirse y el VU nunca llegaba al rojo).
+- **Piloto de recorte** por canal: apagado con silencio (< −50 dBFS), verde con sonido, amarillo de −3 a 0 dBFS de pico, rojo al pasar de 0 dBFS. Se enciende según la intensidad del pico (tenue con poco sonido, pleno cerca del tope). El rojo se retiene 2 s; un clic en el monitor lo borra. El tooltip da el pico de cada canal.
 - `audio::Meter` lee de la mezcla ya calculada la ventana que acaba de sonar (`Player::frames`), por lo que mide lo mismo que se oye y se exporta. Capturas: `LEONTOON_HUECO=animatic/props=audio_vu` pone el editor en un hueco y `LEONTOON_VU=izq,der,pico_izq,pico_der` fija el medidor.
 
 ## Cuchilla en la línea de tiempo de montaje

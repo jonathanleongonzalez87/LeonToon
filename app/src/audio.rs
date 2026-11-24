@@ -492,9 +492,8 @@ pub fn mix(items: &[Item], cache: &Cache, rate: u32, from: f32, total: f32) -> V
             out[n0 * 2 + k] += *v;
         }
     }
-    for v in &mut out {
-        *v = v.clamp(-1.0, 1.0);
-    }
+    // La mezcla no se recorta aquí: así el medidor ve la sobremodulación real (por encima de 0 dBFS). El recorte lo hacen el
+    // dispositivo de salida (`build_stream`) y `write_wav`, que es donde de verdad se pierde la señal.
     out
 }
 /// Guarda una mezcla estéreo como WAV de 16 bits.
@@ -561,7 +560,7 @@ where
                     };
                     for (k, d) in frame.iter_mut().enumerate() {
                         let v = if ch == 1 { (l + r) * 0.5 } else if k == 0 { l } else if k == 1 { r } else { 0.0 };
-                        *d = T::from_sample(v);
+                        *d = T::from_sample(v.clamp(-1.0, 1.0));
                     }
                 }
             },
@@ -708,12 +707,31 @@ impl Meter {
         }
     }
 
-    /// La lectura de la aguja en dBFS eficaces, de −21 (reposo) a 0.
+    /// La lectura de la aguja en dBFS eficaces, de −21 (reposo) a +3.
     pub fn needle_db(&self, ch: usize) -> f32 {
         if self.vu[ch] <= 1e-6 {
             return -21.0;
         }
-        (20.0 * self.vu[ch].log10()).clamp(-21.0, 0.0)
+        (20.0 * self.vu[ch].log10()).clamp(-21.0, 3.0)
+    }
+
+    /// El pico reciente en dBFS (−∞ se da como −99).
+    pub fn peak_db(&self, ch: usize) -> f32 {
+        if self.peak[ch] <= 1e-5 {
+            -99.0
+        } else {
+            20.0 * self.peak[ch].log10()
+        }
+    }
+
+    /// Qué tan encendido está el piloto, de 0 a 1: crece con el pico (de −50 a +3 dBFS).
+    pub fn lamp_intensity(&self, ch: usize) -> f32 {
+        ((self.peak_db(ch) + 50.0) / 53.0).clamp(0.0, 1.0)
+    }
+
+    /// El nivel eficaz en porcentaje de la escala completa (100 % = 0 dBFS).
+    pub fn percent(&self, ch: usize) -> f32 {
+        self.vu[ch] * 100.0
     }
 
     pub fn is_moving(&self) -> bool {
@@ -1119,5 +1137,24 @@ mod tests {
         m.feed(&mix, 0, 1000, 1000);
         assert_eq!(m.lamp(0), Lamp::Green);
         assert_eq!(m.lamp(1), Lamp::Off);
+    }
+    #[test]
+    fn the_mix_keeps_levels_above_full_scale_so_the_meter_can_show_overmodulation() {
+        let (d, f) = tone_file("over", 440.0, 1.0, 0.9);
+        let mut cache = Cache::default();
+        cache.load(&f).unwrap();
+        let rate = 16_000;
+        let mut it = item(&f, 0.0, 1.0);
+        it.params.gain_db = 9.0;
+        let m = mix(&[it], &cache, rate, 0.0, 1.0);
+        assert!(peak(&m, rate, 0.1, 0.9, 0) > 1.5, "la mezcla sobrepasa 0 dBFS");
+        let mut meter = Meter::default();
+        meter.feed(&m, 0, m.len() / 2, rate);
+        assert_eq!(meter.lamp(0), Lamp::Red);
+        assert!(meter.needle_db(0) > -3.0 && meter.lamp_intensity(0) > 0.95 && meter.percent(0) > 90.0);
+        // Al exportar a WAV se recorta a 0 dBFS.
+        let out = d.join("over.wav");
+        write_wav(&out, rate, &m).unwrap();
+        let _ = std::fs::remove_dir_all(&d);
     }
 }
