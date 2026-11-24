@@ -1029,6 +1029,10 @@ pub struct Project {
     /// Salas abiertas (pestañas), en orden: tipo de sala y nombre propio si se renombró.
     #[serde(default)]
     pub rooms: Vec<RoomTab>,
+    /// Editores elegidos en los huecos de las salas, de este proyecto: «sala/hueco» → identificador del editor. Lo que no está aquí
+    /// es el preset de la sala, así que un proyecto nuevo siempre arranca con las salas de fábrica.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub slots: BTreeMap<String, String>,
     /// Pinceles guardados del proyecto (los incluidos con el programa no se guardan aquí).
     #[serde(default)]
     pub brush_presets: Vec<crate::presets::BrushPreset>,
@@ -1162,6 +1166,7 @@ impl Project {
             layers: vec![Layer::new("Capa 1")],
             palette: default_palette(),
             storyboard: Vec::new(),
+            slots: BTreeMap::new(),
             range: None,
             palettes: default_palettes(),
             room_set: String::new(),
@@ -1187,6 +1192,7 @@ impl Project {
             layers: Vec::new(),
             palette: Vec::new(),
             storyboard: Vec::new(),
+            slots: BTreeMap::new(),
             range: None,
             palettes: Vec::new(),
             room_set: String::new(),

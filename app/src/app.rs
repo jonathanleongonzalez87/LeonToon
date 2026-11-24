@@ -251,7 +251,6 @@ pub struct LeonApp {
     n_tab: u8,
     /// Editor elegido en el panel de propiedades (None = el de la sala).
     /// Editor elegido en cada hueco de cada sala (lo que no está aquí usa el del preset de la sala). Se guarda en editores.json.
-    slot_editors: std::collections::HashMap<(RoomKind, Slot), Editor>,
     /// Hueco que se está dibujando (para que los editores con cabecera propia sepan de qué hueco es el selector).
     cur_slot: Slot,
     /// Ventana emergente abierta en el visor: 1 mesa de luz, 2 guías, 3 papel cebolla.
@@ -692,10 +691,6 @@ impl LeonApp {
             show_toolbar: true,
             show_n: true,
             n_tab: std::env::var("LEONTOON_NTAB").ok().and_then(|v| v.parse().ok()).unwrap_or(0),
-            slot_editors: match std::env::var("LEONTOON_TAM") {
-                Ok(_) => Default::default(),
-                Err(_) => safety::data_dir().map(|d| slots::load(&d)).unwrap_or_default(),
-            },
             cur_slot: Slot::Main,
             // Variables de prueba para capturas: LEONTOON_POP=1|2|3, LEONTOON_ALPHA=1, LEONTOON_ADDMENU=1.
             hud_pop: std::env::var("LEONTOON_POP").ok().and_then(|v| v.parse().ok()).unwrap_or(0),
@@ -923,6 +918,10 @@ impl LeonApp {
             }
             app.end_panel_stroke();
         }
+        // Capturas: LEONTOON_ENTRAR=1 hace como si se entrara en la sala elegida con LEONTOON_SALA (por ejemplo, para crear el animatic).
+        if std::env::var("LEONTOON_ENTRAR").is_ok() {
+            app.set_room_idx(app.room_idx);
+        }
         // Capturas y pruebas: LEONTOON_PDF=<archivo> exporta el storyboard a ese PDF al arrancar.
         if let Ok(p) = std::env::var("LEONTOON_PDF") {
             app.write_storyboard_pdf(std::path::Path::new(&p));
@@ -1073,6 +1072,10 @@ impl LeonApp {
         self.view3d = def.id == "comp";
         self.giz_drag = None;
         self.say(format!("Sala {}: {}", self.tab_name(i), def.desc));
+        // La sala Animatic necesita el animatic: si hay planos y todavía no existe, se crea al entrar.
+        if def.id == "animatic" {
+            self.ensure_animatic();
+        }
     }
 
     /// Abre la primera sala de un tipo (o la añade si no está).

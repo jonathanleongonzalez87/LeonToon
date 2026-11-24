@@ -7,66 +7,49 @@
 
 use super::shell::{area_header, in_area};
 use super::*;
-use std::collections::{BTreeMap, HashMap};
-use std::path::Path;
+use std::collections::BTreeMap;
 
-const FILE: &str = "editores.json";
-
-/// Convierte el texto guardado en elecciones válidas. Lo que no se entiende (sala, hueco o editor desconocidos, un hueco
-/// que la sala no tiene, o el editor por defecto) se ignora: un archivo roto nunca impide arrancar.
-pub(super) fn parse(text: &str) -> HashMap<(RoomKind, Slot), Editor> {
-    let raw: BTreeMap<String, String> = serde_json::from_str(text).unwrap_or_default();
-    let mut out = HashMap::new();
-    for (k, v) in raw {
-        let Some((room, slot)) = k.split_once('/') else { continue };
-        let (Some(room), Some(slot), Some(ed)) = (RoomKind::from_id(room), Slot::from_id(slot), Editor::from_id(&v)) else { continue };
-        if room.slots().contains(&slot) && ed != room.default_editor(slot) {
-            out.insert((room, slot), ed);
-        }
-    }
-    out
+/// La clave con la que se guarda la elección de un hueco: «sala/hueco».
+pub(super) fn slot_key(room: RoomKind, slot: Slot) -> String {
+    format!("{}/{}", room.def().id, slot.id())
 }
 
-pub(super) fn serialize(map: &HashMap<(RoomKind, Slot), Editor>) -> String {
-    let sorted: BTreeMap<String, &str> = map.iter().map(|((r, s), e)| (format!("{}/{}", r.def().id, s.id()), e.id())).collect();
-    serde_json::to_string_pretty(&sorted).unwrap_or_else(|_| "{}".into())
-}
-
-pub(super) fn load(dir: &Path) -> HashMap<(RoomKind, Slot), Editor> {
-    std::fs::read_to_string(dir.join(FILE)).map(|s| parse(&s)).unwrap_or_default()
-}
-
-fn save(dir: &Path, map: &HashMap<(RoomKind, Slot), Editor>) -> Result<(), String> {
-    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-    let tmp = dir.join(format!("{FILE}.tmp"));
-    std::fs::write(&tmp, serialize(map)).map_err(|e| e.to_string())?;
-    std::fs::rename(&tmp, dir.join(FILE)).map_err(|e| e.to_string())
+/// El editor elegido para un hueco en lo guardado en el proyecto. Lo que no se entiende (sala, hueco o editor desconocidos, un
+/// hueco que la sala no tiene, o el editor por defecto) se ignora: un archivo roto nunca impide abrirlo.
+pub(super) fn slot_choice(saved: &BTreeMap<String, String>, room: RoomKind, slot: Slot) -> Option<Editor> {
+    let ed = Editor::from_id(saved.get(&slot_key(room, slot))?)?;
+    (room.slots().contains(&slot) && ed != room.default_editor(slot)).then_some(ed)
 }
 
 impl LeonApp {
-    /// El editor que muestra un hueco en la sala actual: el elegido o el del preset.
+    /// El editor que muestra un hueco en la sala actual: el que se eligió en este proyecto o el del preset.
     pub(super) fn slot_editor(&self, slot: Slot) -> Editor {
         let room = self.room_kind();
-        self.slot_editors.get(&(room, slot)).copied().unwrap_or_else(|| room.default_editor(slot))
+        slot_choice(&self.project.slots, room, slot).unwrap_or_else(|| room.default_editor(slot))
     }
 
+    /// Elige el editor de un hueco. Se guarda en el proyecto (no en todos): elegir el editor por defecto borra la elección.
     pub(super) fn set_slot_editor(&mut self, slot: Slot, ed: Editor) {
         let room = self.room_kind();
+        let key = slot_key(room, slot);
         if ed == room.default_editor(slot) {
-            self.slot_editors.remove(&(room, slot));
+            self.project.slots.remove(&key);
         } else {
-            self.slot_editors.insert((room, slot), ed);
+            self.project.slots.insert(key, ed.id().to_string());
         }
-        if self.shot.is_some() {
-            return;
-        }
-        if let Some(dir) = safety::data_dir() {
-            if let Err(e) = save(&dir, &self.slot_editors) {
-                safety::log_line(&format!("No se pudieron guardar los editores elegidos: {e}"));
-            }
-        }
+        self.dirty = true;
     }
 
+    /// Vuelve la sala actual a su preset de fábrica: se borran los editores que se eligieron en sus huecos.
+    pub(super) fn reset_room_slots(&mut self) {
+        let prefix = format!("{}/", self.room_kind().def().id);
+        let before = self.project.slots.len();
+        self.project.slots.retain(|k, _| !k.starts_with(&prefix));
+        if self.project.slots.len() != before {
+            self.dirty = true;
+        }
+        self.say(format!("Sala {} restablecida: sus huecos vuelven a los editores de fábrica", self.tab_name(self.room_idx)));
+    }
     /// ¿La cabecera de herramienta del visor hace de cabecera del hueco principal? (Sala con visor.)
     pub(super) fn main_toolhead(&self) -> bool {
         let room = self.room_kind();
@@ -113,6 +96,7 @@ impl LeonApp {
         }
         // El menú: una columna por grupo.
         let mut chosen = cur;
+        let mut reset = false;
         let area = egui::Area::new(open_id.with("area")).order(egui::Order::Foreground).fixed_pos(rect.left_bottom() + Vec2::new(0.0, 3.0)).constrain(true).show(&ctx, |ui| {
             egui::Frame::popup(ui.style()).inner_margin(egui::Margin::symmetric(6, 6)).show(ui, |ui| {
                 ui.spacing_mut().item_spacing = Vec2::new(8.0, 2.0);
@@ -150,12 +134,19 @@ impl LeonApp {
                         });
                     }
                 });
+                ui.add_space(4.0);
+                if ui.small_button("Restablecer los editores de esta sala").on_hover_text("Los huecos de la sala vuelven a los editores de fábrica").clicked() {
+                    reset = true;
+                }
             });
         });
         // Se cierra al elegir, con Esc o con un clic fuera del menú y del botón.
         let outside = ctx.input(|i| i.pointer.any_pressed() && i.pointer.interact_pos().map_or(false, |p| !area.response.rect.contains(p) && !rect.contains(p)));
-        if chosen != cur || outside || ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+        if chosen != cur || reset || outside || ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
             ctx.data_mut(|d| d.insert_temp(open_id, false));
+        }
+        if reset {
+            self.reset_room_slots();
         }
         if chosen != cur {
             self.set_slot_editor(slot, chosen);
@@ -257,33 +248,35 @@ mod tests {
     }
 
     #[test]
-    fn lo_elegido_se_guarda_y_se_lee_igual() {
-        let mut m = HashMap::new();
-        m.insert((RoomKind::StopMotion, Slot::SmRight), Editor::Preview);
-        m.insert((RoomKind::Layout, Slot::Time), Editor::Curves);
-        let back = parse(&serialize(&m));
-        assert_eq!(back, m);
+    fn lo_elegido_viaja_con_el_proyecto_y_se_lee_igual() {
+        let mut p = crate::model::Project::blank(1280, 720, 24, 24);
+        p.slots.insert(slot_key(RoomKind::StopMotion, Slot::SmRight), Editor::Preview.id().into());
+        p.slots.insert(slot_key(RoomKind::Layout, Slot::Time), Editor::Curves.id().into());
+        let back: crate::model::Project = serde_json::from_str(&serde_json::to_string(&p).unwrap()).unwrap();
+        assert_eq!(slot_choice(&back.slots, RoomKind::StopMotion, Slot::SmRight), Some(Editor::Preview));
+        assert_eq!(slot_choice(&back.slots, RoomKind::Layout, Slot::Time), Some(Editor::Curves));
+        // Un proyecto nuevo no trae ninguna elección: arranca con los presets de fábrica.
+        assert!(crate::model::Project::blank(1280, 720, 24, 24).slots.is_empty());
     }
 
     #[test]
-    fn un_archivo_roto_o_con_cosas_desconocidas_nunca_falla() {
-        assert!(parse("esto no es json").is_empty());
-        assert!(parse("[1,2,3]").is_empty());
-        let t = r#"{
-            "stopmotion/sm_right": "preview",
-            "sala_inventada/main": "viewer",
-            "layout/hueco_inventado": "viewer",
-            "layout/main": "editor_inventado",
-            "layout/sm_left": "preview",
-            "layout/time": "timeline",
-            "sin_barra": "viewer"
-        }"#;
-        let m = parse(t);
+    fn una_eleccion_rota_o_con_cosas_desconocidas_se_ignora() {
+        let mut m = BTreeMap::new();
+        for (k, v) in [
+            ("stopmotion/sm_right", "preview"),
+            ("sala_inventada/main", "viewer"),
+            ("layout/hueco_inventado", "viewer"),
+            ("layout/main", "editor_inventado"),
+            ("layout/sm_left", "preview"),
+            ("layout/time", "timeline"),
+            ("sin_barra", "viewer"),
+        ] {
+            m.insert(k.to_string(), v.to_string());
+        }
         // Solo vale la primera: el hueco sm_left no existe en Layout y time con timeline es el valor por defecto.
-        assert_eq!(m.len(), 1);
-        assert_eq!(m[&(RoomKind::StopMotion, Slot::SmRight)], Editor::Preview);
+        let valid: Vec<_> = RoomKind::ALL.into_iter().flat_map(|r| Slot::ALL.into_iter().map(move |s| (r, s))).filter(|(r, s)| slot_choice(&m, *r, *s).is_some()).collect();
+        assert_eq!(valid, vec![(RoomKind::StopMotion, Slot::SmRight)]);
     }
-
     #[test]
     fn todos_los_iconos_de_editor_se_dibujan_sin_fallar() {
         let ctx = egui::Context::default();

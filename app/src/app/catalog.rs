@@ -493,6 +493,7 @@ pub(crate) enum Slot {
 }
 
 impl Slot {
+    #[allow(dead_code)]
     pub(crate) const ALL: [Slot; 8] = [Slot::Main, Slot::Time, Slot::Layers, Slot::Props, Slot::SmLeft, Slot::SmStage, Slot::SmRight, Slot::SmBottom];
     pub(crate) fn id(self) -> &'static str {
         match self {
@@ -506,6 +507,7 @@ impl Slot {
             Slot::SmBottom => "sm_bottom",
         }
     }
+    #[allow(dead_code)]
     pub(crate) fn from_id(id: &str) -> Option<Slot> {
         Slot::ALL.into_iter().find(|s| s.id() == id)
     }

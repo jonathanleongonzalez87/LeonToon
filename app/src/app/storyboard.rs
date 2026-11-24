@@ -83,7 +83,7 @@ impl LeonApp {
                     .on_hover_text("Crea (o actualiza) la composición «Animatic»: un clip por plano, en el orden y con la duración de la línea de tiempo del storyboard, con sus fundidos y su cámara. Tab entra en ella")
                     .clicked()
                 {
-                    self.animatic_comp();
+                    self.create_animatic_and_open();
                 }
                 ui.separator();
                 muted(ui, "Miniaturas");
@@ -102,6 +102,34 @@ impl LeonApp {
 
     /// El animatic como composición: una precomposición «Animatic» con una capa-clip por plano (barra de entrada y salida y
     /// fundidos cruzados). Se entra en ella para verla y editarla en la línea de tiempo de montaje.
+    /// Crea el animatic al entrar en la sala Animatic si hay planos y todavía no existe (y se está en la composición principal): se
+    /// crea la composición y se entra en ella, para que la línea de tiempo de montaje muestre los clips.
+    pub(super) fn ensure_animatic(&mut self) {
+        if self.project.storyboard.is_empty() || self.project.in_comp() || self.project.has_animatic() {
+            return;
+        }
+        self.animatic_comp();
+        self.open_animatic_level();
+    }
+
+    /// Entra en la composición «Animatic» (si se está fuera de toda composición y existe).
+    fn open_animatic_level(&mut self) {
+        if self.project.in_comp() {
+            return;
+        }
+        let found = self.project.layers.iter().position(|l| l.kind == LayerKind::Precomp && l.precomp.and_then(|id| self.project.comp(id)).map_or(false, |c| c.name == crate::animatic::NAME));
+        if let Some(i) = found {
+            self.enter_precomp(i);
+        }
+    }
+
+    /// El botón «Crear animatic»: crea o actualiza la composición y abre la sala Animatic dentro de ella.
+    pub(super) fn create_animatic_and_open(&mut self) {
+        self.animatic_comp();
+        self.goto_room_kind(RoomKind::Animatic);
+        self.open_animatic_level();
+    }
+
     fn animatic_comp(&mut self) {
         if self.project.storyboard.is_empty() {
             self.say("No hay planos");
@@ -974,7 +1002,7 @@ impl LeonApp {
             .on_hover_text("Crea (o actualiza) la composición «Animatic»: un clip por plano, con su barra, sus fundidos y su cámara, usando los planos vivos. Se edita en la línea de tiempo de montaje")
             .clicked()
         {
-            self.animatic_comp();
+            self.create_animatic_and_open();
         }
         muted(ui, "Transiciones (hasta medio segundo): Fundido cruza los dos planos; Fundido a negro apaga uno y enciende el otro; Deslizar y Empujar mueven el plano nuevo desde la derecha (con movimiento de cámara en alguno de los dos se hace un fundido). Corte: sin transición. El animatic se rehace solo al cambiar los planos.");
     }

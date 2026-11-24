@@ -654,6 +654,9 @@ impl LeonApp {
                 self.xs_horizontal = !self.xs_horizontal;
             }
             ui.add_enabled(false, egui::Button::new("Vista 2D / 3D (pendiente)").shortcut_text("Ctrl+3"));
+            if item(ui, "Restablecer los editores de la sala", "") {
+                self.reset_room_slots();
+            }
             ui.separator();
             if item(ui, "Pantalla de inicio", "") {
                 self.stage = start::Stage::Home;
