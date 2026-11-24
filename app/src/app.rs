@@ -914,7 +914,7 @@ impl LeonApp {
             }
         }
         // Capturas: LEONTOON_HUECO=sala/hueco=editor pone ese editor en el hueco del proyecto (p. ej. animatic/props=audio_vu) y
-        // LEONTOON_VU=izq,der,pico_izq,pico_der deja el medidor de audio fijo (lineal; un pico por encima de 1 enciende el rojo).
+        // LEONTOON_VU=izq,der deja el medidor de audio fijo en esos picos (lineales; por encima de 1 enciende el rojo).
         if let Ok(v) = std::env::var("LEONTOON_HUECO") {
             if let Some((k, e)) = v.split_once('=') {
                 app.project.slots.insert(k.to_string(), e.to_string());
@@ -922,9 +922,8 @@ impl LeonApp {
         }
         if let Ok(v) = std::env::var("LEONTOON_VU") {
             let n: Vec<f32> = v.split(',').filter_map(|x| x.trim().parse().ok()).collect();
-            if n.len() == 4 {
-                app.audio.meter.vu = [n[0], n[1]];
-                app.audio.meter.peak = [n[2], n[3]];
+            if n.len() >= 2 {
+                app.audio.meter.peak = [n[n.len() - 2], n[n.len() - 1]];
                 app.audio.meter.hold = [1e9; 2];
                 app.audio.meter_frozen = true;
             }

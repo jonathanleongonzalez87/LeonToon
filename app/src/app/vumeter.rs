@@ -8,11 +8,11 @@ use egui::{Align2, Color32, FontId, Pos2, Rect, Sense, Shape, StrokeKind, Vec2};
 
 /// Hasta dónde gira la aguja a cada lado de la vertical, en grados.
 const SWEEP: f32 = 55.0;
-/// El rango de la escala en dBFS: de −21 (reposo) a +3 (más allá del tope).
+/// El rango de la escala en dBFS: de −21 (reposo) a +6 (más allá del tope).
 const DB_MIN: f32 = -21.0;
-const DB_MAX: f32 = 3.0;
+const DB_MAX: f32 = 6.0;
 /// Las marcas con número de la escala, en dBFS.
-const MAJORS: [f32; 9] = [-21.0, -18.0, -15.0, -12.0, -9.0, -6.0, -3.0, 0.0, 3.0];
+const MAJORS: [f32; 10] = [-21.0, -18.0, -15.0, -12.0, -9.0, -6.0, -3.0, 0.0, 3.0, 6.0];
 
 /// El ángulo de la aguja (radianes desde la vertical, positivo hacia la derecha) para una lectura en dBFS.
 pub(super) fn needle_angle(db: f32) -> f32 {
@@ -49,7 +49,7 @@ fn at(pivot: Pos2, r: f32, a: f32) -> Pos2 {
     Pos2::new(pivot.x + a.sin() * r, pivot.y - a.cos() * r)
 }
 
-/// Un medidor: cara oscura con la luz cálida de un foco que cae desde arriba, escala en dBFS (de −21 a +3, con las zonas de −3 a 0 en
+/// Un medidor (la aguja marca la salida exacta, el mismo pico que el texto de abajo): cara oscura con la luz cálida de un foco que cae desde arriba, escala en dBFS (de −21 a +3, con las zonas de −3 a 0 en
 /// ámbar y de 0 a +3 en rojo), una escala en porcentaje debajo y el piloto de recorte, que se enciende según la intensidad.
 fn paint_face(p: &egui::Painter, f: Rect, m: &crate::audio::Meter, ch: usize) {
     let h = f.height();
@@ -96,8 +96,8 @@ fn paint_face(p: &egui::Painter, f: Rect, m: &crate::audio::Meter, ch: usize) {
     // La escala en porcentaje (100 % = 0 dBFS), más adentro: 10, 20 … 100 y 120.
     let r2 = r * 0.8;
     clipped.add(Shape::line(arc(percent_db(10.0), 0.0, r2), stk(0.9, with_alpha(ink, 0.6))));
-    clipped.add(Shape::line(arc(0.0, percent_db(141.0), r2), stk(2.0, zone(1.0, ink))));
-    for pc in [10.0f32, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0, 120.0, 140.0] {
+    clipped.add(Shape::line(arc(0.0, percent_db(200.0), r2), stk(2.0, zone(1.0, ink))));
+    for pc in [10.0f32, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0, 120.0, 140.0, 160.0, 200.0] {
         let d = percent_db(pc);
         let a = needle_angle(d);
         let big = pc == 10.0 || pc == 50.0 || pc == 100.0;
@@ -152,7 +152,7 @@ impl LeonApp {
             let f = Rect::from_min_size(Pos2::new(panel.min.x + pad + ch as f32 * (fw + gap), panel.min.y + pad), Vec2::new(fw, fh));
             paint_face(&p, f, &m, ch);
             // El detalle de la medición, debajo de cada medidor: pico y nivel eficaz (dBFS y porcentaje).
-            let detail = format!("pico {} · {:.0} %", dbfs(m.peak[ch]), m.percent(ch));
+            let detail = format!("{} · {:.0} %", dbfs(m.peak[ch]), m.percent(ch));
             let col = match m.lamp(ch) {
                 Lamp::Red => Color32::from_rgb(0xe8, 0x4a, 0x3c),
                 _ => Color32::from_rgb(0xb8, 0xb0, 0xa0),
@@ -179,10 +179,10 @@ mod tests {
     #[test]
     fn la_aguja_barre_de_izquierda_a_derecha_y_no_se_sale_de_la_escala() {
         assert!((needle_angle(-21.0).to_degrees() + SWEEP).abs() < 1e-3);
-        assert!((needle_angle(3.0).to_degrees() - SWEEP).abs() < 1e-3);
+        assert!((needle_angle(6.0).to_degrees() - SWEEP).abs() < 1e-3);
         assert!(needle_angle(-12.0) < needle_angle(-3.0));
         assert_eq!(needle_angle(-99.0), needle_angle(-21.0));
-        assert_eq!(needle_angle(40.0), needle_angle(3.0));
+        assert_eq!(needle_angle(40.0), needle_angle(6.0));
     }
 
     #[test]
@@ -191,7 +191,6 @@ mod tests {
         let mut m = crate::audio::Meter::default();
         for level in [0.0f32, 0.2, 0.9, 1.5] {
             m.peak = [level; 2];
-            m.vu = [level * 0.5; 2];
             if level > 1.0 {
                 m.hold = [2.0; 2];
             }

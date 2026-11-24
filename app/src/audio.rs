@@ -629,12 +629,10 @@ pub enum Lamp {
     Red,
 }
 
-/// El medidor de la mezcla final, por canal (0 = izquierdo, 1 = derecho). La aguja sigue el promedio suave (balística de VU,
-/// unos 300 ms) y el piloto y el número de pico siguen el mismo pico, que se sostiene un instante (`PEAK_HOLD`) y luego cae: lo que dice el piloto es siempre lo que dice el número.
+/// El medidor de la mezcla final, por canal (0 = izquierdo, 1 = derecho). Mide la salida exacta (el pico de las muestras, sin
+/// promediar): la aguja, el piloto y los números leen el mismo pico, que se sostiene un instante (`PEAK_HOLD`) y luego cae.
 #[derive(Clone, Copy, Default, Debug)]
 pub struct Meter {
-    /// Nivel eficaz suavizado (lineal, 1.0 = fondo de escala).
-    pub vu: [f32; 2],
     /// Pico reciente (lineal), sostenido un instante y con caída después; lo usan el piloto y el número.
     pub peak: [f32; 2],
     /// Segundos que le quedan al pico sostenido.
@@ -644,8 +642,6 @@ pub struct Meter {
 impl Meter {
     /// Cuánto se sostiene un pico antes de empezar a caer.
     pub const PEAK_HOLD: f32 = 0.6;
-    /// Constante de tiempo de la aguja.
-    pub const VU_TIME: f32 = 0.3;
     /// Por debajo de esto (−50 dBFS) se considera silencio.
     pub const SILENCE: f32 = 0.003_162_3;
     /// A partir de aquí (−3 dBFS) el piloto pasa a amarillo.
@@ -660,16 +656,8 @@ impl Meter {
             return;
         }
         let dt = n as f32 / rate.max(1) as f32;
-        let a = 1.0 - (-dt / Self::VU_TIME).exp();
         for ch in 0..2 {
-            let (mut sq, mut pk) = (0.0f32, 0.0f32);
-            for i in from..to {
-                let v = mix[i * 2 + ch];
-                sq += v * v;
-                pk = pk.max(v.abs());
-            }
-            let rms = (sq / n as f32).sqrt();
-            self.vu[ch] += a * (rms - self.vu[ch]);
+            let pk = (from..to).fold(0.0f32, |x, i| x.max(mix[i * 2 + ch].abs()));
             self.hold_peak(ch, pk, dt);
         }
     }
@@ -692,10 +680,6 @@ impl Meter {
     /// Sin sonido: la aguja y el piloto vuelven al reposo.
     pub fn idle(&mut self, dt: f32) {
         for ch in 0..2 {
-            self.vu[ch] *= (-dt / 0.12).exp();
-            if self.vu[ch] < 1e-5 {
-                self.vu[ch] = 0.0;
-            }
             self.hold_peak(ch, 0.0, dt);
         }
     }
@@ -719,12 +703,9 @@ impl Meter {
         }
     }
 
-    /// La lectura de la aguja en dBFS eficaces, de −21 (reposo) a +3.
+    /// La lectura de la aguja en dBFS: el mismo pico exacto que el número (de −21 en reposo a +6 al tope de la escala).
     pub fn needle_db(&self, ch: usize) -> f32 {
-        if self.vu[ch] <= 1e-6 {
-            return -21.0;
-        }
-        (20.0 * self.vu[ch].log10()).clamp(-21.0, 3.0)
+        self.peak_db(ch).clamp(-21.0, 6.0)
     }
 
     /// El pico reciente en dBFS (−∞ se da como −99).
@@ -741,13 +722,13 @@ impl Meter {
         ((self.peak_db(ch) + 50.0) / 53.0).clamp(0.0, 1.0)
     }
 
-    /// El nivel eficaz en porcentaje de la escala completa (100 % = 0 dBFS).
+    /// El pico en porcentaje de la escala completa (100 % = 0 dBFS).
     pub fn percent(&self, ch: usize) -> f32 {
-        self.vu[ch] * 100.0
+        self.peak[ch] * 100.0
     }
 
     pub fn is_moving(&self) -> bool {
-        (0..2).any(|c| self.vu[c] > 0.0 || self.peak[c] > 0.0)
+        (0..2).any(|c| self.peak[c] > 0.0)
     }
 }
 
@@ -1114,14 +1095,12 @@ mod tests {
         m.feed(&tone(0.0, 100), 0, 100, rate);
         assert_eq!(m.lamp(0), Lamp::Off);
         assert_eq!(m.needle_db(0), -21.0);
-        // Sonido normal: verde, y la aguja sube con el promedio (no de golpe).
+        // Sonido normal: verde, y la aguja marca de inmediato el nivel exacto (sin promediar): −12 dBFS, el 25 %.
         let quiet = tone(0.25, 1000);
         m.feed(&quiet, 0, 100, rate);
         assert_eq!(m.lamp(0), Lamp::Green);
-        let early = m.needle_db(0);
-        m.feed(&quiet, 100, 1000, rate);
-        assert!(m.needle_db(0) > early, "la aguja sigue subiendo con el tiempo");
-        assert!((m.needle_db(0) - 20.0 * 0.25f32.log10()).abs() < 1.0, "se acerca al nivel eficaz de la señal (−12 dBFS)");
+        assert!((m.needle_db(0) - 20.0 * 0.25f32.log10()).abs() < 0.05 && (m.needle_db(0) - m.peak_db(0)).abs() < 1e-4, "aguja = número de pico");
+        assert!((m.percent(0) - 25.0).abs() < 0.1);
         // Cerca del tope (entre −3 y 0 dBFS): amarillo.
         m.feed(&tone(0.85, 100), 0, 100, rate);
         assert_eq!(m.lamp(0), Lamp::Yellow);
