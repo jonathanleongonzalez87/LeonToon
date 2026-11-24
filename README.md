@@ -3,7 +3,7 @@
 Estudio de animación 2D de escritorio, hecho en Rust con egui. Mezcla ideas de los programas de animación tradicional,
 de motion graphics y de stop motion (salas de trabajo, mesa de luz, papel cebolla, línea de tiempo de montaje, hoja de
 exposición, Live View) con un motor propio de dibujo **vectorial** y de **píxeles**. Está en desarrollo activo; la versión
-actual es la **0.3.0**.
+actual es la **0.4.0**.
 
 ![LeonToon: salas, editores y herramientas](docs/img/00-portada-v2.png)
 
