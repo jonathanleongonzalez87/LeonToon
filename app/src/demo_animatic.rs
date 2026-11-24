@@ -574,4 +574,32 @@ mod tests {
         assert!(q.layers.iter().any(|l| l.kind == LayerKind::Audio), "el audio sobrevive al rehacer el animatic");
         let _ = std::fs::remove_dir_all(&dir);
     }
+
+    #[test]
+    fn the_sample_exports_an_mp4_with_its_boings_when_ffmpeg_is_installed() {
+        let Some(ffmpeg) = crate::render::find_ffmpeg() else {
+            eprintln!("ffmpeg no está instalado en este equipo: se omite la prueba del MP4 del ejemplo");
+            return;
+        };
+        let dir = std::env::temp_dir().join(format!("leontoon_demo_mp4_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let p = build_with_audio(&dir);
+        let root = p.root_clone();
+        let items = crate::audio::collect(&root);
+        let mut cache = crate::audio::Cache::default();
+        cache.load(&items[0].path).unwrap();
+        // Los primeros cuatro segundos: incluyen el primer bote de A (en el segundo 3,6).
+        let m = crate::audio::mix(&items, &cache, 48_000, 0.0, 4.0);
+        let wav = dir.join("mezcla.wav");
+        crate::audio::write_wav(&wav, 48_000, &m).unwrap();
+        let mp4 = dir.join("animatic.mp4");
+        let n = crate::render::export_video(&root, &ffmpeg, &mp4, 0, 95, 0.25, Some(&wav)).unwrap();
+        assert_eq!(n, 96);
+        let out = std::process::Command::new(&ffmpeg).arg("-i").arg(&mp4).output().unwrap();
+        let info = String::from_utf8_lossy(&out.stderr).to_string();
+        assert!(info.contains("Video:") && info.contains("Audio:"), "{info}");
+        assert!(info.contains("Duration: 00:00:04.0"), "dura cuatro segundos: {info}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
