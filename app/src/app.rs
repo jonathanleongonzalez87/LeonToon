@@ -925,7 +925,7 @@ impl LeonApp {
             if n.len() == 4 {
                 app.audio.meter.vu = [n[0], n[1]];
                 app.audio.meter.peak = [n[2], n[3]];
-                app.audio.meter.clip = [if n[2] > 1.0 { 2.0 } else { 0.0 }, if n[3] > 1.0 { 2.0 } else { 0.0 }];
+                app.audio.meter.hold = [1e9; 2];
                 app.audio.meter_frozen = true;
             }
         }

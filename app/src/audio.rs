@@ -630,20 +630,20 @@ pub enum Lamp {
 }
 
 /// El medidor de la mezcla final, por canal (0 = izquierdo, 1 = derecho). La aguja sigue el promedio suave (balística de VU,
-/// unos 300 ms), el piloto sigue el pico, y el rojo se retiene un par de segundos para no perder un recorte.
+/// unos 300 ms) y el piloto y el número de pico siguen el mismo pico, que se sostiene un instante (`PEAK_HOLD`) y luego cae: lo que dice el piloto es siempre lo que dice el número.
 #[derive(Clone, Copy, Default, Debug)]
 pub struct Meter {
     /// Nivel eficaz suavizado (lineal, 1.0 = fondo de escala).
     pub vu: [f32; 2],
-    /// Pico reciente (lineal) con caída lenta, para el piloto.
+    /// Pico reciente (lineal), sostenido un instante y con caída después; lo usan el piloto y el número.
     pub peak: [f32; 2],
-    /// Segundos que le quedan al rojo retenido.
-    pub clip: [f32; 2],
+    /// Segundos que le quedan al pico sostenido.
+    pub hold: [f32; 2],
 }
 
 impl Meter {
-    /// Cuánto se retiene el rojo tras un recorte.
-    pub const CLIP_HOLD: f32 = 2.0;
+    /// Cuánto se sostiene un pico antes de empezar a caer.
+    pub const PEAK_HOLD: f32 = 0.6;
     /// Constante de tiempo de la aguja.
     pub const VU_TIME: f32 = 0.3;
     /// Por debajo de esto (−50 dBFS) se considera silencio.
@@ -670,33 +670,45 @@ impl Meter {
             }
             let rms = (sq / n as f32).sqrt();
             self.vu[ch] += a * (rms - self.vu[ch]);
-            self.peak[ch] = pk.max(self.peak[ch] * (-dt / 0.15).exp());
-            self.clip[ch] = if pk > 1.0 { Self::CLIP_HOLD } else { (self.clip[ch] - dt).max(0.0) };
+            self.hold_peak(ch, pk, dt);
         }
     }
 
-    /// Sin sonido: la aguja y el piloto vuelven al reposo (el rojo retenido sigue su cuenta).
+    /// Un pico nuevo mayor lo sustituye y reinicia la espera; si no, se espera y luego cae.
+    fn hold_peak(&mut self, ch: usize, pk: f32, dt: f32) {
+        if pk >= self.peak[ch] {
+            self.peak[ch] = pk;
+            self.hold[ch] = Self::PEAK_HOLD;
+        } else if self.hold[ch] > 0.0 {
+            self.hold[ch] -= dt;
+        } else {
+            self.peak[ch] *= (-dt / 0.25).exp();
+        }
+        if self.peak[ch] < 1e-5 {
+            self.peak[ch] = 0.0;
+        }
+    }
+
+    /// Sin sonido: la aguja y el piloto vuelven al reposo.
     pub fn idle(&mut self, dt: f32) {
         for ch in 0..2 {
             self.vu[ch] *= (-dt / 0.12).exp();
-            self.peak[ch] *= (-dt / 0.15).exp();
-            self.clip[ch] = (self.clip[ch] - dt).max(0.0);
             if self.vu[ch] < 1e-5 {
                 self.vu[ch] = 0.0;
             }
-            if self.peak[ch] < 1e-5 {
-                self.peak[ch] = 0.0;
-            }
+            self.hold_peak(ch, 0.0, dt);
         }
     }
 
-    /// Borra los rojos retenidos (clic en el medidor).
+    /// Borra el pico sostenido (clic en el medidor).
     pub fn clear_clip(&mut self) {
-        self.clip = [0.0; 2];
+        self.peak = [0.0; 2];
+        self.hold = [0.0; 2];
     }
 
+    /// Rojo al pasar de 0 dBFS, amarillo desde −3 dBFS, verde con señal (desde −50 dBFS) y apagado en silencio.
     pub fn lamp(&self, ch: usize) -> Lamp {
-        if self.clip[ch] > 0.0 {
+        if self.peak[ch] > 1.0 {
             Lamp::Red
         } else if self.peak[ch] >= Self::WARN {
             Lamp::Yellow
@@ -735,7 +747,7 @@ impl Meter {
     }
 
     pub fn is_moving(&self) -> bool {
-        (0..2).any(|c| self.vu[c] > 0.0 || self.peak[c] > 0.0 || self.clip[c] > 0.0)
+        (0..2).any(|c| self.vu[c] > 0.0 || self.peak[c] > 0.0)
     }
 }
 
@@ -1113,16 +1125,24 @@ mod tests {
         // Cerca del tope (entre −3 y 0 dBFS): amarillo.
         m.feed(&tone(0.85, 100), 0, 100, rate);
         assert_eq!(m.lamp(0), Lamp::Yellow);
-        // Sobremodulación: rojo, que se retiene aunque vuelva el silencio y se apaga con el tiempo o con un clic.
+        // Justo por debajo de 0 dBFS sigue amarillo; solo por encima de 0 dBFS es rojo.
+        m.feed(&tone(0.999, 100), 0, 100, rate);
+        assert_eq!(m.lamp(1), Lamp::Yellow);
         m.feed(&tone(1.4, 100), 0, 100, rate);
         assert_eq!(m.lamp(1), Lamp::Red);
-        m.feed(&tone(0.0, 1000), 0, 1000, rate);
-        assert_eq!(m.lamp(1), Lamp::Red, "el rojo se retiene");
-        m.clear_clip();
-        assert_ne!(m.lamp(1), Lamp::Red);
+        // El pico se sostiene un instante (la lámpara y el número coinciden) y luego cae: el rojo no se queda pegado.
+        m.idle(0.3);
+        assert_eq!(m.lamp(1), Lamp::Red, "dentro de la espera");
+        assert!(m.peak_db(1) > 0.0, "el número dice lo mismo que el piloto");
+        m.idle(Meter::PEAK_HOLD);
+        for _ in 0..10 {
+            m.idle(0.1);
+        }
+        assert_ne!(m.lamp(1), Lamp::Red, "pasada la espera, el piloto sigue a la señal");
         m.feed(&tone(1.4, 100), 0, 100, rate);
-        m.idle(Meter::CLIP_HOLD + 0.1);
-        assert_ne!(m.lamp(0), Lamp::Red, "tras la retención se apaga");
+        m.clear_clip();
+        assert_eq!(m.lamp(1), Lamp::Off, "un clic borra el pico");
+        m.feed(&tone(1.4, 100), 0, 100, rate);
         for _ in 0..40 {
             m.idle(0.1);
         }

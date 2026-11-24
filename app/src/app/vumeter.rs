@@ -193,7 +193,7 @@ mod tests {
             m.peak = [level; 2];
             m.vu = [level * 0.5; 2];
             if level > 1.0 {
-                m.clip = [2.0; 2];
+                m.hold = [2.0; 2];
             }
             let _ = ctx.run(Default::default(), |ctx| {
                 egui::CentralPanel::default().show(ctx, |ui| {

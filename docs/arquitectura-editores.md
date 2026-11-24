@@ -171,7 +171,7 @@ Editor del grupo Monitores (`Editor::AudioVu`, id `audio_vu`, `app/vumeter.rs`).
 - **Aguja**: nivel eficaz con balística de VU (constante de 300 ms), de −21 (reposo) a +3 dBFS.
 - **Detalle bajo cada medidor**: pico en dBFS y nivel eficaz en %, en rojo si hay recorte.
 - La mezcla (`audio::mix`) ya no se recorta a ±1: el recorte lo hacen el dispositivo y `write_wav`. Así el medidor ve la sobremodulación real (antes la mezcla se recortaba antes de medirse y el VU nunca llegaba al rojo).
-- **Piloto de recorte** por canal: apagado con silencio (< −50 dBFS), verde con sonido, amarillo de −3 a 0 dBFS de pico, rojo al pasar de 0 dBFS. Se enciende según la intensidad del pico (tenue con poco sonido, pleno cerca del tope). El rojo se retiene 2 s; un clic en el monitor lo borra. El tooltip da el pico de cada canal.
+- **Piloto de recorte** por canal: apagado con silencio (< −50 dBFS), verde con sonido, amarillo de −3 a 0 dBFS de pico, rojo al pasar de 0 dBFS. Piloto y número de pico leen el mismo valor, que se sostiene 0,6 s y luego cae (el rojo no se queda pegado). Se enciende según la intensidad del pico (tenue con poco sonido, pleno cerca del tope). Un clic en el monitor borra el pico sostenido. El tooltip da el pico de cada canal.
 - `audio::Meter` lee de la mezcla ya calculada la ventana que acaba de sonar (`Player::frames`), por lo que mide lo mismo que se oye y se exporta. Capturas: `LEONTOON_HUECO=animatic/props=audio_vu` pone el editor en un hueco y `LEONTOON_VU=izq,der,pico_izq,pico_der` fija el medidor.
 
 ## Cuchilla en la línea de tiempo de montaje
