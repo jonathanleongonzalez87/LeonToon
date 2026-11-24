@@ -113,3 +113,7 @@ El orden propuesto es **audio primero** (menor riesgo, aporta de inmediato al an
 - [Symphonia](https://github.com/pdeljanov/Symphonia): formatos y códecs, licencia MPL-2.0, AAC detrás de opción.
 - [Media Foundation: códecs y decodificador H.264](https://learn.microsoft.com/en-ie/windows/win32/medfound/codecobjects): H.264 de serie; HEVC con requisitos propios.
 - Foros y documentación de `ffmpeg-next` / `ffmpeg-sys-next`: necesitan libclang y bibliotecas de FFmpeg; en Windows se usa vcpkg y el enlazado estático suele dar problemas.
+
+## 9. Estado
+
+M8a (audio) hecha junto con A2 (Issue #136): se tomó la recomendación del estudio, symphonia para leer y cpal para reproducir, con AAC/M4A activado desde el principio. Compilan con la toolchain GNU sin cambios. Falta M8b en lo que respecta a más formatos de mezcla, y M8c a M8e (vídeo).

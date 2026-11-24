@@ -139,6 +139,11 @@ impl LeonApp {
 
     /// Crea una capa del tipo elegido en el menú Mayús+A y la inserta sobre la actual.
     pub(super) fn add_layer_kind(&mut self, kind: LayerKind) {
+        // Una capa de audio se crea eligiendo el archivo de sonido.
+        if kind == LayerKind::Audio {
+            self.import_audio();
+            return;
+        }
         self.checkpoint();
         self.lsel.clear();
         let name = self.unique_layer_name(kind.label());
@@ -359,7 +364,7 @@ impl LeonApp {
         self.frame = (self.frame as i64 + d).rem_euclid(len) as u32;
     }
 
-    fn play_bounds(&self) -> (u32, u32) {
+    pub(super) fn play_bounds(&self) -> (u32, u32) {
         let last = self.project.length - 1;
         match self.sm_play_range.or(self.project.range) {
             Some((a, b)) => (a.min(last), b.min(last)),
@@ -373,6 +378,12 @@ impl LeonApp {
         let (a, b) = self.play_bounds();
         if self.playing && (self.frame >= b || self.frame < a) {
             self.frame = a;
+        }
+        // Con audios en el proyecto, suenan al reproducir; al pausar, se callan.
+        if self.playing {
+            self.audio_start();
+        } else {
+            self.audio_stop();
         }
     }
 
@@ -391,6 +402,10 @@ impl LeonApp {
 
     pub(super) fn advance_playback(&mut self, ctx: &egui::Context) {
         if !self.playing {
+            // Cualquier forma de parar (pausa, cuadro a cuadro, salto) calla el audio.
+            if self.audio.on {
+                self.audio_stop();
+            }
             return;
         }
         let dt = ctx.input(|i| i.stable_dt).min(0.1) as f64;
@@ -409,6 +424,9 @@ impl LeonApp {
             } else {
                 self.frame += 1;
             }
+        }
+        if self.audio.on {
+            self.audio_follow();
         }
         ctx.request_repaint();
     }

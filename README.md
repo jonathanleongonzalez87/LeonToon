@@ -100,6 +100,8 @@ y alrededor las hojas de exposición y la tira de fotos.
 El **storyboard** muestra los planos como miniaturas con nombre y duración; se reordenan arrastrando el número, y se puede dibujar directamente sobre ellas.
 La línea de tiempo del storyboard da la duración de cada plano y su cámara, y *Crear animatic* arma con ellos la composición del animatic.
 Cada plano lleva su escena y su número (editables, con «Renumerar de 10 en 10» para poder intercalar planos), y el storyboard se exporta a **PDF**: hojas A4 con la miniatura de cada plano y sus textos.
+El **audio** (WAV, MP3, FLAC, OGG y AAC/M4A) se importa como una capa de audio («+ Audio» en la línea de tiempo del storyboard, «Importar audio…» en el panel del animatic o Mayús+A): su barra muestra la onda y se mueve y recorta como cualquier capa (la opacidad es el volumen y el ojo lo silencia), suena al reproducir con la imagen siguiendo al sonido, y se mezcla en el MP4 al exportar (hace falta ffmpeg). El ejemplo del animatic trae los «boings» de A y B sincronizados con la historia.
+
 Desde la pantalla de inicio se abre **«Ejemplo: Animatic con bocetos (A y B)»**: la historia de la pelota en seis planos dibujados como bocetos en mapa de bits (lápiz y marcador), con el Personaje A (roja) y el Personaje B (azul), sus textos, fundidos, cámara y el animatic ya creado.
 
 ![Storyboard](docs/img/21-storyboard-v2.png)

@@ -569,6 +569,9 @@ impl LeonApp {
                     self.project.storyboard.swap(i, i + 1);
                     self.sb_sel = i + 1;
                 }
+                if pill(ui, "+ Audio", false).on_hover_text("Importa un audio (WAV, MP3, FLAC, OGG o AAC) como capa de audio, desde el cuadro actual").clicked() {
+                    self.import_audio();
+                }
                 ui.separator();
                 muted(ui, "Zoom ↔");
                 ui.add(egui::Slider::new(&mut self.sbt_pps, 20.0..=400.0).show_value(false)).on_hover_text("Zoom horizontal: segundos por pantalla (Ctrl + rueda)");
@@ -630,6 +633,9 @@ impl LeonApp {
         let mut drop_to: Option<(usize, usize)> = None;
         let mut trans_set: Option<(usize, &'static str)> = None;
         let playing = self.playing;
+        // Pista de audio: las capas de audio de la composición, con su onda.
+        let audio_items = crate::audio::collect(&self.project);
+        let audio_h = if audio_items.is_empty() { 0.0 } else { 40.0 };
         // Ctrl + rueda: zoom horizontal; Alt + rueda: zoom vertical. La rueda sola desplaza (con Mayús, de lado).
         let area = ui.available_rect_before_wrap();
         let (ctrl, alt, dy) = ui.input(|i| (i.modifiers.command, i.modifiers.alt, i.raw_scroll_delta.y));
@@ -650,7 +656,7 @@ impl LeonApp {
             let (ruler_h, cam_h, trans_h) = (20.0, 20.0, 24.0);
             let clip_h = ((ui.available_height() - ruler_h - cam_h - trans_h - 18.0).clamp(46.0, 120.0) * vz).clamp(30.0, 360.0);
             let width = (total * pps + 120.0).max(ui.available_width());
-            let (rect, _) = ui.allocate_exact_size(Vec2::new(width, ruler_h + clip_h + cam_h + trans_h + 12.0), Sense::hover());
+            let (rect, _) = ui.allocate_exact_size(Vec2::new(width, ruler_h + clip_h + cam_h + trans_h + audio_h + 12.0), Sense::hover());
             let painter = ui.painter_at(rect);
             let id = ui.id();
             // Regla en segundos: clic o arrastre mueven la cabeza de reproducción.
@@ -767,6 +773,17 @@ impl LeonApp {
                     painter.text(Pos2::new(x + 2.0, trans_top + 10.0), Align2::LEFT_CENTER, "·", FontId::proportional(11.0), MU);
                 }
                 x += cwid;
+            }
+            // Pista de audio: una barra por audio, con su onda (se mueven y se recortan en la línea de tiempo de montaje).
+            for it in &audio_items {
+                let bar = Rect::from_min_size(Pos2::new(rect.min.x + it.start * pps, trans_top + trans_h + 3.0), Vec2::new((it.len * pps).max(4.0), audio_h - 4.0));
+                painter.rect_filled(bar, 3.0, Color32::from_rgb(0x6f, 0xc3, 0xd8).gamma_multiply(0.45));
+                painter.rect_stroke(bar, 3.0, stk(1.0, Color32::from_rgb(0x6f, 0xc3, 0xd8)), EStrokeKind::Inside);
+                if let Some(e) = self.audio.cache.get(&it.path) {
+                    super::audioui::paint_wave(&painter, bar, e, 1.0 / pps, 0.0, Color32::from_black_alpha(170));
+                }
+                let name = it.path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+                painter.with_clip_rect(bar).text(bar.min + Vec2::new(4.0, 2.0), Align2::LEFT_TOP, name, FontId::proportional(10.0), TX);
             }
             // Reordenar: el plano arrastrado se suelta antes o después de otro, según dónde esté el cursor.
             if let Some(from) = self.sbt_drag {
@@ -998,6 +1015,9 @@ impl LeonApp {
             self.frame = ((s * fps).round() as u32).min(self.project.length - 1);
         }
         ui.separator();
+        if pill(ui, "Importar audio…", false).on_hover_text("Pone un audio (WAV, MP3, FLAC, OGG o AAC) como capa de audio desde el cuadro actual: suena al reproducir y sale en el MP4").clicked() {
+            self.import_audio();
+        }
         if pill(ui, "Crear animatic", true)
             .on_hover_text("Crea (o actualiza) la composición «Animatic»: un clip por plano, con su barra, sus fundidos y su cámara, usando los planos vivos. Se edita en la línea de tiempo de montaje")
             .clicked()

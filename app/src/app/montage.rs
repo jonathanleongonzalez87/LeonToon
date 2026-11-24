@@ -386,6 +386,13 @@ impl LeonApp {
                     if li == self.cl {
                         painter.rect_stroke(bar, 3.0, stk(1.0, with_alpha(col, 0.95)), EStrokeKind::Inside);
                     }
+                    // Capa de audio: la onda dentro de su barra.
+                    if inf.kind == LayerKind::Audio {
+                        let path = self.project.layers[li].audio.as_ref().and_then(|a| a.resolve(self.project.base_dir.as_deref()));
+                        if let Some(e) = path.and_then(|p| self.audio.cache.get(&p)) {
+                            super::audioui::paint_wave(&painter, bar, e, 1.0 / (fps as f32 * cell), 0.0, Color32::from_black_alpha(170));
+                        }
+                    }
                     // Si no tiene propiedades abiertas, sus claves se ven sobre su barra.
                     if !has_props[li] {
                         for &kf in &inf.key_frames {

@@ -12,6 +12,7 @@ mod safety;
 mod start;
 mod select;
 mod shell;
+mod audioui;
 mod storyboard;
 mod abrui;
 mod brushui;
@@ -386,6 +387,8 @@ pub struct LeonApp {
     xs_lane: f32,
     /// Zoom vertical (alto de los planos) de la línea de tiempo del storyboard.
     sbt_vz: f32,
+    /// Audio: los archivos leídos, el dispositivo de salida y la mezcla (ver `audio.rs`).
+    audio: crate::audio::State,
     /// Rueda acumulada para dar un paso de zoom por muesca.
     wheel_acc: f32,
 
@@ -793,6 +796,7 @@ impl LeonApp {
             xs_zoom: XS_ZOOM_DEFAULT,
             xs_lane: XS_ZOOM_DEFAULT,
             sbt_vz: 1.0,
+            audio: Default::default(),
             wheel_acc: 0.0,
             sb_sel: 0,
             sb_zoom: 260.0,
@@ -1190,6 +1194,8 @@ impl LeonApp {
         self.sb_sel = 0;
         self.sb_detail = false;
         self.anim_sig = None;
+        self.audio_stop();
+        self.audio.mix = None;
         self.picked.clear();
         self.pal_sel = self.pal_sel.min(self.project.palettes.len().saturating_sub(1));
         self.playing = false;

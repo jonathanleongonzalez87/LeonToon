@@ -82,9 +82,12 @@ fn rich_project() -> Project {
     bitmap.keys.insert(0, Arc::new(Drawing { strokes: Vec::new(), raster: Some(Arc::new(r)) }));
     p.layers.push(bitmap);
 
-    for (i, k) in [LayerKind::Solid, LayerKind::Null, LayerKind::Text, LayerKind::Light, LayerKind::Camera, LayerKind::StopMotion, LayerKind::Collection, LayerKind::Precomp].into_iter().enumerate() {
+    for (i, k) in [LayerKind::Solid, LayerKind::Null, LayerKind::Text, LayerKind::Light, LayerKind::Camera, LayerKind::StopMotion, LayerKind::Collection, LayerKind::Precomp, LayerKind::Audio].into_iter().enumerate() {
         let mut l = Layer::new(format!("Capa {k:?}"));
         l.kind = k;
+        if k == LayerKind::Audio {
+            l.audio = Some(crate::model::AudioRef { path: "C:/no/existe/voz.wav".into(), rel: Some("audio/voz.wav".into()), name: "voz".into() });
+        }
         if k == LayerKind::StopMotion {
             l.stopmotion = Some(SmRef { id: "0123456789abcdef".into(), name: "Escena 1".into(), rel: Some("fotos/escena1".into()), abs: "C:/no/existe/escena1".into(), photos: 12, frames: 30, fps: 12, start: 0 });
         }
@@ -132,6 +135,8 @@ fn rich_project_survives_save_and_open_identically() {
     for k in LayerKind::ALL {
         assert!(kinds.contains(&k), "falta una capa {k:?}");
     }
+    let au = back.layers.iter().find(|l| l.kind == LayerKind::Audio).unwrap().audio.clone().unwrap();
+    assert_eq!((au.name.as_str(), au.rel.as_deref()), ("voz", Some("audio/voz.wav")), "la referencia del audio se conserva");
     let sm = back.layers.iter().find(|l| l.kind == LayerKind::StopMotion).unwrap().stopmotion.clone().unwrap();
     assert_eq!((sm.name.as_str(), sm.rel.as_deref(), sm.photos, sm.frames, sm.fps), ("Escena 1", Some("fotos/escena1"), 12, 30, 12), "la referencia de Stop Motion se conserva");
     let cam = back.layers.iter().find(|l| l.kind == LayerKind::Camera).unwrap();
@@ -228,7 +233,7 @@ fn old_projects_keep_their_details_and_render() {
     assert_eq!(p.range, Some((2, 18)));
     let kinds: Vec<LayerKind> = p.layers.iter().map(|l| l.kind).collect();
     // Las capas Stop Motion, las colecciones y las precomposiciones no existían en 0.1.0: el resto de clases sí están.
-    for k in LayerKind::ALL.into_iter().filter(|k| !matches!(k, LayerKind::StopMotion | LayerKind::Collection | LayerKind::Precomp)) {
+    for k in LayerKind::ALL.into_iter().filter(|k| !matches!(k, LayerKind::StopMotion | LayerKind::Collection | LayerKind::Precomp | LayerKind::Audio)) {
         assert!(kinds.contains(&k), "falta una capa {k:?} del proyecto viejo");
     }
     assert!(p.layers.iter().all(|l| l.stopmotion.is_none()), "un proyecto viejo no trae secuencias Stop Motion");
@@ -454,9 +459,48 @@ fn mp4_export_works_when_ffmpeg_is_installed() {
     let dir = temp_dir("mp4");
     let p = export_project();
     let path = dir.join("v.mp4");
-    let n = render::export_video(&p, &ffmpeg, &path, 0, 5, 0.25).unwrap();
+    let n = render::export_video(&p, &ffmpeg, &path, 0, 5, 0.25, None).unwrap();
     assert_eq!(n, 6);
     assert!(std::fs::metadata(&path).map_or(false, |m| m.len() > 500), "el MP4 está vacío");
+    finish(&dir);
+}
+
+#[test]
+fn the_ffmpeg_command_adds_the_audio_input_and_codec_only_when_there_is_audio() {
+    let args = |audio: Option<&Path>| -> Vec<String> {
+        render::video_command(Path::new("ffmpeg"), 24, Path::new("tmp"), audio, Path::new("out.mp4")).get_args().map(|a| a.to_string_lossy().to_string()).collect()
+    };
+    let sin = args(None);
+    assert!(!sin.iter().any(|a| a == "aac") && sin.iter().filter(|a| *a == "-i").count() == 1);
+    let con = args(Some(Path::new("mezcla.wav")));
+    assert_eq!(con.iter().filter(|a| *a == "-i").count(), 2, "imagen y audio como entradas");
+    assert!(con.iter().any(|a| a.ends_with("mezcla.wav")));
+    assert!(con.windows(2).any(|w| w == ["-c:a", "aac"]) && con.iter().any(|a| a == "-shortest"));
+    assert_eq!(con.last().map(String::as_str), Some("out.mp4"), "el archivo de salida va al final");
+}
+
+#[test]
+fn mp4_export_carries_the_mixed_audio_when_ffmpeg_is_installed() {
+    let Some(ffmpeg) = render::find_ffmpeg() else {
+        eprintln!("ffmpeg no está instalado en este equipo: se omite la prueba de MP4 con audio");
+        return;
+    };
+    let dir = temp_dir("mp4audio");
+    let p = export_project();
+    // Medio segundo de tono, mezclado como lo hace la exportación.
+    let tone: Vec<f32> = (0..24_000).flat_map(|i| {
+        let v = (i as f32 * 0.1).sin() * 0.5;
+        [v, v]
+    }).collect();
+    let wav = dir.join("mezcla.wav");
+    crate::audio::write_wav(&wav, 48_000, &tone).unwrap();
+    let path = dir.join("v.mp4");
+    let n = render::export_video(&p, &ffmpeg, &path, 0, 11, 0.25, Some(&wav)).unwrap();
+    assert_eq!(n, 12);
+    // ffmpeg, sin salida, cuenta lo que trae el archivo: debe haber un flujo de audio.
+    let out = std::process::Command::new(&ffmpeg).arg("-i").arg(&path).output().unwrap();
+    let info = String::from_utf8_lossy(&out.stderr);
+    assert!(info.contains("Audio:") && info.contains("Video:"), "el MP4 debe traer imagen y sonido: {info}");
     finish(&dir);
 }
 

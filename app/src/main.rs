@@ -3,6 +3,7 @@
 mod app;
 mod abr;
 mod animatic;
+mod audio;
 mod demo;
 mod demo_animatic;
 mod pdf;

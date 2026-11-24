@@ -307,7 +307,8 @@ impl LeonApp {
 
     /// Ejemplo de animatic: la historia de la pelota con bocetos en mapa de bits (Personaje A y Personaje B), con el animatic creado.
     pub(crate) fn open_animatic_demo(&mut self) {
-        let mut p = crate::demo_animatic::build();
+        let audio_dir = safety::data_dir().map(|d| d.join("muestras").join("animatic")).unwrap_or_else(|| std::env::temp_dir().join("leontoon_muestras_animatic"));
+        let mut p = crate::demo_animatic::build_with_audio(&audio_dir);
         p.room_set = "animatic".into();
         p.rooms = tabs_for_set("animatic");
         self.project = p;

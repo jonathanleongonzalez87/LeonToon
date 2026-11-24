@@ -398,7 +398,23 @@ fn search_dir(dir: &Path, exe: &str, depth: u32) -> Option<std::path::PathBuf> {
 }
 
 /// Vídeo MP4 (H.264) de los fotogramas a..=b, usando ffmpeg.
-pub fn export_video(p: &Project, ffmpeg: &Path, path: &Path, a: u32, b: u32, scale: f32) -> Result<u32, String> {
+/// La orden de ffmpeg que une los fotogramas PNG de `dir` (y, si hay, el WAV de audio) en un MP4.
+pub fn video_command(ffmpeg: &Path, fps: u32, dir: &Path, audio: Option<&Path>, out: &Path) -> std::process::Command {
+    let mut cmd = std::process::Command::new(ffmpeg);
+    cmd.args(["-y", "-loglevel", "error", "-framerate"]).arg(fps.to_string()).arg("-i").arg(dir.join("f_%05d.png"));
+    if let Some(wav) = audio {
+        cmd.arg("-i").arg(wav);
+    }
+    cmd.args(["-c:v", "libx264", "-pix_fmt", "yuv420p", "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2"]);
+    if audio.is_some() {
+        cmd.args(["-c:a", "aac", "-b:a", "192k", "-shortest"]);
+    }
+    cmd.arg(out);
+    cmd
+}
+
+/// Exporta los fotogramas a..=b a un MP4. Con `audio` (un WAV con la mezcla de ese tramo), el vídeo lleva sonido.
+pub fn export_video(p: &Project, ffmpeg: &Path, path: &Path, a: u32, b: u32, scale: f32, audio: Option<&Path>) -> Result<u32, String> {
     let tmp = std::env::temp_dir().join(format!("leontoon_video_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&tmp);
     std::fs::create_dir_all(&tmp).map_err(|e| e.to_string())?;
@@ -408,13 +424,7 @@ pub fn export_video(p: &Project, ffmpeg: &Path, path: &Path, a: u32, b: u32, sca
         export_png_opts(p, f, scale, false, &tmp.join(format!("f_{:05}.png", n)))?;
         n += 1;
     }
-    let mut cmd = std::process::Command::new(ffmpeg);
-    cmd.args(["-y", "-loglevel", "error", "-framerate"])
-        .arg(p.fps.to_string())
-        .arg("-i")
-        .arg(tmp.join("f_%05d.png"))
-        .args(["-c:v", "libx264", "-pix_fmt", "yuv420p", "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2"])
-        .arg(path);
+    let mut cmd = video_command(ffmpeg, p.fps, &tmp, audio, path);
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;

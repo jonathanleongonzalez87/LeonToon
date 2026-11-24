@@ -24,10 +24,23 @@ impl LeonApp {
             return;
         };
         if let Some(p) = rfd::FileDialog::new().add_filter("Vídeo MP4", &["mp4"]).set_file_name("mi_animacion.mp4").save_file() {
-            self.render_opts.message = match render::export_video(&self.project, &ff, &p, a, b, scale) {
-                Ok(n) => format!("Terminado: vídeo de {n} fotogramas en {}", p.display()),
+            // Se exporta la composición principal (aunque se esté dentro de otra), con la mezcla de sus audios si los tiene.
+            let root = self.project.root_clone();
+            let b = b.min(root.length.saturating_sub(1));
+            let wav = std::env::temp_dir().join(format!("leontoon_audio_{}.wav", std::process::id()));
+            let audio = match self.audio_mixdown_wav(&root, a, b, &wav) {
+                Some(Ok(())) => Some(wav.clone()),
+                Some(Err(e)) => {
+                    self.render_opts.message = format!("Error de audio: {e}");
+                    return;
+                }
+                None => None,
+            };
+            self.render_opts.message = match render::export_video(&root, &ff, &p, a, b, scale, audio.as_deref()) {
+                Ok(n) => format!("Terminado: vídeo de {n} fotogramas{} en {}", if audio.is_some() { " con sonido" } else { "" }, p.display()),
                 Err(e) => format!("Error: {e}"),
             };
+            let _ = std::fs::remove_file(&wav);
             let m = self.render_opts.message.clone();
             self.say(m);
         }

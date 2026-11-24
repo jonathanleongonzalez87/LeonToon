@@ -623,10 +623,35 @@ pub enum LayerKind {
     Collection,
     /// Precomposición: su contenido es otra composición (ver `Layer::precomp`), con sus propias capas y su duración.
     Precomp,
+    /// Audio: un archivo de sonido (ver `Layer::audio`). Su barra es el tramo que suena; la opacidad es el volumen y el ojo lo apaga.
+    Audio,
+}
+
+/// Referencia al archivo de audio de una capa de audio (el sonido nunca se guarda dentro del proyecto).
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+pub struct AudioRef {
+    /// Ruta completa del archivo cuando se importó.
+    pub path: String,
+    /// Ruta relativa a la carpeta del proyecto, si el archivo está junto a él.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rel: Option<String>,
+    pub name: String,
+}
+
+impl AudioRef {
+    /// La ruta del archivo en este equipo: la completa si existe, o la relativa a la carpeta del proyecto.
+    pub fn resolve(&self, base: Option<&std::path::Path>) -> Option<std::path::PathBuf> {
+        let abs = std::path::PathBuf::from(&self.path);
+        if abs.is_file() {
+            return Some(abs);
+        }
+        let joined = base.zip(self.rel.as_ref()).map(|(b, r)| b.join(r))?;
+        joined.is_file().then_some(joined)
+    }
 }
 
 impl LayerKind {
-    pub const ALL: [LayerKind; 10] = [
+    pub const ALL: [LayerKind; 11] = [
         LayerKind::Vector,
         LayerKind::Bitmap,
         LayerKind::Solid,
@@ -637,6 +662,7 @@ impl LayerKind {
         LayerKind::StopMotion,
         LayerKind::Collection,
         LayerKind::Precomp,
+        LayerKind::Audio,
     ];
     pub fn label(self) -> &'static str {
         match self {
@@ -650,6 +676,7 @@ impl LayerKind {
             LayerKind::StopMotion => "Stop Motion",
             LayerKind::Collection => "Colección",
             LayerKind::Precomp => "Precomposición",
+            LayerKind::Audio => "Audio",
         }
     }
     /// Letra de la etiqueta en la lista de capas.
@@ -665,6 +692,7 @@ impl LayerKind {
             LayerKind::StopMotion => "M",
             LayerKind::Collection => "G",
             LayerKind::Precomp => "P",
+            LayerKind::Audio => "A",
         }
     }
     /// Color de etiqueta del prototipo.
@@ -679,6 +707,7 @@ impl LayerKind {
             LayerKind::StopMotion => [0x7a, 0xc9, 0xa4, 255],
             LayerKind::Collection => [0xa8, 0xcf, 0x8f, 255],
             LayerKind::Precomp => [0xf0, 0xb0, 0x80, 255],
+            LayerKind::Audio => [0x6f, 0xc3, 0xd8, 255],
         }
     }
     /// Se crean y se guardan, pero aún no se dibujan ni actúan en la escena (necesitan 3D o texto).
@@ -714,6 +743,9 @@ pub struct Layer {
     /// Solo para leer proyectos anteriores, que guardaban una sola pista con todo junto. Al abrir se convierte en 	racks.
     #[serde(default, rename = "xform", skip_serializing)]
     legacy_xform: BTreeMap<u32, XKey>,
+    /// El archivo de sonido (solo en capas de audio).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audio: Option<AudioRef>,
     /// Referencia a la carpeta de la secuencia (solo en capas Stop Motion).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stopmotion: Option<crate::stopmotion::SmRef>,
@@ -778,6 +810,7 @@ impl Layer {
             keys: BTreeMap::new(),
             tracks: Tracks::default(),
             legacy_xform: BTreeMap::new(),
+            audio: None,
             stopmotion: None,
             in_f: 0,
             out_f: None,
@@ -1796,7 +1829,9 @@ impl Project {
         let built = self.build_animatic();
         let open = self.stack.last().map_or(false, |lv| self.comp(lv.comp_id).map_or(false, |c| c.name == crate::animatic::NAME));
         if open {
+            let audio: Vec<Layer> = self.layers.iter().filter(|l| l.kind == LayerKind::Audio).cloned().collect();
             self.layers = built.layers;
+            self.layers.extend(audio);
             self.length = built.length;
             true
         } else {
@@ -1820,7 +1855,10 @@ impl Project {
                 return None;
             }
             let c = self.comps.iter_mut().find(|c| c.id == id)?;
+            // Los audios que se pusieron en el animatic se conservan al rehacer los clips.
+            let audio: Vec<Layer> = c.layers.iter().filter(|l| l.kind == LayerKind::Audio).cloned().collect();
             c.layers = built.layers;
+            c.layers.extend(audio);
             c.length = built.length;
             return Some(i);
         }
