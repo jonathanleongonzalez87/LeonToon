@@ -8,10 +8,10 @@ use egui::{Align2, Color32, FontId, Pos2, Rect, Sense, Shape, StrokeKind, Vec2};
 
 /// Hasta dónde gira la aguja a cada lado de la vertical, en grados.
 const SWEEP: f32 = 48.0;
-/// El rango de la escala en dBFS: de −18 (reposo) a 0 (tope).
-const DB_MIN: f32 = -18.0;
+/// El rango de la escala en dBFS: de −21 (reposo) a 0 (tope).
+const DB_MIN: f32 = -21.0;
 /// Las marcas con número de la escala, en dBFS.
-const MAJORS: [f32; 4] = [-12.0, -9.0, -6.0, -3.0];
+const MAJORS: [f32; 7] = [-21.0, -18.0, -15.0, -12.0, -9.0, -6.0, -3.0];
 
 /// El ángulo de la aguja (radianes desde la vertical, positivo hacia la derecha) para una lectura en dBFS.
 pub(super) fn needle_angle(db: f32) -> f32 {
@@ -33,48 +33,53 @@ fn at(pivot: Pos2, r: f32, a: f32) -> Pos2 {
     Pos2::new(pivot.x + a.sin() * r, pivot.y - a.cos() * r)
 }
 
-/// Un medidor: cara oscura con el resplandor de una bombilla detrás de la aguja (como la luz de la mesa de luz), escala fina y
-/// el piloto de recorte arriba a la derecha.
+/// Un medidor: cara oscura con la luz de un foco que cae desde arriba (el degradado cálido de la mesa de luz), escala fina y neutra
+/// (sin brillo) y el piloto de recorte arriba a la derecha, que es lo único que se enciende.
 fn paint_face(p: &egui::Painter, f: Rect, m: &crate::audio::Meter, ch: usize) {
     let h = f.height();
     p.rect_filled(f, 5.0, Color32::from_rgb(0x1a, 0x19, 0x18));
     let clipped = p.with_clip_rect(f);
     let pivot = Pos2::new(f.center().x, f.max.y - h * 0.1);
     let db = m.needle_db(ch);
-    // La bombilla: un resplandor cálido radial que se intensifica con el nivel.
+    // El foco: la luz entra por el borde de arriba y se desvanece hacia abajo; un resplandor radial en el centro del borde la suaviza.
     let level = ((db - DB_MIN) / -DB_MIN).clamp(0.0, 1.0);
     let warm = Color32::from_rgb(0xff, 0xa8, 0x40);
-    super::canvas::glow(&clipped, Pos2::new(f.center().x, f.center().y + h * 0.1), h * 0.05, h * 1.0, with_alpha(warm, 0.20 + 0.40 * level));
-    super::canvas::glow(&clipped, Pos2::new(f.center().x, f.center().y + h * 0.1), h * 0.02, h * 0.45, with_alpha(Color32::from_rgb(0xff, 0xe0, 0xa0), 0.10 + 0.25 * level));
+    let strength = 0.45 + 0.35 * level;
+    let band = Rect::from_min_max(f.min, Pos2::new(f.max.x, f.min.y + h * 0.6));
+    let mut mesh = egui::Mesh::default();
+    let (top, none) = (with_alpha(warm, 0.38 * strength), with_alpha(warm, 0.0));
+    mesh.colored_vertex(band.left_top(), top);
+    mesh.colored_vertex(band.right_top(), top);
+    mesh.colored_vertex(band.right_bottom(), none);
+    mesh.colored_vertex(band.left_bottom(), none);
+    mesh.add_triangle(0, 1, 2);
+    mesh.add_triangle(0, 2, 3);
+    clipped.add(Shape::mesh(mesh));
+    super::canvas::glow(&clipped, Pos2::new(f.center().x, f.min.y), h * 0.05, h * 0.9, with_alpha(warm, 0.22 * strength));
     p.rect_stroke(f, 5.0, stk(1.0, Color32::from_rgb(0x3a, 0x38, 0x35)), StrokeKind::Inside);
 
     let r = h * 0.66;
-    let ink = Color32::from_rgb(0xd8, 0xc9, 0xa8);
-    let amber = Color32::from_rgb(0xff, 0xb4, 0x54);
-    let red = Color32::from_rgb(0xe8, 0x4a, 0x3c);
-    let arc = |from: f32, to: f32| -> Vec<Pos2> { (0..=24).map(|i| at(pivot, r, needle_angle(from + (to - from) * i as f32 / 24.0))).collect() };
-    clipped.add(Shape::line(arc(DB_MIN, -3.0), stk(1.2, with_alpha(ink, 0.8))));
-    clipped.add(Shape::line(arc(-3.0, 0.0), stk(2.2, amber)));
-    // Marcas finas cada 1,5 dB y marcas con número en −12, −9, −6 y −3.
-    let mut v = DB_MIN;
-    while v <= 0.001 {
+    let ink = Color32::from_rgb(0xd8, 0xd2, 0xc4);
+    let arc = |from: f32, to: f32| -> Vec<Pos2> { (0..=32).map(|i| at(pivot, r, needle_angle(from + (to - from) * i as f32 / 32.0))).collect() };
+    clipped.add(Shape::line(arc(DB_MIN, 0.0), stk(1.2, with_alpha(ink, 0.85))));
+    // Una marca por dB (la escala es lineal en dB: cada marca separa lo mismo) y marcas largas con número cada 3 dB.
+    for k in 0..=(-DB_MIN as i32) {
+        let v = DB_MIN + k as f32;
+        let major = k % 3 == 0;
         let a = needle_angle(v);
-        clipped.line_segment([at(pivot, r, a), at(pivot, r + h * 0.035, a)], stk(1.0, with_alpha(if v >= -3.0 { amber } else { ink }, 0.7)));
-        v += 1.5;
+        let len = if major { h * 0.07 } else { h * 0.035 };
+        clipped.line_segment([at(pivot, r, a), at(pivot, r + len, a)], stk(if major { 1.3 } else { 0.9 }, with_alpha(ink, if major { 0.95 } else { 0.7 })));
     }
-    clipped.line_segment([at(pivot, r - h * 0.02, needle_angle(0.0)), at(pivot, r + h * 0.08, needle_angle(0.0))], stk(1.8, red));
     for v in MAJORS {
         let a = needle_angle(v);
-        clipped.line_segment([at(pivot, r, a), at(pivot, r + h * 0.07, a)], stk(1.4, if v >= -3.0 { amber } else { ink }));
-        clipped.text(at(pivot, r + h * 0.17, a), Align2::CENTER_CENTER, format!("{}", v as i32).replace('-', "−"), FontId::proportional((h * 0.105).clamp(8.0, 12.0)), if v >= -3.0 { amber } else { with_alpha(ink, 0.9) });
+        clipped.text(at(pivot, r + h * 0.16, a), Align2::CENTER_CENTER, format!("{}", v as i32).replace('-', "−"), FontId::proportional((h * 0.095).clamp(7.5, 11.0)), with_alpha(ink, 0.9));
     }
     clipped.text(Pos2::new(f.min.x + h * 0.09, f.min.y + h * 0.12), Align2::LEFT_CENTER, if ch == 0 { "L" } else { "R" }, FontId::proportional((h * 0.12).clamp(9.0, 13.0)), with_alpha(ink, 0.8));
 
-    // La aguja: un trazo cálido con un halo suave.
+    // La aguja: un trazo limpio, sin brillo.
     let tip = at(pivot, r * 1.04, needle_angle(db));
-    clipped.line_segment([pivot, tip], stk(4.0, with_alpha(warm, 0.18)));
-    clipped.line_segment([pivot, tip], stk(1.5, Color32::from_rgb(0xff, 0xf0, 0xd0)));
-    clipped.circle_filled(pivot, h * 0.03, Color32::from_rgb(0xff, 0xf0, 0xd0));
+    clipped.line_segment([pivot, tip], stk(1.6, Color32::from_rgb(0xf0, 0xea, 0xdc)));
+    clipped.circle_filled(pivot, h * 0.03, Color32::from_rgb(0xf0, 0xea, 0xdc));
 
     // El piloto de recorte, con halo cuando está encendido.
     let lamp = m.lamp(ch);
@@ -127,10 +132,10 @@ mod tests {
 
     #[test]
     fn la_aguja_barre_de_izquierda_a_derecha_y_no_se_sale_de_la_escala() {
-        assert!((needle_angle(-18.0).to_degrees() + SWEEP).abs() < 1e-3);
+        assert!((needle_angle(-21.0).to_degrees() + SWEEP).abs() < 1e-3);
         assert!((needle_angle(0.0).to_degrees() - SWEEP).abs() < 1e-3);
         assert!(needle_angle(-12.0) < needle_angle(-3.0));
-        assert_eq!(needle_angle(-99.0), needle_angle(-18.0));
+        assert_eq!(needle_angle(-99.0), needle_angle(-21.0));
         assert_eq!(needle_angle(40.0), needle_angle(0.0));
     }
 

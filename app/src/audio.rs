@@ -708,12 +708,12 @@ impl Meter {
         }
     }
 
-    /// La lectura de la aguja en dBFS eficaces, de −18 (reposo) a 0.
+    /// La lectura de la aguja en dBFS eficaces, de −21 (reposo) a 0.
     pub fn needle_db(&self, ch: usize) -> f32 {
         if self.vu[ch] <= 1e-6 {
-            return -18.0;
+            return -21.0;
         }
-        (20.0 * self.vu[ch].log10()).clamp(-18.0, 0.0)
+        (20.0 * self.vu[ch].log10()).clamp(-21.0, 0.0)
     }
 
     pub fn is_moving(&self) -> bool {
@@ -1083,7 +1083,7 @@ mod tests {
         // Silencio: piloto apagado y aguja en reposo.
         m.feed(&tone(0.0, 100), 0, 100, rate);
         assert_eq!(m.lamp(0), Lamp::Off);
-        assert_eq!(m.needle_db(0), -18.0);
+        assert_eq!(m.needle_db(0), -21.0);
         // Sonido normal: verde, y la aguja sube con el promedio (no de golpe).
         let quiet = tone(0.25, 1000);
         m.feed(&quiet, 0, 100, rate);

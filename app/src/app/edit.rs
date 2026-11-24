@@ -847,7 +847,7 @@ impl LeonApp {
             return;
         }
         // Línea de tiempo de montaje: A, P, S, R, T, U y F4 con el puntero encima.
-        if self.mt_keys(ctx) {
+        if self.mt_split_key(ctx) || self.mt_keys(ctx) {
             return;
         }
         // Pluma con una curva en curso: Intro termina, Esc cancela, Retroceso quita el último nodo.
@@ -877,6 +877,10 @@ impl LeonApp {
         let cmd = Modifiers::COMMAND;
         if k(cs, Key::C) {
             self.precompose_current();
+        }
+        // Ctrl + D duplica la capa (Ctrl + Mayús + D corta en el cabezal, en el montaje).
+        if k(cmd, Key::D) && !story && !ctx.wants_keyboard_input() {
+            self.duplicate_layer();
         }
         if k(cs, Key::G) {
             self.ungroup_current();

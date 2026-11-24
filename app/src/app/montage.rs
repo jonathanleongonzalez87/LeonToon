@@ -247,6 +247,20 @@ impl LeonApp {
         build_rows_ex(&shy, &hidden, &is3d, &animated, &audio, &audio_animated, self.cl, self.hide_shy, &self.mt.open, &self.mt.reveal)
     }
 
+    /// Ctrl + Mayús + D (como en After Effects): corta las capas elegidas (o la actual) en el cabezal, esté el puntero donde esté,
+    /// mientras la sala tenga la línea de tiempo de montaje y no se esté escribiendo en un campo. No activa la cuchilla.
+    pub(super) fn mt_split_key(&mut self, ctx: &egui::Context) -> bool {
+        if self.slot_editor(Slot::Time) != Editor::Montage || self.room_kind().slots().iter().all(|s| *s != Slot::Time) || ctx.wants_keyboard_input() {
+            return false;
+        }
+        use egui::{Key, Modifiers};
+        if ctx.input_mut(|i| i.consume_key(Modifiers::COMMAND | Modifiers::SHIFT, Key::D)) {
+            self.mt_split(self.frame, None);
+            return true;
+        }
+        false
+    }
+
     /// Teclas de la línea de tiempo de montaje, con el puntero encima: A, P, S, R y T muestran esa propiedad (Mayús suma),
     /// U las animadas y F4 alterna las columnas. Devuelve true si se usó alguna.
     pub(super) fn mt_keys(&mut self, ctx: &egui::Context) -> bool {
@@ -254,11 +268,6 @@ impl LeonApp {
             return false;
         }
         use egui::{Key, Modifiers};
-        // Ctrl + Mayús + D (como en After Effects): corta las capas elegidas en el cabezal.
-        if ctx.input_mut(|i| i.consume_key(Modifiers::COMMAND | Modifiers::SHIFT, Key::D)) {
-            self.mt_split(self.frame, None);
-            return true;
-        }
         if self.mt.blade && ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Escape)) {
             self.mt.blade = false;
             return true;
