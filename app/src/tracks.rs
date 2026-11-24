@@ -21,10 +21,67 @@ pub enum Prop {
     Opacity,
     /// Profundidad (eje Z) de una capa 3D: un desplazamiento sobre su plano (BG, MG o FG) o sobre la posición de la cámara.
     Depth,
+    // ---- Propiedades de una capa de audio (no tienen nada de imagen) ----
+    /// Ganancia en decibelios (0 = sin cambio).
+    Gain,
+    /// Paneo: de -1 (todo a la izquierda) a 1 (todo a la derecha).
+    Pan,
+    /// Ecualizador: agudos, medios y graves, en decibelios.
+    EqHi,
+    EqMid,
+    EqLo,
+    /// Silencio automatizable (0 suena, 1 calla; solo cambia de golpe).
+    Mute,
+    /// Efectos: cuánta reverberación y cuánto eco se mezclan (de 0 a 1).
+    Reverb,
+    Echo,
 }
 
 impl Prop {
+    /// Las propiedades de imagen (las de las capas visibles).
     pub const ALL: [Prop; 6] = [Prop::Anchor, Prop::Position, Prop::Scale, Prop::Rotation, Prop::Opacity, Prop::Depth];
+    /// Las propiedades de una capa de audio.
+    pub const AUDIO: [Prop; 8] = [Prop::Gain, Prop::Pan, Prop::EqHi, Prop::EqMid, Prop::EqLo, Prop::Mute, Prop::Reverb, Prop::Echo];
+    /// Todas, para lo que afecta a las claves de cualquier capa (mover, quitar, desplazar).
+    pub const EVERY: [Prop; 14] = [
+        Prop::Anchor,
+        Prop::Position,
+        Prop::Scale,
+        Prop::Rotation,
+        Prop::Opacity,
+        Prop::Depth,
+        Prop::Gain,
+        Prop::Pan,
+        Prop::EqHi,
+        Prop::EqMid,
+        Prop::EqLo,
+        Prop::Mute,
+        Prop::Reverb,
+        Prop::Echo,
+    ];
+
+    pub fn is_audio(self) -> bool {
+        Prop::AUDIO.contains(&self)
+    }
+
+    /// Mínimo y máximo de una propiedad de audio.
+    pub fn audio_range(self) -> (f32, f32) {
+        match self {
+            Prop::Gain => (-60.0, 12.0),
+            Prop::Pan => (-1.0, 1.0),
+            Prop::EqHi | Prop::EqMid | Prop::EqLo => (-15.0, 15.0),
+            _ => (0.0, 1.0),
+        }
+    }
+
+    /// Cómo se pasa de una clave de esta propiedad a la siguiente: el silencio cambia de golpe, lo demás es continuo.
+    pub fn audio_interp(self) -> Interp {
+        if self == Prop::Mute {
+            Interp::Step
+        } else {
+            Interp::Linear
+        }
+    }
 
     pub fn name(self) -> &'static str {
         match self {
@@ -34,6 +91,14 @@ impl Prop {
             Prop::Rotation => "Rotación",
             Prop::Opacity => "Opacidad",
             Prop::Depth => "Profundidad (Z)",
+            Prop::Gain => "Ganancia",
+            Prop::Pan => "Paneo",
+            Prop::EqHi => "EQ agudos",
+            Prop::EqMid => "EQ medios",
+            Prop::EqLo => "EQ graves",
+            Prop::Mute => "Mute",
+            Prop::Reverb => "Reverb",
+            Prop::Echo => "Eco",
         }
     }
 
@@ -42,6 +107,7 @@ impl Prop {
         match self {
             Prop::Anchor | Prop::Position | Prop::Rotation | Prop::Depth => [0.0, 0.0],
             Prop::Scale | Prop::Opacity => [1.0, 0.0],
+            _ => [0.0, 0.0],
         }
     }
 
@@ -54,6 +120,7 @@ impl Prop {
             Prop::Rotation => [k.r, 0.0],
             Prop::Opacity => [k.o, 0.0],
             Prop::Depth => [k.dz, 0.0],
+            _ => [0.0, 0.0],
         }
     }
 
@@ -65,6 +132,7 @@ impl Prop {
             Prop::Rotation => k.r = v[0],
             Prop::Opacity => k.o = v[0],
             Prop::Depth => k.dz = v[0],
+            _ => {}
         }
     }
 }
@@ -87,6 +155,14 @@ pub struct Tracks {
     rotation: BTreeMap<u32, PKey>,
     opacity: BTreeMap<u32, PKey>,
     depth: BTreeMap<u32, PKey>,
+    gain: BTreeMap<u32, PKey>,
+    pan: BTreeMap<u32, PKey>,
+    eq_hi: BTreeMap<u32, PKey>,
+    eq_mid: BTreeMap<u32, PKey>,
+    eq_lo: BTreeMap<u32, PKey>,
+    mute: BTreeMap<u32, PKey>,
+    reverb: BTreeMap<u32, PKey>,
+    echo: BTreeMap<u32, PKey>,
 }
 
 impl Tracks {
@@ -98,6 +174,14 @@ impl Tracks {
             Prop::Rotation => &self.rotation,
             Prop::Opacity => &self.opacity,
             Prop::Depth => &self.depth,
+            Prop::Gain => &self.gain,
+            Prop::Pan => &self.pan,
+            Prop::EqHi => &self.eq_hi,
+            Prop::EqMid => &self.eq_mid,
+            Prop::EqLo => &self.eq_lo,
+            Prop::Mute => &self.mute,
+            Prop::Reverb => &self.reverb,
+            Prop::Echo => &self.echo,
         }
     }
 
@@ -109,11 +193,19 @@ impl Tracks {
             Prop::Rotation => &mut self.rotation,
             Prop::Opacity => &mut self.opacity,
             Prop::Depth => &mut self.depth,
+            Prop::Gain => &mut self.gain,
+            Prop::Pan => &mut self.pan,
+            Prop::EqHi => &mut self.eq_hi,
+            Prop::EqMid => &mut self.eq_mid,
+            Prop::EqLo => &mut self.eq_lo,
+            Prop::Mute => &mut self.mute,
+            Prop::Reverb => &mut self.reverb,
+            Prop::Echo => &mut self.echo,
         }
     }
 
     pub fn is_empty(&self) -> bool {
-        Prop::ALL.iter().all(|p| self.map(*p).is_empty())
+        Prop::EVERY.iter().all(|p| self.map(*p).is_empty())
     }
 
     /// ¿Esta propiedad está animada (tiene alguna clave)?
@@ -123,7 +215,7 @@ impl Tracks {
 
     /// Cuadros que tienen alguna clave, de cualquier propiedad.
     pub fn frames(&self) -> BTreeSet<u32> {
-        Prop::ALL.iter().flat_map(|p| self.map(*p).keys().copied()).collect()
+        Prop::EVERY.iter().flat_map(|p| self.map(*p).keys().copied()).collect()
     }
 
     /// Cuántos cuadros distintos tienen clave.
@@ -132,7 +224,7 @@ impl Tracks {
     }
 
     pub fn has_key_at(&self, f: u32) -> bool {
-        Prop::ALL.iter().any(|p| self.map(*p).contains_key(&f))
+        Prop::EVERY.iter().any(|p| self.map(*p).contains_key(&f))
     }
 
     pub fn has_prop_key_at(&self, p: Prop, f: u32) -> bool {
@@ -225,7 +317,7 @@ impl Tracks {
     /// Quita las claves de todas las propiedades en el cuadro `f`. Devuelve true si había alguna.
     pub fn remove_at(&mut self, f: u32) -> bool {
         let mut any = false;
-        for p in Prop::ALL {
+        for p in Prop::EVERY {
             any |= self.map_mut(p).remove(&f).is_some();
         }
         any
@@ -269,7 +361,7 @@ impl Tracks {
 
     /// Desplaza una posición las claves desde `f` (al insertar o quitar un fotograma).
     pub fn shift_from(&mut self, f: u32, up: bool) {
-        for p in Prop::ALL {
+        for p in Prop::EVERY {
             let m = self.map_mut(p);
             let moved: Vec<(u32, PKey)> = m.split_off(&f).into_iter().collect();
             for (k, x) in moved {
@@ -285,7 +377,7 @@ impl Tracks {
 
     /// Mueve todas las claves `d` cuadros (positivo: más tarde). El llamador se asegura de que ninguna quede antes del cuadro 0.
     pub fn shift_all(&mut self, d: i32) {
-        for p in Prop::ALL {
+        for p in Prop::EVERY {
             let m = self.map_mut(p);
             *m = std::mem::take(m).into_iter().map(|(k, x)| ((k as i64 + d as i64).max(0) as u32, x)).collect();
         }
@@ -293,7 +385,7 @@ impl Tracks {
 
     /// Al quitar el fotograma `f`: una clave que quedaría pegada a la siguiente se descarta.
     pub fn remove_frame_keys(&mut self, f: u32) {
-        for p in Prop::ALL {
+        for p in Prop::EVERY {
             let m = self.map_mut(p);
             if m.contains_key(&f) && m.contains_key(&(f + 1)) {
                 m.remove(&f);
@@ -303,7 +395,7 @@ impl Tracks {
 
     /// Duplica la duración (×2): cada clave pasa al cuadro doble.
     pub fn double(&mut self) {
-        for p in Prop::ALL {
+        for p in Prop::EVERY {
             let m = self.map_mut(p);
             *m = std::mem::take(m).into_iter().map(|(k, x)| (k * 2, x)).collect();
         }
@@ -312,13 +404,17 @@ impl Tracks {
     /// Deja las pistas válidas (por si vienen de un archivo editado o dañado): números finitos, cuadros razonables, opacidad
     /// entre 0 y 1 y escala acotada.
     pub fn sanitize(&mut self) {
-        for p in Prop::ALL {
+        for p in Prop::EVERY {
             let m = self.map_mut(p);
             m.retain(|k, x| *k < 1_000_000 && x.v.iter().all(|v| v.is_finite()));
             for x in m.values_mut() {
                 match p {
                     Prop::Opacity => x.v[0] = x.v[0].clamp(0.0, 1.0),
                     Prop::Scale => x.v[0] = x.v[0].clamp(-50.0, 50.0),
+                    p if p.is_audio() => {
+                        let (lo, hi) = p.audio_range();
+                        x.v[0] = x.v[0].clamp(lo, hi);
+                    }
                     _ => {}
                 }
             }

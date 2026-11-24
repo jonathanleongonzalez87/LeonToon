@@ -627,8 +627,55 @@ pub enum LayerKind {
     Audio,
 }
 
+/// Los valores de una capa de audio mientras no están animados (con claves, manda la pista de la propiedad).
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Default)]
+#[serde(default)]
+pub struct AudioParams {
+    /// Ganancia en dB.
+    pub gain_db: f32,
+    /// Paneo de -1 a 1.
+    pub pan: f32,
+    /// Ecualizador en dB: agudos, medios y graves.
+    pub eq_hi: f32,
+    pub eq_mid: f32,
+    pub eq_lo: f32,
+    /// Cuánta reverberación y cuánto eco se mezclan (0 a 1).
+    pub reverb: f32,
+    pub echo: f32,
+}
+
+impl AudioParams {
+    pub fn get(&self, p: Prop) -> f32 {
+        match p {
+            Prop::Gain => self.gain_db,
+            Prop::Pan => self.pan,
+            Prop::EqHi => self.eq_hi,
+            Prop::EqMid => self.eq_mid,
+            Prop::EqLo => self.eq_lo,
+            Prop::Reverb => self.reverb,
+            Prop::Echo => self.echo,
+            _ => 0.0,
+        }
+    }
+
+    pub fn set(&mut self, p: Prop, v: f32) {
+        let (lo, hi) = p.audio_range();
+        let v = v.clamp(lo, hi);
+        match p {
+            Prop::Gain => self.gain_db = v,
+            Prop::Pan => self.pan = v,
+            Prop::EqHi => self.eq_hi = v,
+            Prop::EqMid => self.eq_mid = v,
+            Prop::EqLo => self.eq_lo = v,
+            Prop::Reverb => self.reverb = v,
+            Prop::Echo => self.echo = v,
+            _ => {}
+        }
+    }
+}
+
 /// Referencia al archivo de audio de una capa de audio (el sonido nunca se guarda dentro del proyecto).
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Default)]
 pub struct AudioRef {
     /// Ruta completa del archivo cuando se importó.
     pub path: String,
@@ -636,6 +683,16 @@ pub struct AudioRef {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rel: Option<String>,
     pub name: String,
+    /// Segundos del principio del archivo que se recortan: la capa empieza a sonar desde ese punto del archivo.
+    #[serde(default, skip_serializing_if = "is_zero_f32")]
+    pub offset: f32,
+    /// Ganancia, paneo, ecualizador y efectos mientras no están animados.
+    #[serde(default)]
+    pub params: AudioParams,
+}
+
+fn is_zero_f32(v: &f32) -> bool {
+    *v == 0.0
 }
 
 impl AudioRef {
@@ -891,6 +948,40 @@ impl Layer {
     }
 
     /// Mueve toda la capa en el tiempo `d` cuadros (la barra con sus dibujos y claves). No pasa del cuadro 0. Devuelve lo que se movió de verdad.
+    /// El valor de una propiedad de audio en el cuadro `f`: el de su pista si está animada, o el fijo de la capa.
+    pub fn audio_value(&self, p: Prop, f: u32) -> f32 {
+        if self.tracks.has(p) {
+            self.tracks.value_at(p, f).0[0]
+        } else {
+            self.audio.as_ref().map_or(p.default_value()[0], |a| a.params.get(p))
+        }
+    }
+
+    /// Cambia una propiedad de audio: con cronómetro, pone clave en el cuadro `f`; sin él, cambia el valor fijo.
+    pub fn audio_set(&mut self, p: Prop, f: u32, v: f32) {
+        let (lo, hi) = p.audio_range();
+        let v = v.clamp(lo, hi);
+        if self.tracks.has(p) {
+            self.tracks.set(p, f, [v, 0.0], p.audio_interp());
+        } else if let Some(a) = &mut self.audio {
+            a.params.set(p, v);
+        }
+    }
+
+    /// El cronómetro de una propiedad de audio: al encenderlo se pone una clave con el valor actual; al apagarlo se borran las claves y
+    /// el valor de este cuadro pasa a ser el fijo.
+    pub fn audio_stopwatch(&mut self, p: Prop, f: u32) {
+        let v = self.audio_value(p, f);
+        if self.tracks.has(p) {
+            self.tracks.clear_prop(p);
+            if let Some(a) = &mut self.audio {
+                a.params.set(p, v);
+            }
+        } else {
+            self.tracks.set(p, f, [v, 0.0], p.audio_interp());
+        }
+    }
+
     pub fn shift_time(&mut self, d: i32) -> i32 {
         let d = d.max(-(self.first_used_frame() as i32));
         if d == 0 {

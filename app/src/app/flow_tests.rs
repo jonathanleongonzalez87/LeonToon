@@ -86,7 +86,9 @@ fn rich_project() -> Project {
         let mut l = Layer::new(format!("Capa {k:?}"));
         l.kind = k;
         if k == LayerKind::Audio {
-            l.audio = Some(crate::model::AudioRef { path: "C:/no/existe/voz.wav".into(), rel: Some("audio/voz.wav".into()), name: "voz".into() });
+            l.audio = Some(crate::model::AudioRef { path: "C:/no/existe/voz.wav".into(), rel: Some("audio/voz.wav".into()), name: "voz".into(), offset: 0.75, params: crate::model::AudioParams { gain_db: -4.5, pan: 0.3, eq_lo: 2.0, reverb: 0.2, ..Default::default() } });
+            l.tracks.set(crate::tracks::Prop::Gain, 5, [-10.0, 0.0], crate::model::Interp::Linear);
+            l.tracks.set(crate::tracks::Prop::Mute, 9, [1.0, 0.0], crate::model::Interp::Step);
         }
         if k == LayerKind::StopMotion {
             l.stopmotion = Some(SmRef { id: "0123456789abcdef".into(), name: "Escena 1".into(), rel: Some("fotos/escena1".into()), abs: "C:/no/existe/escena1".into(), photos: 12, frames: 30, fps: 12, start: 0 });
@@ -136,7 +138,10 @@ fn rich_project_survives_save_and_open_identically() {
         assert!(kinds.contains(&k), "falta una capa {k:?}");
     }
     let au = back.layers.iter().find(|l| l.kind == LayerKind::Audio).unwrap().audio.clone().unwrap();
-    assert_eq!((au.name.as_str(), au.rel.as_deref()), ("voz", Some("audio/voz.wav")), "la referencia del audio se conserva");
+    assert_eq!((au.name.as_str(), au.rel.as_deref(), au.offset), ("voz", Some("audio/voz.wav"), 0.75), "la referencia del audio se conserva");
+    assert_eq!((au.params.gain_db, au.params.pan, au.params.eq_lo, au.params.reverb), (-4.5, 0.3, 2.0, 0.2), "los valores de audio se conservan");
+    let al = back.layers.iter().find(|l| l.kind == LayerKind::Audio).unwrap();
+    assert!(al.tracks.has(crate::tracks::Prop::Gain) && al.tracks.has(crate::tracks::Prop::Mute), "las claves de audio se conservan");
     let sm = back.layers.iter().find(|l| l.kind == LayerKind::StopMotion).unwrap().stopmotion.clone().unwrap();
     assert_eq!((sm.name.as_str(), sm.rel.as_deref(), sm.photos, sm.frames, sm.fps), ("Escena 1", Some("fotos/escena1"), 12, 30, 12), "la referencia de Stop Motion se conserva");
     let cam = back.layers.iter().find(|l| l.kind == LayerKind::Camera).unwrap();
@@ -384,7 +389,7 @@ fn png_export_has_the_right_size_content_and_no_paper_grain() {
 fn image_sequence_export_writes_one_valid_png_per_frame() {
     let dir = temp_dir("secuencia");
     let p = export_project();
-    let n = render::export_sequence_range(&p, &dir, 2, 5, 0.25, false).unwrap();
+    let n = render::export_sequence_range(&p, &dir, 2, 5, 0.25, false, None).unwrap();
     assert_eq!(n, 4);
     for f in 3..=6 {
         let path = dir.join(format!("fotograma_{f:04}.png"));
@@ -400,7 +405,7 @@ fn gif_export_has_one_frame_per_step_and_respects_the_max_width() {
     let dir = temp_dir("gif");
     let p = export_project();
     let path = dir.join("a.gif");
-    render::export_gif_range(&p, &path, 0, 4, 320).unwrap();
+    render::export_gif_range(&p, &path, 0, 4, 320, None).unwrap();
     let bytes = std::fs::read(&path).unwrap();
     assert!(bytes.starts_with(b"GIF89a") || bytes.starts_with(b"GIF87a"), "no empieza como un GIF");
     let mut dec = gif::DecodeOptions::new();
@@ -427,7 +432,7 @@ fn sprite_sheet_export_lays_out_every_frame_and_describes_them() {
     let dir = temp_dir("hoja");
     let p = export_project();
     let path = dir.join("hoja.png");
-    let n = render::export_sprite_sheet(&p, &path, 0, 3, 0.25, 2, false).unwrap();
+    let n = render::export_sprite_sheet(&p, &path, 0, 3, 0.25, 2, false, None).unwrap();
     assert_eq!(n, 4);
     let pm = tiny_skia::Pixmap::load_png(&path).unwrap();
     let (cw, ch) = ((p.width as f32 * 0.25).round() as u32, (p.height as f32 * 0.25).round() as u32);
@@ -459,7 +464,7 @@ fn mp4_export_works_when_ffmpeg_is_installed() {
     let dir = temp_dir("mp4");
     let p = export_project();
     let path = dir.join("v.mp4");
-    let n = render::export_video(&p, &ffmpeg, &path, 0, 5, 0.25, None).unwrap();
+    let n = render::export_video(&p, &ffmpeg, &path, 0, 5, 0.25, None, None).unwrap();
     assert_eq!(n, 6);
     assert!(std::fs::metadata(&path).map_or(false, |m| m.len() > 500), "el MP4 está vacío");
     finish(&dir);
@@ -495,7 +500,7 @@ fn mp4_export_carries_the_mixed_audio_when_ffmpeg_is_installed() {
     let wav = dir.join("mezcla.wav");
     crate::audio::write_wav(&wav, 48_000, &tone).unwrap();
     let path = dir.join("v.mp4");
-    let n = render::export_video(&p, &ffmpeg, &path, 0, 11, 0.25, Some(&wav)).unwrap();
+    let n = render::export_video(&p, &ffmpeg, &path, 0, 11, 0.25, Some(&wav), None).unwrap();
     assert_eq!(n, 12);
     // ffmpeg, sin salida, cuenta lo que trae el archivo: debe haber un flujo de audio.
     let out = std::process::Command::new(&ffmpeg).arg("-i").arg(&path).output().unwrap();

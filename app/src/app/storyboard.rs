@@ -440,9 +440,12 @@ impl LeonApp {
         let title = self.path.as_ref().and_then(|p| p.file_stem()).map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "Storyboard".into());
         // Se exporta la composición principal aunque se esté dentro de un plano.
         let root = self.project.root_clone();
-        match crate::pdf::storyboard_pdf(&root, &title).and_then(|bytes| std::fs::write(path, bytes).map_err(|e| e.to_string())) {
-            Ok(()) => self.say(format!("Storyboard exportado: {} ({} planos)", path.display(), root.storyboard.len())),
-            Err(e) => self.say(format!("No se pudo exportar el PDF: {e}")),
+        match crate::pdf::storyboard_pdf(&root, &title).and_then(|bytes| std::fs::write(path, bytes).map(|_| ()).map_err(|e| e.to_string())) {
+            Ok(()) => {
+                let size = std::fs::metadata(path).map_or(0, |m| m.len());
+                self.finish_export(true, format!("Storyboard en PDF guardado: {} planos", root.storyboard.len()), format!("{} página(s) · {:.1} MB", root.storyboard.len().div_ceil(crate::pdf::PER_PAGE), size as f64 / 1_048_576.0), Some(path.to_path_buf()));
+            }
+            Err(e) => self.finish_export(false, "No se pudo exportar el PDF", e, None),
         }
     }
 
@@ -780,7 +783,7 @@ impl LeonApp {
                 painter.rect_filled(bar, 3.0, Color32::from_rgb(0x6f, 0xc3, 0xd8).gamma_multiply(0.45));
                 painter.rect_stroke(bar, 3.0, stk(1.0, Color32::from_rgb(0x6f, 0xc3, 0xd8)), EStrokeKind::Inside);
                 if let Some(e) = self.audio.cache.get(&it.path) {
-                    super::audioui::paint_wave(&painter, bar, e, 1.0 / pps, 0.0, Color32::from_black_alpha(170));
+                    super::audioui::paint_wave(&painter, bar, e, 1.0 / pps, it.offset, Color32::from_black_alpha(170), &|t| (it.gain_lin(it.start + t), it.muted(it.start + t)));
                 }
                 let name = it.path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
                 painter.with_clip_rect(bar).text(bar.min + Vec2::new(4.0, 2.0), Align2::LEFT_TOP, name, FontId::proportional(10.0), TX);

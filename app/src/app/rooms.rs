@@ -10,6 +10,9 @@ fn heading(ui: &mut egui::Ui, t: &str) {
 
 impl LeonApp {
     fn export_mp4(&mut self, a: u32, b: u32, scale: f32) {
+        if self.exporting() {
+            return;
+        }
         if self.ffmpeg.as_ref().map_or(true, |p| !p.is_file()) {
             self.ffmpeg = render::find_ffmpeg();
         }
@@ -20,32 +23,28 @@ impl LeonApp {
                 .pick_file();
         }
         let Some(ff) = self.ffmpeg.clone() else {
-            self.render_opts.message = "Para exportar vídeo hace falta ffmpeg (gratuito, ffmpeg.org).".into();
+            self.finish_export(false, "Falta ffmpeg para exportar vídeo", "ffmpeg es gratuito (ffmpeg.org). Instálalo con «winget install Gyan.FFmpeg» y vuelve a abrir LeonToon, o indica dónde está ffmpeg.exe.", None);
             return;
         };
-        if let Some(p) = rfd::FileDialog::new().add_filter("Vídeo MP4", &["mp4"]).set_file_name("mi_animacion.mp4").save_file() {
-            // Se exporta la composición principal (aunque se esté dentro de otra), con la mezcla de sus audios si los tiene.
-            let root = self.project.root_clone();
-            let b = b.min(root.length.saturating_sub(1));
-            let wav = std::env::temp_dir().join(format!("leontoon_audio_{}.wav", std::process::id()));
-            let audio = match self.audio_mixdown_wav(&root, a, b, &wav) {
-                Some(Ok(())) => Some(wav.clone()),
-                Some(Err(e)) => {
-                    self.render_opts.message = format!("Error de audio: {e}");
-                    return;
+        let Some(path) = rfd::FileDialog::new().add_filter("Vídeo MP4", &["mp4"]).set_file_name("mi_animacion.mp4").save_file() else { return };
+        // Los audios de la composición principal (aunque se esté dentro de otra) se leen aquí y se mezclan en el hilo de la exportación.
+        let root = self.project.root_clone();
+        let items = crate::audio::collect(&root);
+        let audio = if items.is_empty() {
+            None
+        } else {
+            for it in &items {
+                if self.audio.cache.get(&it.path).is_none() {
+                    if let Err(e) = self.audio.cache.load(&it.path) {
+                        self.finish_export(false, "No se pudo leer un audio", e, None);
+                        return;
+                    }
                 }
-                None => None,
-            };
-            self.render_opts.message = match render::export_video(&root, &ff, &p, a, b, scale, audio.as_deref()) {
-                Ok(n) => format!("Terminado: vídeo de {n} fotogramas{} en {}", if audio.is_some() { " con sonido" } else { "" }, p.display()),
-                Err(e) => format!("Error: {e}"),
-            };
-            let _ = std::fs::remove_file(&wav);
-            let m = self.render_opts.message.clone();
-            self.say(m);
-        }
+            }
+            Some((items, self.audio.cache.clone()))
+        };
+        self.start_export(super::exportjob::ExportKind::Mp4 { path, ffmpeg: ff, audio }, a, b, scale, false);
     }
-
     pub(super) fn schematic_room(&mut self, ui: &mut egui::Ui) {
         egui::Frame::default().inner_margin(egui::Margin::same(14)).show(ui, |ui| {
             muted(ui, "Esquema de columnas (solo lectura). Cada columna se combina, de abajo arriba, hasta la SALIDA. El orden se cambia arrastrando las cabeceras del Xsheet.");
@@ -171,7 +170,10 @@ impl LeonApp {
     pub(super) fn render_room(&mut self, ui: &mut egui::Ui) {
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
             egui::Frame::default().inner_margin(egui::Margin::same(14)).show(ui, |ui| {
-                ui.set_max_width(760.0);
+                ui.set_max_width(760.0f32.min(ui.available_width()));
+                // El avance y el resultado de la exportación van arriba, a la vista (lo de abajo se desplaza en paneles estrechos).
+                self.export_status_ui(ui);
+                ui.add_space(6.0);
                 let n = self.project.length;
                 let o = &mut self.render_opts;
                 o.b = o.b.clamp(1, n);
@@ -192,7 +194,7 @@ impl LeonApp {
                     ui.end_row();
                 });
                 ui.checkbox(&mut o.transparent, "Fondo transparente (PNG)");
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     if pill(ui, "Usar el rango de reproducción", false).clicked() {
                         if let Some((a, b)) = self.project.range {
                             self.render_opts.a = a + 1;
@@ -211,55 +213,39 @@ impl LeonApp {
                     let o = &self.render_opts;
                     (o.a - 1, o.b - 1, o.scale, o.transparent, o.columns)
                 };
-                ui.horizontal_wrapped(|ui| {
-                    if pill(ui, "PNG del fotograma actual", false).clicked() {
-                        if let Some(p) = rfd::FileDialog::new()
-                            .add_filter("Imagen PNG", &["png"])
-                            .set_file_name(format!("fotograma_{:04}.png", self.frame + 1))
-                            .save_file()
-                        {
-                            self.render_opts.message = match render::export_png_opts(&self.project, self.frame, scale, tr, &p) {
-                                Ok(()) => format!("Terminado: {}", p.display()),
-                                Err(e) => format!("Error: {e}"),
-                            };
+                let busy = self.exporting();
+                ui.add_enabled_ui(!busy, |ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        use super::exportjob::ExportKind;
+                        if pill(ui, "PNG del fotograma actual", false).clicked() {
+                            if let Some(path) = rfd::FileDialog::new().add_filter("Imagen PNG", &["png"]).set_file_name(format!("fotograma_{:04}.png", self.frame + 1)).save_file() {
+                                let f = self.frame;
+                                self.start_export(ExportKind::Png { path }, f, f, scale, tr);
+                            }
                         }
-                    }
-                    if pill(ui, "Secuencia PNG (carpeta)", false).clicked() {
-                        if let Some(dir) = rfd::FileDialog::new().set_title("Elige una carpeta para los fotogramas").pick_folder() {
-                            self.render_opts.message = match render::export_sequence_range(&self.project, &dir, a, b, scale, tr) {
-                                Ok(k) => format!("Terminado: {k} imágenes en {}", dir.display()),
-                                Err(e) => format!("Error: {e}"),
-                            };
+                        if pill(ui, "Secuencia PNG (carpeta)", false).clicked() {
+                            if let Some(dir) = rfd::FileDialog::new().set_title("Elige una carpeta para los fotogramas").pick_folder() {
+                                self.start_export(ExportKind::Sequence { dir }, a, b, scale, tr);
+                            }
                         }
-                    }
-                    if pill(ui, "Hoja de sprites (.png + .json)", false).clicked() {
-                        if let Some(p) = rfd::FileDialog::new().add_filter("Imagen PNG", &["png"]).set_file_name("sprites.png").save_file() {
-                            self.render_opts.message = match render::export_sprite_sheet(&self.project, &p, a, b, scale, cols, tr) {
-                                Ok(k) => format!("Terminado: {k} fotogramas en {}", p.display()),
-                                Err(e) => format!("Error: {e}"),
-                            };
+                        if pill(ui, "Hoja de sprites (.png + .json)", false).clicked() {
+                            if let Some(path) = rfd::FileDialog::new().add_filter("Imagen PNG", &["png"]).set_file_name("sprites.png").save_file() {
+                                self.start_export(ExportKind::Sheet { path, cols }, a, b, scale, tr);
+                            }
                         }
-                    }
-                    if pill(ui, "Storyboard a PDF", false).on_hover_text("Hojas A4 con la miniatura de cada plano y sus textos").clicked() {
-                        self.export_storyboard_pdf();
-                    }
-                    if pill(ui, "GIF animado", false).clicked() {
-                        if let Some(p) = rfd::FileDialog::new().add_filter("GIF animado", &["gif"]).set_file_name("mi_animacion.gif").save_file() {
-                            let maxw = (self.project.width as f32 * scale).round() as u32;
-                            self.render_opts.message = match render::export_gif_range(&self.project, &p, a, b, maxw.min(1920)) {
-                                Ok(()) => format!("Terminado: {}", p.display()),
-                                Err(e) => format!("Error: {e}"),
-                            };
+                        if pill(ui, "Storyboard a PDF", false).on_hover_text("Hojas A4 con la miniatura de cada plano y sus textos").clicked() {
+                            self.export_storyboard_pdf();
                         }
-                    }
-                    if pill(ui, "Vídeo MP4", false).on_hover_text("Necesita ffmpeg (gratuito); se busca solo en tu equipo").clicked() {
-                        self.export_mp4(a, b, scale);
-                    }
-                    ui.add_enabled(false, egui::Button::new("StoryBoard PDF (pendiente)"));
+                        if pill(ui, "GIF animado", false).clicked() {
+                            if let Some(path) = rfd::FileDialog::new().add_filter("GIF animado", &["gif"]).set_file_name("mi_animacion.gif").save_file() {
+                                self.start_export(ExportKind::Gif { path }, a, b, scale, false);
+                            }
+                        }
+                        if pill(ui, "Vídeo MP4", false).on_hover_text("Necesita ffmpeg (gratuito); se busca solo en tu equipo. Si hay audios, van en el vídeo").clicked() {
+                            self.export_mp4(a, b, scale);
+                        }
+                    });
                 });
-                ui.add_space(6.0);
-                let msg = self.render_opts.message.clone();
-                ui.label(RichText::new(msg).color(if self.render_opts.message.starts_with("Error") { ONION_BEFORE } else { MU }));
             });
         });
     }

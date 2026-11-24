@@ -59,7 +59,7 @@ El orden sigue la **experiencia de usuario**: primero lo que más se nota al dib
 | **S2. Línea de tiempo del storyboard** (#133) | Editor nuevo con tira de planos (miniaturas y duración arrastrable) y pista de cámara con claves; operaciones de plano; **editor «Miniaturas» en vertical**, como el de Storyboard Pro (columna de planos junto al visor, con el mismo dibujo sobre miniaturas), para armar una disposición Visor grande + miniaturas verticales + línea de tiempo | S1 |
 | **S3. Datos del plano y PDF** (#134) | Numeración escena/plano editable, panel «Datos del plano», exportar el storyboard a PDF | S1 (S2 no hace falta) |
 | **A1. Sala Animatic** (#135) | Reproducción de los planos con sus duraciones, edición de bordes en la tira, transiciones elegibles (corte, fundido, otros) | S2 |
-| **A2. Audio del animatic** (#136) | Pista de audio, onda y reproducción sincronizada; exportar el MP4 con sonido | A1 y M8a (Issue de estudio #100) |
+| **A2. Audio del animatic** (#136, hecho; propiedades de audio con claves, mezcla de ejemplo y barra de progreso al exportar) | Pista de audio, onda y reproducción sincronizada; exportar el MP4 con sonido | A1 y M8a (Issue de estudio #100) |
 
 ### Riesgos
 
@@ -95,3 +95,15 @@ Valores por defecto asumidos, a corregir si no convienen:
 **Ajuste tras probar S2 (Issue #142)**: «Animatic > Xsheet» creaba una sola capa con dibujos aplanados. Ahora hay un único botón, **«Crear animatic»** (en la barra del Storyboard y en el panel de la sala Animatic), que crea o actualiza la composición «Animatic»: un clip por plano, en el orden y con la duración de la línea de tiempo del storyboard, con sus fundidos y su cámara. Cada clip es la **composición viva del plano** (una precomposición), así que si se cambia un plano el animatic lo refleja; los planos sin composición usan su dibujo aplanado. Se quita la columna aplanada.
 
 **Ejemplo para el animatic (Issue #145)**: la pantalla de inicio ofrece «Ejemplo: Animatic con bocetos (A y B)», con la historia de la pelota en seis planos dibujados en mapa de bits (módulo demo_animatic.rs): cada plano es una composición con las capas «Personaje B» (azul), «Personaje A» (roja) y «Fondo», numerados 1·10 a 1·60, con textos, fundidos y cámara, y el animatic creado y abierto. Con esto la **miniatura de un plano** incluye ya los píxeles de sus capas de mapa de bits (antes solo los trazos vectoriales).
+
+## Capa de audio: propiedades propias
+
+Una capa de audio no tiene transformación, opacidad ni modo 3D. Sus propiedades son: **Ganancia** (−60 a +12 dB, reflejada en la onda), **Paneo** (−1 a 1), **EQ** de agudos, medios y graves (±15 dB), **Reverb** y **Eco** (0 a 1), y los interruptores **M** (mute) y **S** (solo). Todas llevan cronómetro y claves (`Prop::AUDIO` en `tracks.rs`) y se editan en el panel de la capa o en las filas de propiedades del montaje. El motor (`audio.rs`) procesa en bloques de 10 ms: EQ, luego FX, luego ganancia y paneo con rampas, para que las claves no produzcan chasquidos. El mismo procesado se usa al reproducir y al exportar el MP4.
+
+## Exportación con progreso
+
+Las exportaciones corren en un hilo aparte (`exportjob.rs`) con `render::Progress`: la sala Exportar muestra una barra con la fase (dibujando los fotogramas, codificando), un botón para cancelar y, al terminar, un mensaje claro de éxito (con la ruta del archivo) o de error. `LEONTOON_EXPORT_ESTADO` fuerza un estado para las capturas.
+
+## Mezcla de ejemplo
+
+`demo_animatic.rs` incluye cuatro MP3 ligeros (`app/assets/audio_demo/`, recortes de la carpeta de referencia de sonido): dos boings, ambiente y música. Al abrir el ejemplo se extraen a `%APPDATA%\LeonToon\muestras\animatic` y se crean las capas: música con fundidos y bajada durante el diálogo, ambiente con agudos recortados y algo de reverb, y ocho boings recortados (con `offset` y duración) en el cuadro de cada bote, A a la izquierda y B a la derecha, agrupados en la colección «Boings de A y B».

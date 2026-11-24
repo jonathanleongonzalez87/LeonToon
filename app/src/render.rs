@@ -290,13 +290,67 @@ pub fn export_png_opts(p: &Project, frame: u32, scale: f32, transparent: bool, p
 }
 
 /// Exporta los fotogramas a..=b como fotograma_0001.png, … en una carpeta.
-pub fn export_sequence_range(p: &Project, dir: &Path, a: u32, b: u32, scale: f32, transparent: bool) -> Result<u32, String> {
+/// El avance de una exportación que corre en otro hilo: la fracción hecha (de 0 a 1), la fase en que va y si se pidió cancelar.
+#[derive(Default)]
+pub struct Progress {
+    per_mille: std::sync::atomic::AtomicU32,
+    cancel: std::sync::atomic::AtomicBool,
+    phase: std::sync::Mutex<String>,
+}
+
+impl Progress {
+    pub fn set(&self, frac: f32) {
+        self.per_mille.store((frac.clamp(0.0, 1.0) * 1000.0) as u32, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    pub fn get(&self) -> f32 {
+        self.per_mille.load(std::sync::atomic::Ordering::Relaxed) as f32 / 1000.0
+    }
+
+    pub fn cancel(&self) {
+        self.cancel.store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    pub fn cancelled(&self) -> bool {
+        self.cancel.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    pub fn set_phase(&self, s: &str) {
+        if let Ok(mut p) = self.phase.lock() {
+            *p = s.to_string();
+        }
+    }
+
+    pub fn phase(&self) -> String {
+        self.phase.lock().map(|p| p.clone()).unwrap_or_default()
+    }
+}
+
+/// Anota el avance (`done` de `total` pasos, entre `from` y `to` del total) y devuelve Err si se pidió cancelar.
+fn step(progress: Option<&Progress>, done: u32, total: u32, from: f32, to: f32) -> Result<(), String> {
+    if let Some(pr) = progress {
+        if pr.cancelled() {
+            return Err("Exportación cancelada".into());
+        }
+        pr.set(from + (to - from) * done as f32 / total.max(1) as f32);
+    }
+    Ok(())
+}
+
+pub fn export_sequence_range(p: &Project, dir: &Path, a: u32, b: u32, scale: f32, transparent: bool, progress: Option<&Progress>) -> Result<u32, String> {
     let mut n = 0;
-    for f in a..=b.min(p.length - 1) {
+    let b = b.min(p.length - 1);
+    let total = b.saturating_sub(a) + 1;
+    if let Some(pr) = progress {
+        pr.set_phase("Dibujando los fotogramas");
+    }
+    for f in a..=b {
+        step(progress, n, total, 0.0, 1.0)?;
         let path = dir.join(format!("fotograma_{:04}.png", f + 1));
         export_png_opts(p, f, scale, transparent, &path)?;
         n += 1;
     }
+    step(progress, n, total, 0.0, 1.0)?;
     Ok(n)
 }
 
@@ -309,6 +363,7 @@ pub fn export_sprite_sheet(
     scale: f32,
     columns: u32,
     transparent: bool,
+    progress: Option<&Progress>,
 ) -> Result<u32, String> {
     let b = b.min(p.length - 1);
     let n = b.saturating_sub(a) + 1;
@@ -321,11 +376,18 @@ pub fn export_sprite_sheet(
     }
     let mut sheet = Pixmap::new(cw * cols, ch * rows).ok_or("No se pudo crear la imagen")?;
     let mut frames = Vec::new();
+    if let Some(pr) = progress {
+        pr.set_phase("Dibujando los fotogramas de la hoja");
+    }
     for (i, f) in (a..=b).enumerate() {
+        step(progress, i as u32, n, 0.0, 0.95)?;
         let pm = render_frame_opts(p, f, scale, transparent).ok_or("No se pudo crear la imagen")?;
         let (x, y) = ((i as u32 % cols) * cw, (i as u32 / cols) * ch);
         sheet.draw_pixmap(x as i32, y as i32, pm.as_ref(), &PixmapPaint::default(), Transform::identity(), None);
         frames.push(serde_json::json!({ "frame": f + 1, "x": x, "y": y, "w": cw, "h": ch }));
+    }
+    if let Some(pr) = progress {
+        pr.set_phase("Guardando la hoja y su .json");
     }
     sheet.save_png(path).map_err(|e| e.to_string())?;
     let meta = serde_json::json!({ "image": path.file_name().map(|s| s.to_string_lossy().to_string()),
@@ -335,7 +397,7 @@ pub fn export_sprite_sheet(
     Ok(n)
 }
 
-pub fn export_gif_range(p: &Project, path: &Path, a: u32, b: u32, max_width: u32) -> Result<(), String> {
+pub fn export_gif_range(p: &Project, path: &Path, a: u32, b: u32, max_width: u32, progress: Option<&Progress>) -> Result<(), String> {
     let scale = (max_width as f32 / p.width as f32).min(1.0);
     let w = ((p.width as f32 * scale).round() as u32).clamp(1, 65535);
     let h = ((p.height as f32 * scale).round() as u32).clamp(1, 65535);
@@ -343,7 +405,13 @@ pub fn export_gif_range(p: &Project, path: &Path, a: u32, b: u32, max_width: u32
     let mut enc = gif::Encoder::new(std::io::BufWriter::new(file), w as u16, h as u16, &[]).map_err(|e| e.to_string())?;
     enc.set_repeat(gif::Repeat::Infinite).map_err(|e| e.to_string())?;
     let delay = ((100.0 / p.fps as f32).round() as u16).max(2);
-    for f in a..=b.min(p.length - 1) {
+    let last = b.min(p.length - 1);
+    let total = last.saturating_sub(a) + 1;
+    if let Some(pr) = progress {
+        pr.set_phase("Dibujando y comprimiendo los fotogramas del GIF");
+    }
+    for f in a..=last {
+        step(progress, f - a, total, 0.0, 1.0)?;
         let pm = render_frame(p, f, scale).ok_or("No se pudo crear la imagen")?;
         let mut rgba: Vec<u8> = Vec::with_capacity((pm.width() * pm.height() * 4) as usize);
         for px in pm.pixels() {
@@ -354,6 +422,7 @@ pub fn export_gif_range(p: &Project, path: &Path, a: u32, b: u32, max_width: u32
         frame.delay = delay;
         enc.write_frame(&frame).map_err(|e| e.to_string())?;
     }
+    step(progress, total, total, 0.0, 1.0)?;
     Ok(())
 }
 
@@ -414,15 +483,34 @@ pub fn video_command(ffmpeg: &Path, fps: u32, dir: &Path, audio: Option<&Path>, 
 }
 
 /// Exporta los fotogramas a..=b a un MP4. Con `audio` (un WAV con la mezcla de ese tramo), el vídeo lleva sonido.
-pub fn export_video(p: &Project, ffmpeg: &Path, path: &Path, a: u32, b: u32, scale: f32, audio: Option<&Path>) -> Result<u32, String> {
-    let tmp = std::env::temp_dir().join(format!("leontoon_video_{}", std::process::id()));
+pub fn export_video(p: &Project, ffmpeg: &Path, path: &Path, a: u32, b: u32, scale: f32, audio: Option<&Path>, progress: Option<&Progress>) -> Result<u32, String> {
+    // Una carpeta de trabajo propia de cada exportación (dos exportaciones a la vez no se pisan).
+    static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+    let tmp = std::env::temp_dir().join(format!("leontoon_video_{}_{}", std::process::id(), NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)));
     let _ = std::fs::remove_dir_all(&tmp);
     std::fs::create_dir_all(&tmp).map_err(|e| e.to_string())?;
     let b = b.min(p.length - 1);
+    let total = b.saturating_sub(a) + 1;
     let mut n = 0;
+    if let Some(pr) = progress {
+        pr.set_phase("Dibujando los fotogramas");
+    }
+    // Dibujar es la mayor parte del trabajo (hasta el 90 %); codificar con ffmpeg es el resto. Si algo falla o se cancela, se limpia.
     for f in a..=b {
-        export_png_opts(p, f, scale, false, &tmp.join(format!("f_{:05}.png", n)))?;
+        let done = step(progress, n, total, 0.0, 0.9).and_then(|_| export_png_opts(p, f, scale, false, &tmp.join(format!("f_{:05}.png", n))));
+        if let Err(e) = done {
+            let _ = std::fs::remove_dir_all(&tmp);
+            return Err(e);
+        }
         n += 1;
+    }
+    if let Some(pr) = progress {
+        if pr.cancelled() {
+            let _ = std::fs::remove_dir_all(&tmp);
+            return Err("Exportación cancelada".into());
+        }
+        pr.set(0.9);
+        pr.set_phase(if audio.is_some() { "Codificando el vídeo y el audio con ffmpeg" } else { "Codificando el vídeo con ffmpeg" });
     }
     let mut cmd = video_command(ffmpeg, p.fps, &tmp, audio, path);
     #[cfg(windows)]
@@ -436,6 +524,9 @@ pub fn export_video(p: &Project, ffmpeg: &Path, path: &Path, a: u32, b: u32, sca
     if !out.status.success() {
         let err = String::from_utf8_lossy(&out.stderr);
         return Err(format!("ffmpeg falló: {}", err.lines().last().unwrap_or("error desconocido")));
+    }
+    if let Some(pr) = progress {
+        pr.set(1.0);
     }
     Ok(n)
 }

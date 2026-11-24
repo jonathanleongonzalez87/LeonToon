@@ -100,7 +100,7 @@ y alrededor las hojas de exposición y la tira de fotos.
 El **storyboard** muestra los planos como miniaturas con nombre y duración; se reordenan arrastrando el número, y se puede dibujar directamente sobre ellas.
 La línea de tiempo del storyboard da la duración de cada plano y su cámara, y *Crear animatic* arma con ellos la composición del animatic.
 Cada plano lleva su escena y su número (editables, con «Renumerar de 10 en 10» para poder intercalar planos), y el storyboard se exporta a **PDF**: hojas A4 con la miniatura de cada plano y sus textos.
-El **audio** (WAV, MP3, FLAC, OGG y AAC/M4A) se importa como una capa de audio («+ Audio» en la línea de tiempo del storyboard, «Importar audio…» en el panel del animatic o Mayús+A): su barra muestra la onda y se mueve y recorta como cualquier capa (la opacidad es el volumen y el ojo lo silencia), suena al reproducir con la imagen siguiendo al sonido, y se mezcla en el MP4 al exportar (hace falta ffmpeg). El ejemplo del animatic trae los «boings» de A y B sincronizados con la historia.
+El **audio** (WAV, MP3, FLAC, OGG y AAC/M4A) se importa como una capa de audio («+ Audio» en la línea de tiempo del storyboard, «Importar audio…» en el panel del animatic o Mayús+A): su barra muestra la onda y se mueve y recorta como cualquier capa, suena al reproducir con la imagen siguiendo al sonido, y se mezcla en el MP4 al exportar (hace falta ffmpeg). Una capa de audio tiene **sus propias propiedades**, no las de imagen: **Ganancia** en dB (la onda de la barra la refleja), **Paneo**, **ecualizador** de tres bandas (agudos, medios, graves), **Mute (M)** y **Solo (S)**, y **FX** de reverberación y eco. Todos los valores se pueden animar con claves (cronómetro y ◆, también en las filas de propiedades de la línea de tiempo). El ejemplo del animatic trae una mezcla breve con sonidos reales: música ambiental, ambiente de escena y los «boings» de A y B recortados al cuadro exacto del bote, con la música bajando mientras hablan.
 
 Desde la pantalla de inicio se abre **«Ejemplo: Animatic con bocetos (A y B)»**: la historia de la pelota en seis planos dibujados como bocetos en mapa de bits (lápiz y marcador), con el Personaje A (roja) y el Personaje B (azul), sus textos, fundidos, cámara y el animatic ya creado.
 
@@ -142,7 +142,7 @@ LeonToon está en construcción. Entre lo que todavía falta o no se ha probado 
 - La presión de **tableta gráfica** no se ha probado con hardware real, y la inclinación del lápiz no está disponible.
 - Los `.abr` exportados no se han abierto todavía en Photoshop.
 - La captura con **cámara real** en Stop Motion depende del dispositivo; las imágenes de este README usan una secuencia de fotos de referencia (`referencia/Sec_Ref_Stop_Motion`) en lugar de la cámara.
-- Pendientes: importar **video y audio** al montaje, herramienta Texto, rigging, luz y profundidad de campo en 3D, sonido, exportar con la cámara 3D.
+- Pendientes: importar **video y audio** al montaje, herramienta Texto, rigging, luz y profundidad de campo en 3D, exportar con la cámara 3D.
 
 ## Documentación y desarrollo
 

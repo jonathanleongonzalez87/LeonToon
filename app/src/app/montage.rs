@@ -83,6 +83,8 @@ enum Act {
     SetParent(usize, Option<usize>),
     Stopwatch(usize, Prop),
     EditValue(usize, XKey, XKey),
+    /// Cambia el valor de una propiedad de audio en el cuadro actual (con cronómetro pone clave; sin él, cambia el valor fijo).
+    AudioEdit(usize, Prop, f32),
     AddKey(usize, Prop, u32),
     DeleteKey(usize, Prop, u32),
     MoveKey(usize, Prop, u32, u32),
@@ -118,6 +120,8 @@ struct Info {
     in_f: u32,
     out_f: u32,
     animated: [bool; 6],
+    /// Qué propiedades de audio tienen claves (en el orden de `Prop::AUDIO`).
+    audio_animated: [bool; 8],
     key_frames: Vec<u32>,
     is_col: bool,
     is_precomp: bool,
@@ -129,7 +133,15 @@ struct Info {
 
 /// Qué filas salen. `hidden[li]`: la capa está en una colección plegada. `animated[li][p]`: la propiedad `p` de la capa `li` tiene claves. Las capas tímidas se ocultan con el botón
 /// maestro (menos la elegida).
+#[cfg(test)]
 pub(super) fn build_rows(shy: &[bool], hidden: &[bool], is3d: &[bool], animated: &[[bool; 6]], cl: usize, hide_shy: bool, open: &[bool], reveal: &Option<Reveal>) -> Vec<Row> {
+    build_rows_ex(shy, hidden, is3d, animated, &[], &[], cl, hide_shy, open, reveal)
+}
+
+/// Como `build_rows`, sabiendo cuáles son capas de audio (`audio`) y qué propiedades de audio tienen claves (`audio_animated`): una capa
+/// de audio muestra sus propiedades de audio (ganancia, paneo, EQ, silencio, reverb y eco) y nunca las de imagen.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn build_rows_ex(shy: &[bool], hidden: &[bool], is3d: &[bool], animated: &[[bool; 6]], audio: &[bool], audio_animated: &[[bool; 8]], cl: usize, hide_shy: bool, open: &[bool], reveal: &Option<Reveal>) -> Vec<Row> {
     let mut out = Vec::new();
     for li in 0..shy.len() {
         if (hide_shy && shy[li] && li != cl) || hidden.get(li).copied().unwrap_or(false) {
@@ -138,7 +150,15 @@ pub(super) fn build_rows(shy: &[bool], hidden: &[bool], is3d: &[bool], animated:
         out.push(Row::Layer(li));
         // La profundidad (eje Z) solo la tienen las capas 3D.
         let keep = |p: &Prop| *p != Prop::Depth || is3d.get(li).copied().unwrap_or(false);
-        let props: Vec<Prop> = match reveal {
+        let is_audio = audio.get(li).copied().unwrap_or(false);
+        let props: Vec<Prop> = if is_audio {
+            match reveal {
+                Some(Reveal::Animated) => Prop::AUDIO.iter().copied().filter(|p| audio_animated.get(li).map_or(false, |a| a[*p as usize - Prop::AUDIO[0] as usize])).collect(),
+                Some(Reveal::Props(_)) => Vec::new(),
+                None => if open.get(li).copied().unwrap_or(false) { Prop::AUDIO.to_vec() } else { Vec::new() },
+            }
+        } else {
+            match reveal {
             Some(Reveal::Animated) => Prop::ALL.iter().copied().filter(|p| animated[li][*p as usize] && keep(p)).collect(),
             Some(Reveal::Props(ks)) => {
                 if li == cl {
@@ -154,6 +174,7 @@ pub(super) fn build_rows(shy: &[bool], hidden: &[bool], is3d: &[bool], animated:
                     Vec::new()
                 }
             }
+        }
         };
         if !props.is_empty() {
             if reveal.is_none() {
@@ -194,6 +215,7 @@ fn prop_key(p: Prop) -> &'static str {
         Prop::Rotation => "R",
         Prop::Opacity => "T",
         Prop::Depth => "Z",
+        _ => "",
     }
 }
 
@@ -216,7 +238,9 @@ impl LeonApp {
         let animated: Vec<[bool; 6]> = self.project.layers.iter().map(|l| Prop::ALL.map(|p| l.tracks.has(p))).collect();
         let hidden: Vec<bool> = (0..n).map(|li| self.project.is_hidden_by_fold(li)).collect();
         let is3d: Vec<bool> = self.project.layers.iter().map(|l| l.is3d || l.kind == LayerKind::Camera).collect();
-        build_rows(&shy, &hidden, &is3d, &animated, self.cl, self.hide_shy, &self.mt.open, &self.mt.reveal)
+        let audio: Vec<bool> = self.project.layers.iter().map(|l| l.kind == LayerKind::Audio).collect();
+        let audio_animated: Vec<[bool; 8]> = self.project.layers.iter().map(|l| Prop::AUDIO.map(|p| l.tracks.has(p))).collect();
+        build_rows_ex(&shy, &hidden, &is3d, &animated, &audio, &audio_animated, self.cl, self.hide_shy, &self.mt.open, &self.mt.reveal)
     }
 
     /// Teclas de la línea de tiempo de montaje, con el puntero encima: A, P, S, R y T muestran esa propiedad (Mayús suma),
@@ -324,6 +348,7 @@ impl LeonApp {
                     in_f: l.in_f,
                     out_f: l.out_frame(len),
                     animated: Prop::ALL.map(|p| l.tracks.has(p)),
+                    audio_animated: Prop::AUDIO.map(|p| l.tracks.has(p)),
                     key_frames: l.tracks.frames().into_iter().collect(),
                     is_col: l.kind == LayerKind::Collection,
                     is_precomp: l.kind == LayerKind::Precomp,
@@ -390,7 +415,13 @@ impl LeonApp {
                     if inf.kind == LayerKind::Audio {
                         let path = self.project.layers[li].audio.as_ref().and_then(|a| a.resolve(self.project.base_dir.as_deref()));
                         if let Some(e) = path.and_then(|p| self.audio.cache.get(&p)) {
-                            super::audioui::paint_wave(&painter, bar, e, 1.0 / (fps as f32 * cell), 0.0, Color32::from_black_alpha(170));
+                            let l = &self.project.layers[li];
+                            let (in_f, offset) = (inf.in_f, l.audio.as_ref().map_or(0.0, |a| a.offset));
+                            let lvl = |t: f32| {
+                                let f = in_f + (t * fps as f32) as u32;
+                                (10f32.powf(l.audio_value(Prop::Gain, f) / 20.0), l.tracks.has(Prop::Mute) && l.audio_value(Prop::Mute, f) > 0.5)
+                            };
+                            super::audioui::paint_wave(&painter, bar, e, 1.0 / (fps as f32 * cell), offset, Color32::from_black_alpha(170), &lvl);
                         }
                     }
                     // Si no tiene propiedades abiertas, sus claves se ven sobre su barra.
@@ -526,8 +557,13 @@ impl LeonApp {
                     };
                     let toggle = |ui: &mut egui::Ui, r: Rect, salt: &str| ui.interact(r, ui.id().with((salt, li)), Sense::click());
                     let r = cellr(W_EYE);
-                    draw_eye(&painter, r, inf.visible, false);
-                    if toggle(ui, r, "mt_eye").on_hover_text("Visible").clicked() {
+                    if inf.kind == LayerKind::Audio {
+                        // En una capa de audio, este botón es el silencio (M): encendido, la capa no suena.
+                        painter.text(r.center(), Align2::CENTER_CENTER, "M", semi(11.0), if inf.visible { INK3 } else { ACCENT });
+                    } else {
+                        draw_eye(&painter, r, inf.visible, false);
+                    }
+                    if toggle(ui, r, "mt_eye").on_hover_text(if inf.kind == LayerKind::Audio { "Mute (M): la capa de audio no suena" } else { "Visible" }).clicked() {
                         acts.push(Act::ToggleVisible(li));
                     }
                     let r = cellr(W_SOLO);
@@ -536,7 +572,7 @@ impl LeonApp {
                     } else {
                         painter.circle_stroke(r.center(), 3.5, stk(1.0, INK3));
                     }
-                    if toggle(ui, r, "mt_solo").on_hover_text("Solo: si alguna capa está en solo, únicamente se ven las que lo están").clicked() {
+                    if toggle(ui, r, "mt_solo").on_hover_text(if inf.kind == LayerKind::Audio { "Solo (S): si alguna capa de audio está en solo, únicamente suenan las que lo están" } else { "Solo: si alguna capa está en solo, únicamente se ven las que lo están" }).clicked() {
                         acts.push(Act::ToggleSolo(li));
                     }
                     let r = cellr(W_LOCK);
@@ -639,7 +675,7 @@ impl LeonApp {
                         }
                         // Espacio de la capa: 2D (fija al tamaño de la cámara) o 3D (eje Z, animable ante la cámara).
                         let r = cellr(W_3D);
-                        if !inf.is_col && inf.kind != LayerKind::Camera {
+                        if !inf.is_col && inf.kind != LayerKind::Camera && inf.kind != LayerKind::Audio {
                             painter.text(r.center(), Align2::CENTER_CENTER, if inf.is3d { "3D" } else { "2D" }, semi(10.0), if inf.is3d { ACCENT } else { INK3 });
                             if toggle(ui, r, "mt_3d").on_hover_text("2D: fija al tamaño de la cámara · 3D: con eje Z, se anima ante la cámara (clic para cambiar)").clicked() {
                                 acts.push(Act::Toggle3d(li));
@@ -648,7 +684,8 @@ impl LeonApp {
                             painter.text(r.center(), Align2::CENTER_CENTER, "3D", semi(10.0), with_alpha(ACCENT, 0.5));
                         }
                     }
-                    if self.mt.cols != 1 {
+                    // Una capa de audio no tiene fusión, mate ni vínculo: son cosas de imagen.
+                    if self.mt.cols != 1 && inf.kind != LayerKind::Audio {
                         let r = cellr(W_BLEND);
                         ui.allocate_new_ui(egui::UiBuilder::new().max_rect(r.shrink2(Vec2::new(2.0, 2.0))), |ui| {
                             egui::ComboBox::from_id_salt(("mt_blend", li)).selected_text(inf.blend.label()).width(r.width() - 8.0).show_ui(ui, |ui| {
@@ -690,13 +727,13 @@ impl LeonApp {
                         });
                     }
                 }
-                Row::Group(_) => {
+                Row::Group(gl) => {
                     painter.rect_filled(full, 0.0, Color32::from_rgb(0x20, 0x1f, 0x1e));
-                    painter.text(Pos2::new(lx + W_EYE + W_SOLO + W_LOCK + W_LABEL + 28.0, y + rh / 2.0), Align2::LEFT_CENTER, "Transformar", semi(11.0), MU);
+                    painter.text(Pos2::new(lx + W_EYE + W_SOLO + W_LOCK + W_LABEL + 28.0, y + rh / 2.0), Align2::LEFT_CENTER, if infos[gl].kind == LayerKind::Audio { "Audio" } else { "Transformar" }, semi(11.0), MU);
                 }
                 Row::Prop(li, p) => {
                     painter.rect_filled(full, 0.0, Color32::from_rgb(0x20, 0x1f, 0x1e));
-                    let animated = infos[li].animated[p as usize];
+                    let animated = if p.is_audio() { infos[li].audio_animated[p as usize - Prop::AUDIO[0] as usize] } else { infos[li].animated[p as usize] };
                     let ix = lx + W_EYE + W_SOLO + W_LOCK + W_LABEL + 36.0;
                     // Cronómetro
                     let sw = Rect::from_min_size(Pos2::new(ix, y), Vec2::new(20.0, rh));
@@ -711,36 +748,70 @@ impl LeonApp {
                     }
                     painter.text(Pos2::new(ix + 26.0, y + rh / 2.0), Align2::LEFT_CENTER, p.name(), FontId::proportional(11.5), TX);
                     painter.text(Pos2::new(ix + 26.0 + 100.0, y + rh / 2.0), Align2::LEFT_CENTER, prop_key(p), FontId::proportional(9.5), INK3);
-                    // Valor en este cuadro, editable.
-                    let now = self.project.layers[li].transform_at(frame);
-                    let mut v = p.of(&now);
-                    let two = matches!(p, Prop::Anchor | Prop::Position);
-                    let vr = Rect::from_min_size(Pos2::new(lx + left_w - if two { 150.0 } else { 82.0 }, y + 2.0), Vec2::new(if two { 144.0 } else { 78.0 }, rh - 4.0));
-                    let mut changed = false;
-                    ui.allocate_new_ui(egui::UiBuilder::new().max_rect(vr).layout(egui::Layout::left_to_right(egui::Align::Center)), |ui| {
-                        ui.spacing_mut().item_spacing.x = 3.0;
-                        match p {
-                            Prop::Anchor | Prop::Position => {
-                                changed |= ui.add(egui::DragValue::new(&mut v[0]).speed(1.0).max_decimals(1).prefix("x ")).changed();
-                                changed |= ui.add(egui::DragValue::new(&mut v[1]).speed(1.0).max_decimals(1).prefix("y ")).changed();
+                    // Propiedades de audio: valor en este cuadro (con claves o fijo), con su unidad.
+                    if p.is_audio() {
+                        let cur = self.project.layers[li].audio_value(p, frame);
+                        let mut v = cur;
+                        let (lo, hi) = p.audio_range();
+                        let vr = Rect::from_min_size(Pos2::new(lx + left_w - 92.0, y + 2.0), Vec2::new(88.0, rh - 4.0));
+                        ui.allocate_new_ui(egui::UiBuilder::new().max_rect(vr).layout(egui::Layout::left_to_right(egui::Align::Center)), |ui| {
+                            match p {
+                                Prop::Mute => {
+                                    let mut on = v > 0.5;
+                                    if ui.checkbox(&mut on, "Silencio").changed() {
+                                        v = if on { 1.0 } else { 0.0 };
+                                    }
+                                }
+                                Prop::Gain => {
+                                    ui.add(egui::DragValue::new(&mut v).speed(0.1).range(lo..=hi).max_decimals(1).suffix(" dB"));
+                                }
+                                Prop::Pan => {
+                                    ui.add(egui::DragValue::new(&mut v).speed(0.01).range(lo..=hi).max_decimals(2));
+                                }
+                                Prop::EqHi | Prop::EqMid | Prop::EqLo => {
+                                    ui.add(egui::DragValue::new(&mut v).speed(0.1).range(lo..=hi).max_decimals(1).suffix(" dB"));
+                                }
+                                _ => {
+                                    ui.add(egui::DragValue::new(&mut v).speed(0.01).range(lo..=hi).max_decimals(2));
+                                }
                             }
-                            Prop::Scale => changed |= ui.add(egui::DragValue::new(&mut v[0]).speed(0.01).max_decimals(2)).changed(),
-                            Prop::Rotation => changed |= ui.add(egui::DragValue::new(&mut v[0]).speed(1.0).max_decimals(1).suffix("°")).changed(),
-                            Prop::Opacity => changed |= ui.add(egui::DragValue::new(&mut v[0]).speed(0.01).max_decimals(2).range(0.0..=1.0)).changed(),
-                            Prop::Depth => changed |= ui.add(egui::DragValue::new(&mut v[0]).speed(2.0).max_decimals(0).prefix("z ")).changed(),
+                        });
+                        if v != cur {
+                            acts.push(Act::AudioEdit(li, p, v));
                         }
-                    });
-                    if changed {
-                        let mut new = now;
-                        match p {
-                            Prop::Anchor => (new.ax, new.ay) = (v[0], v[1]),
-                            Prop::Position => (new.x, new.y) = (v[0], v[1]),
-                            Prop::Scale => new.s = v[0],
-                            Prop::Rotation => new.r = v[0],
-                            Prop::Opacity => new.o = v[0].clamp(0.0, 1.0),
-                            Prop::Depth => new.dz = v[0],
+                    } else {                        // Valor en este cuadro, editable.
+                        let now = self.project.layers[li].transform_at(frame);
+                        let mut v = p.of(&now);
+                        let two = matches!(p, Prop::Anchor | Prop::Position);
+                        let vr = Rect::from_min_size(Pos2::new(lx + left_w - if two { 150.0 } else { 82.0 }, y + 2.0), Vec2::new(if two { 144.0 } else { 78.0 }, rh - 4.0));
+                        let mut changed = false;
+                        ui.allocate_new_ui(egui::UiBuilder::new().max_rect(vr).layout(egui::Layout::left_to_right(egui::Align::Center)), |ui| {
+                            ui.spacing_mut().item_spacing.x = 3.0;
+                            match p {
+                                Prop::Anchor | Prop::Position => {
+                                    changed |= ui.add(egui::DragValue::new(&mut v[0]).speed(1.0).max_decimals(1).prefix("x ")).changed();
+                                    changed |= ui.add(egui::DragValue::new(&mut v[1]).speed(1.0).max_decimals(1).prefix("y ")).changed();
+                                }
+                                Prop::Scale => changed |= ui.add(egui::DragValue::new(&mut v[0]).speed(0.01).max_decimals(2)).changed(),
+                                Prop::Rotation => changed |= ui.add(egui::DragValue::new(&mut v[0]).speed(1.0).max_decimals(1).suffix("°")).changed(),
+                                Prop::Opacity => changed |= ui.add(egui::DragValue::new(&mut v[0]).speed(0.01).max_decimals(2).range(0.0..=1.0)).changed(),
+                                Prop::Depth => changed |= ui.add(egui::DragValue::new(&mut v[0]).speed(2.0).max_decimals(0).prefix("z ")).changed(),
+                                _ => {}
+                            }
+                        });
+                        if changed {
+                            let mut new = now;
+                            match p {
+                                Prop::Anchor => (new.ax, new.ay) = (v[0], v[1]),
+                                Prop::Position => (new.x, new.y) = (v[0], v[1]),
+                                Prop::Scale => new.s = v[0],
+                                Prop::Rotation => new.r = v[0],
+                                Prop::Opacity => new.o = v[0].clamp(0.0, 1.0),
+                                Prop::Depth => new.dz = v[0],
+                                _ => {}
+                            }
+                            acts.push(Act::EditValue(li, new, now));
                         }
-                        acts.push(Act::EditValue(li, new, now));
                     }
                 }
             }
@@ -875,7 +946,17 @@ impl LeonApp {
             }
             Act::Stopwatch(li, p) => {
                 self.cl = li;
-                self.toggle_stopwatch(p);
+                if p.is_audio() {
+                    self.checkpoint();
+                    self.project.layers[li].audio_stopwatch(p, frame);
+                } else {
+                    self.toggle_stopwatch(p);
+                }
+            }
+            Act::AudioEdit(li, p, v) => {
+                if !self.project.layers[li].locked {
+                    self.project.layers[li].audio_set(p, frame, v);
+                }
             }
             Act::EditValue(li, new, old) => {
                 if !self.project.layers[li].locked {
@@ -884,8 +965,14 @@ impl LeonApp {
             }
             Act::AddKey(li, p, f) => {
                 let l = &mut self.project.layers[li];
-                let (v, i) = l.tracks.value_at(p, f);
-                l.tracks.set(p, f, v, i);
+                if p.is_audio() {
+                    // Una clave de audio guarda el valor que tiene la propiedad en ese cuadro (fijo o animado).
+                    let v = l.audio_value(p, f);
+                    l.tracks.set(p, f, [v, 0.0], p.audio_interp());
+                } else {
+                    let (v, i) = l.tracks.value_at(p, f);
+                    l.tracks.set(p, f, v, i);
+                }
             }
             Act::DeleteKey(li, p, f) => {
                 self.project.layers[li].tracks.remove_prop_at(p, f);
@@ -895,8 +982,21 @@ impl LeonApp {
             }
             Act::BarIn(li, f) => {
                 let len = self.project.length;
+                let fps = self.project.fps.max(1) as f32;
                 let l = &mut self.project.layers[li];
-                l.in_f = f.min(l.out_frame(len));
+                let new_in = f.min(l.out_frame(len));
+                match (l.kind, l.audio.as_mut()) {
+                    // Recortar el principio de un audio: la capa empieza más tarde pero sigue sonando lo mismo desde ese punto del archivo
+                    // (no se puede ir antes del principio del archivo).
+                    (LayerKind::Audio, Some(a)) => {
+                        let delta = (new_in as f32 - l.in_f as f32) / fps;
+                        let off = (a.offset + delta).max(0.0);
+                        let applied = ((off - a.offset) * fps).round() as i64;
+                        a.offset = off;
+                        l.in_f = (l.in_f as i64 + applied).max(0) as u32;
+                    }
+                    _ => l.in_f = new_in,
+                }
             }
             Act::BarOut(li, f) => {
                 let len = self.project.length;

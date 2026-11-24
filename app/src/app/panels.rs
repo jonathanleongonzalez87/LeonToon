@@ -589,6 +589,11 @@ impl LeonApp {
     /// Propiedades animables de la capa, cada una con su cronómetro (activa o desactiva su animación), su valor en este
     /// cuadro y un rombo si tiene clave aquí. Cambiar un valor pone clave solo en esa propiedad.
     pub(super) fn anim_panel(&mut self, ui: &mut egui::Ui) {
+        // Una capa de audio no tiene transformación: sus propiedades son las del sonido.
+        if self.layer().kind == LayerKind::Audio {
+            self.audio_panel(ui);
+            return;
+        }
         let f = self.frame;
         let layer = self.layer();
         let is_key = layer.tracks.has_key_at(f);
@@ -645,6 +650,7 @@ impl LeonApp {
                         Prop::Depth => {
                             ui.add(egui::DragValue::new(&mut t.dz).speed(2.0).max_decimals(0).prefix("z "));
                         }
+                        _ => {}
                     }
                 });
                 ui.end_row();
@@ -686,24 +692,37 @@ impl LeonApp {
         let len = self.project.length;
         let mut shift = 0i32;
         let layer = &mut self.project.layers[cl];
+        // Una capa de audio solo tiene lo que tiene sentido en el sonido: nombre, M (mute), S (solo), etiqueta y barra.
+        let audio = layer.kind == LayerKind::Audio;
         ui.horizontal(|ui| {
             ui.label(RichText::new("Nombre").color(MU));
             ui.add(egui::TextEdit::singleline(&mut layer.name).desired_width(150.0));
         });
-        ui.horizontal(|ui| {
-            ui.checkbox(&mut layer.visible, "Visible");
-            ui.checkbox(&mut layer.locked, "Bloqueada");
-        });
-        ui.horizontal(|ui| {
-            ui.checkbox(&mut layer.solo, "Solo").on_hover_text("Si alguna capa está en solo, únicamente se ven las que lo están");
-            ui.checkbox(&mut layer.shy, "Tímida").on_hover_text("Se puede ocultar de las listas con «Ocultar tímidas»");
-        });
-        ui.horizontal(|ui| {
-            ui.label(RichText::new("Opacidad").color(MU));
-            ui.add(egui::Slider::new(&mut layer.opacity, 0.0..=1.0).custom_formatter(|v, _| format!("{:.0} %", v * 100.0)));
-        });
+        if audio {
+            ui.horizontal(|ui| {
+                let mut mute = !layer.visible;
+                if ui.checkbox(&mut mute, "M (mute)").on_hover_text("La capa de audio no suena").changed() {
+                    layer.visible = !mute;
+                }
+                ui.checkbox(&mut layer.solo, "S (solo)").on_hover_text("Si alguna capa de audio está en solo, únicamente suenan las que lo están");
+                ui.checkbox(&mut layer.locked, "Bloqueada");
+            });
+        } else {
+            ui.horizontal(|ui| {
+                ui.checkbox(&mut layer.visible, "Visible");
+                ui.checkbox(&mut layer.locked, "Bloqueada");
+            });
+            ui.horizontal(|ui| {
+                ui.checkbox(&mut layer.solo, "Solo").on_hover_text("Si alguna capa está en solo, únicamente se ven las que lo están");
+                ui.checkbox(&mut layer.shy, "Tímida").on_hover_text("Se puede ocultar de las listas con «Ocultar tímidas»");
+            });
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("Opacidad").color(MU));
+                ui.add(egui::Slider::new(&mut layer.opacity, 0.0..=1.0).custom_formatter(|v, _| format!("{:.0} %", v * 100.0)));
+            });
+        }
         // Espacio: 2D (fija al tamaño de la cámara) o 3D (eje Z, plano BG, MG o FG, animable ante la cámara).
-        if layer.kind != LayerKind::Camera && layer.kind != LayerKind::Collection {
+        if layer.kind != LayerKind::Camera && layer.kind != LayerKind::Collection && !audio {
             ui.horizontal(|ui| {
                 ui.label(RichText::new("Espacio").color(MU));
                 if ui.selectable_label(!layer.is3d, "2D").on_hover_text("Fija al tamaño de la cámara").clicked() {
@@ -743,7 +762,11 @@ impl LeonApp {
         });
         // Barra de la capa: entrada, salida y desplazamiento en el tiempo.
         ui.add_space(2.0);
-        muted(ui, "La fusión y el vínculo se cambian en la línea de tiempo de montaje (columnas Modo y Primario).");
+        if !audio {
+            muted(ui, "La fusión y el vínculo se cambian en la línea de tiempo de montaje (columnas Modo y Primario).");
+        } else if let Some(a) = &layer.audio {
+            muted(ui, format!("Archivo: {} · recorte del principio: {:.2} s. Arrastrar el borde izquierdo de la barra recorta.", a.name, a.offset));
+        }
         ui.label(RichText::new("Barra de la capa").color(MU));
         ui.horizontal(|ui| {
             ui.label(RichText::new("Entrada").color(MU));
@@ -817,6 +840,11 @@ impl LeonApp {
             p.text(fr.left_center() + Vec2::new(7.0, 0.0), Align2::LEFT_CENTER, v, FontId::proportional(11.5), TX);
         };
         match self.n_tab {
+            0 if self.layer().kind == LayerKind::Audio => {
+                self.audio_panel(ui);
+                panel_header(ui, "Capa");
+                self.column_panel(ui);
+            }
             0 => {
                 if self.layer().kind == LayerKind::StopMotion {
                     self.stopmotion_panel_ui(ui);

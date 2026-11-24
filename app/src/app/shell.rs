@@ -62,6 +62,7 @@ impl LeonApp {
         // El animatic sigue a los planos: si cambiaron duraciones, transiciones, cámara u orden, se rehace.
         self.sync_animatic();
         self.audio_prepare();
+        self.poll_export(ctx);
         self.title_bar(ctx);
         self.status_bar(ctx);
         egui::CentralPanel::default()

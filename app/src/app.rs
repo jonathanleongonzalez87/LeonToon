@@ -13,6 +13,7 @@ mod start;
 mod select;
 mod shell;
 mod audioui;
+mod exportjob;
 mod storyboard;
 mod abrui;
 mod brushui;
@@ -225,7 +226,6 @@ struct RenderOpts {
     scale: f32,
     transparent: bool,
     columns: u32,
-    message: String,
 }
 
 pub struct LeonApp {
@@ -389,6 +389,8 @@ pub struct LeonApp {
     sbt_vz: f32,
     /// Audio: los archivos leídos, el dispositivo de salida y la mezcla (ver `audio.rs`).
     audio: crate::audio::State,
+    /// La exportación en marcha o el resultado de la última (barra de avance y mensaje del panel de exportación).
+    export: exportjob::ExportState,
     /// Rueda acumulada para dar un paso de zoom por muesca.
     wheel_acc: f32,
 
@@ -797,6 +799,7 @@ impl LeonApp {
             xs_lane: XS_ZOOM_DEFAULT,
             sbt_vz: 1.0,
             audio: Default::default(),
+            export: Default::default(),
             wheel_acc: 0.0,
             sb_sel: 0,
             sb_zoom: 260.0,
@@ -810,7 +813,7 @@ impl LeonApp {
             sbt_drag: None,
             anim_sig: None,
             sb_drag: None,
-            render_opts: RenderOpts { a: 1, b: len, scale: 1.0, transparent: false, columns: 8, message: "Listo.".into() },
+            render_opts: RenderOpts { a: 1, b: len, scale: 1.0, transparent: false, columns: 8 },
             gesture: None,
             pre: None,
             changed: false,
@@ -925,6 +928,10 @@ impl LeonApp {
         // Capturas: LEONTOON_ENTRAR=1 hace como si se entrara en la sala elegida con LEONTOON_SALA (por ejemplo, para crear el animatic).
         if std::env::var("LEONTOON_ENTRAR").is_ok() {
             app.set_room_idx(app.room_idx);
+        }
+        // Capturas: LEONTOON_EXPORT_ESTADO=progreso|ok|error muestra en el panel de exportación ese estado (sin exportar de verdad).
+        if let Ok(s) = std::env::var("LEONTOON_EXPORT_ESTADO") {
+            app.demo_export_state(&s);
         }
         // Capturas y pruebas: LEONTOON_PDF=<archivo> exporta el storyboard a ese PDF al arrancar.
         if let Ok(p) = std::env::var("LEONTOON_PDF") {

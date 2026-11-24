@@ -453,54 +453,125 @@ pub fn build() -> Project {
     p
 }
 
-/// Un «boing»: una nota que baja de `f0` a `f1` y se apaga, como un bote. Se suma a `out` (mono) desde el segundo `t0`.
-fn boing(out: &mut [f32], rate: u32, t0: f32, f0: f32, f1: f32) {
-    let start = (t0 * rate as f32) as usize;
-    let n = (0.4 * rate as f32) as usize;
-    let mut phase = 0.0f32;
-    for k in 0..n {
-        let t = k as f32 / rate as f32;
-        let env = (-t * 9.0).exp() * (1.0 - (-t * 400.0).exp());
-        let f = f1 + (f0 - f1) * (-t * 8.0).exp();
-        phase += std::f32::consts::TAU * f / rate as f32;
-        if let Some(o) = out.get_mut(start + k) {
-            *o += (phase.sin() + 0.35 * (2.0 * phase).sin()) * env * 0.45;
-        }
-    }
+// Los sonidos del ejemplo (recortes de los archivos de la carpeta «referencia/Sonido», pasados a MP3 más ligero).
+const BOING_A: &[u8] = include_bytes!("../assets/audio_demo/boing_a.mp3");
+const BOING_B: &[u8] = include_bytes!("../assets/audio_demo/boing_b.mp3");
+const AMBIENTE: &[u8] = include_bytes!("../assets/audio_demo/ambiente.mp3");
+const MUSICA: &[u8] = include_bytes!("../assets/audio_demo/musica.mp3");
+
+/// Un trozo de sonido colocado en el tiempo: de qué archivo, cuándo suena en el animatic, qué parte del archivo (desde `offset`, durante
+/// `len` segundos) y con qué paneo, ganancia y eco.
+struct Piece {
+    name: &'static str,
+    file: &'static str,
+    at: f32,
+    offset: f32,
+    len: f32,
+    pan: f32,
+    gain_db: f32,
+    echo: f32,
 }
 
-/// El proyecto de muestra con sonido: los botes de A (grave) y de B (agudo) sincronizados con la historia. El audio se escribe como
-/// WAV en `dir` (si se puede) y va en una capa de audio dentro de la composición del animatic.
-pub fn build_with_audio(dir: &std::path::Path) -> Project {
-    let mut p = build();
-    let rate = 16_000u32;
-    let secs = p.comps.iter().find(|c| c.name == crate::animatic::NAME).map_or(10.5, |c| c.length as f32 / p.fps as f32);
-    let mut mono = vec![0.0f32; (secs * rate as f32) as usize + 1];
-    // A rebota en el plano 3 y los dos rebotan juntos en el plano 6 (A grave, B agudo).
-    for (t, f0, f1) in [(3.62, 620.0, 260.0), (8.7, 620.0, 260.0), (8.86, 900.0, 380.0), (9.6, 560.0, 240.0), (9.72, 820.0, 340.0)] {
-        boing(&mut mono, rate, t, f0, f1);
-    }
-    let stereo: Vec<f32> = mono.iter().flat_map(|v| [*v, *v]).collect();
-    let path = dir.join("boings.wav");
-    if std::fs::create_dir_all(dir).is_ok() && crate::audio::write_wav(&path, rate, &stereo).is_ok() {
-        let mut l = Layer::new("Boings");
-        l.kind = LayerKind::Audio;
-        l.audio = Some(crate::model::AudioRef { path: path.to_string_lossy().to_string(), rel: None, name: "Boings".into() });
-        l.label = 6;
-        let frames = ((secs * p.fps as f32).ceil() as u32).max(1);
-        l.in_f = 0;
-        l.out_f = Some(frames - 1);
-        // Dentro de la composición del animatic (si se está dentro, en las capas abiertas).
-        if let Some(open) = p.stack.last().filter(|lv| p.comp(lv.comp_id).map_or(false, |c| c.name == crate::animatic::NAME)) {
-            let _ = open;
-            p.layers.push(l);
-        } else if let Some(c) = p.comps.iter_mut().find(|c| c.name == crate::animatic::NAME) {
-            c.layers.push(l);
+/// Cada «boing» está recortado al justo momento: el archivo trae varios botes seguidos, y de cada uno se toma solo su trozo (con una
+/// brizna de silencio antes) y se coloca en el cuadro en que la pelota toca el suelo o habla. A suena a la izquierda y B a la derecha.
+const PIECES: [Piece; 8] = [
+    Piece { name: "Boing A 1", file: "boing_a.mp3", at: 3.5, offset: 0.22, len: 0.35, pan: -0.45, gain_db: 9.0, echo: 0.0 },
+    Piece { name: "Boing A 2", file: "boing_a.mp3", at: 6.7, offset: 1.33, len: 0.38, pan: -0.45, gain_db: 9.0, echo: 0.0 },
+    Piece { name: "Boing A 3", file: "boing_a.mp3", at: 8.7, offset: 2.58, len: 0.34, pan: -0.45, gain_db: 9.0, echo: 0.0 },
+    Piece { name: "Boing A 4", file: "boing_a.mp3", at: 9.5, offset: 3.69, len: 0.30, pan: -0.45, gain_db: 9.0, echo: 0.0 },
+    Piece { name: "Boing B 1", file: "boing_b.mp3", at: 5.0, offset: 0.06, len: 0.78, pan: 0.45, gain_db: 3.0, echo: 0.2 },
+    Piece { name: "Boing B 2", file: "boing_b.mp3", at: 7.6, offset: 1.10, len: 0.85, pan: 0.45, gain_db: 3.0, echo: 0.2 },
+    Piece { name: "Boing B 3", file: "boing_b.mp3", at: 8.86, offset: 0.06, len: 0.78, pan: 0.45, gain_db: 3.0, echo: 0.2 },
+    Piece { name: "Boing B 4", file: "boing_b.mp3", at: 9.66, offset: 1.10, len: 0.84, pan: 0.45, gain_db: 3.0, echo: 0.2 },
+];
+
+/// Escribe en `dir` los sonidos del ejemplo (si no están ya) y devuelve las rutas.
+fn extract_sounds(dir: &std::path::Path) -> Option<std::collections::HashMap<&'static str, std::path::PathBuf>> {
+    std::fs::create_dir_all(dir).ok()?;
+    let mut out = std::collections::HashMap::new();
+    for (name, bytes) in [("boing_a.mp3", BOING_A), ("boing_b.mp3", BOING_B), ("ambiente.mp3", AMBIENTE), ("musica.mp3", MUSICA)] {
+        let path = dir.join(name);
+        if std::fs::metadata(&path).map_or(true, |m| m.len() != bytes.len() as u64) {
+            std::fs::write(&path, bytes).ok()?;
         }
+        out.insert(name, path);
+    }
+    Some(out)
+}
+
+/// Una capa de audio de las del ejemplo.
+#[allow(clippy::too_many_arguments)]
+fn sound_layer(name: &str, path: &std::path::Path, in_f: u32, out_f: u32, offset: f32, params: crate::model::AudioParams, label: u8) -> Layer {
+    let mut l = Layer::new(name);
+    l.kind = LayerKind::Audio;
+    l.audio = Some(crate::model::AudioRef { path: path.to_string_lossy().to_string(), rel: None, name: name.into(), offset, params });
+    l.in_f = in_f;
+    l.out_f = Some(out_f);
+    l.label = label;
+    l
+}
+
+/// El proyecto de muestra con una mezcla breve: música ambiental, ambiente de escena y los «boings» de A y B recortados al justo momento,
+/// con ganancia animada con claves (entradas, salidas y bajada de la música mientras hablan), paneo, ecualizador y eco. Los sonidos
+/// se escriben en `dir` y las capas de audio van dentro de la composición del animatic.
+pub fn build_with_audio(dir: &std::path::Path) -> Project {
+    use crate::model::{AudioParams, Interp};
+    use crate::tracks::Prop;
+    let mut p = build();
+    let Some(files) = extract_sounds(dir) else { return p };
+    let fps = p.fps as f32;
+    let frames = p.comps.iter().find(|c| c.name == crate::animatic::NAME).map_or(p.length, |c| c.length).max(p.length).max(1);
+    let last = frames - 1;
+    let at = |t: f32| ((t * fps).round() as u32).min(last);
+    let mut layers: Vec<Layer> = Vec::new();
+
+    // Música: entra con un fundido, baja mientras hablan (planos 5) y sale con otro fundido.
+    let mut music = sound_layer("Música ambiental", &files["musica.mp3"], 0, last, 0.0, AudioParams { gain_db: -14.0, eq_lo: 2.0, ..Default::default() }, 6);
+    for (f, db) in [(0, -60.0), (at(2.0), -14.0), (at(6.5), -14.0), (at(6.8), -22.0), (at(8.2), -22.0), (at(8.5), -14.0), (at(9.0), -14.0), (last, -60.0)] {
+        music.tracks.set(Prop::Gain, f, [db, 0.0], Interp::Linear);
+    }
+    layers.push(music);
+
+    // Ambiente de la escena: suave, con agudos recortados y un poco de espacio.
+    let mut amb = sound_layer("Ambiente de la escena", &files["ambiente.mp3"], 0, last, 0.0, AudioParams { gain_db: 10.0, eq_hi: -4.0, reverb: 0.08, ..Default::default() }, 4);
+    for (f, db) in [(0, -40.0), (at(1.5), 10.0), (at(9.0), 10.0), (last, -40.0)] {
+        amb.tracks.set(Prop::Gain, f, [db, 0.0], Interp::Linear);
+    }
+    layers.push(amb);
+
+    // Los «boings», recortados: cada uno empieza en el cuadro del bote y toma solo su trozo del archivo.
+    let first_boing = layers.len();
+    for pc in &PIECES {
+        let in_f = at(pc.at);
+        let out_f = (in_f + (pc.len * fps).ceil() as u32).saturating_sub(1).clamp(in_f, last);
+        let params = AudioParams { gain_db: pc.gain_db, pan: pc.pan, echo: pc.echo, ..Default::default() };
+        layers.push(sound_layer(pc.name, &files[pc.file], in_f, out_f, pc.offset, params, if pc.name.contains(" A ") { 1 } else { 3 }));
+    }
+    let boings: Vec<usize> = (first_boing..layers.len()).collect();
+
+    // Dentro de la composición del animatic (si está abierta, en las capas que se editan).
+    let open = p.stack.last().map_or(false, |lv| p.comp(lv.comp_id).map_or(false, |c| c.name == crate::animatic::NAME));
+    if open {
+        let base = p.layers.len();
+        p.layers.extend(layers);
+        let idx: Vec<usize> = boings.iter().map(|i| base + i).collect();
+        if let Some(ci) = p.group_layers(&idx) {
+            p.layers[ci].name = "Boings de A y B".into();
+            p.layers[ci].collapsed = true;
+        }
+    } else if let Some(ci) = p.comps.iter().position(|c| c.name == crate::animatic::NAME) {
+        std::mem::swap(&mut p.layers, &mut p.comps[ci].layers);
+        let base = p.layers.len();
+        p.layers.extend(layers);
+        let idx: Vec<usize> = boings.iter().map(|i| base + i).collect();
+        if let Some(gi) = p.group_layers(&idx) {
+            p.layers[gi].name = "Boings de A y B".into();
+            p.layers[gi].collapsed = true;
+        }
+        std::mem::swap(&mut p.layers, &mut p.comps[ci].layers);
     }
     p
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -551,30 +622,42 @@ mod tests {
     }
 
     #[test]
-    fn the_sample_with_sound_has_boings_synchronised_with_the_bounces() {
+    fn the_sample_with_sound_is_a_short_mix_with_trimmed_boings_music_and_ambience() {
         let dir = std::env::temp_dir().join(format!("leontoon_demo_audio_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let p = build_with_audio(&dir);
         let root = p.root_clone();
         let items = crate::audio::collect(&root);
-        assert_eq!(items.len(), 1, "una capa de audio dentro del animatic");
-        assert_eq!(items[0].start, 0.0);
-        assert!((items[0].len - 10.5).abs() < 0.1, "dura lo que el animatic: {}", items[0].len);
+        assert_eq!(items.len(), 10, "música, ambiente y ocho boings");
+        // Los boings están recortados: empiezan en medio del archivo y duran menos de un segundo.
+        let boing = items.iter().find(|i| i.path.ends_with("boing_a.mp3") && i.start > 6.0 && i.start < 7.0).unwrap();
+        assert!(boing.offset > 1.0 && boing.len < 0.5, "{boing:?}");
+        // La música y el ambiente duran todo el animatic y su ganancia está animada con claves.
+        let music = items.iter().find(|i| i.path.ends_with("musica.mp3")).unwrap();
+        assert!((music.len - 10.5).abs() < 0.1 && music.tracks.has(crate::tracks::Prop::Gain));
+        assert!(music.value(crate::tracks::Prop::Gain, 0.0) < -50.0 && (music.value(crate::tracks::Prop::Gain, 4.0) + 14.0).abs() < 0.1, "entra con un fundido");
+        assert!(music.value(crate::tracks::Prop::Gain, 7.5) < -20.0, "baja mientras hablan");
+        // Los boings quedan agrupados en una colección plegada dentro del animatic.
+        let anim = root.comps.iter().find(|c| c.name == crate::animatic::NAME).unwrap();
+        assert!(anim.layers.iter().any(|l| l.kind == crate::model::LayerKind::Collection && l.collapsed && l.name.contains("Boings")));
+        // La mezcla: en el momento del primer bote suena más que antes, A más a la izquierda y B más a la derecha.
         let mut cache = crate::audio::Cache::default();
-        cache.load(&items[0].path).unwrap();
-        let m = crate::audio::mix(&items, &cache, 16_000, 0.0, 10.5);
-        let peak = |a: f32, b: f32| m[(a * 16_000.0) as usize * 2..(b * 16_000.0) as usize * 2].iter().fold(0.0f32, |x, v| x.max(v.abs()));
-        assert!(peak(0.0, 3.5) < 0.001, "silencio hasta el primer bote");
-        assert!(peak(3.62, 3.8) > 0.2, "boing de A al rebotar en el plano 3");
-        assert!(peak(8.7, 8.9) > 0.2, "boing de A y B en el plano 6");
+        for it in &items {
+            cache.load(&it.path).unwrap();
+        }
+        let rate = 22_050;
+        let m = crate::audio::mix(&items, &cache, rate, 0.0, 10.5);
+        let side = |a: f32, b: f32, ch: usize| (((a * rate as f32) as usize)..((b * rate as f32) as usize)).fold(0.0f32, |x, i| x.max(m[i * 2 + ch].abs()));
+        assert!(side(3.52, 3.8, 0) > side(0.6, 1.2, 0) * 1.5, "el boing se oye por encima del ambiente");
+        assert!(side(3.52, 3.8, 0) > side(3.52, 3.8, 1), "A suena más a la izquierda");
+        assert!(side(5.02, 5.6, 1) > side(5.02, 5.6, 0), "B suena más a la derecha");
         // Al cambiar los planos, el audio se conserva en la composición rehecha.
         let mut q = p.clone();
         q.storyboard[0].dur = 3.0;
         assert!(q.refresh_animatic());
-        assert!(q.layers.iter().any(|l| l.kind == LayerKind::Audio), "el audio sobrevive al rehacer el animatic");
+        assert!(q.layers.iter().any(|l| l.kind == crate::model::LayerKind::Audio), "el audio sobrevive al rehacer el animatic");
         let _ = std::fs::remove_dir_all(&dir);
     }
-
     #[test]
     fn the_sample_exports_an_mp4_with_its_boings_when_ffmpeg_is_installed() {
         let Some(ffmpeg) = crate::render::find_ffmpeg() else {
@@ -589,12 +672,12 @@ mod tests {
         let items = crate::audio::collect(&root);
         let mut cache = crate::audio::Cache::default();
         cache.load(&items[0].path).unwrap();
-        // Los primeros cuatro segundos: incluyen el primer bote de A (en el segundo 3,6).
+        // Los primeros cuatro segundos: incluyen el primer bote de A (en el segundo 3,5).
         let m = crate::audio::mix(&items, &cache, 48_000, 0.0, 4.0);
         let wav = dir.join("mezcla.wav");
         crate::audio::write_wav(&wav, 48_000, &m).unwrap();
         let mp4 = dir.join("animatic.mp4");
-        let n = crate::render::export_video(&root, &ffmpeg, &mp4, 0, 95, 0.25, Some(&wav)).unwrap();
+        let n = crate::render::export_video(&root, &ffmpeg, &mp4, 0, 95, 0.25, Some(&wav), None).unwrap();
         assert_eq!(n, 96);
         let out = std::process::Command::new(&ffmpeg).arg("-i").arg(&mp4).output().unwrap();
         let info = String::from_utf8_lossy(&out.stderr).to_string();
