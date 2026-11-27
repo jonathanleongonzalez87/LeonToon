@@ -82,4 +82,79 @@ El original usa Alt + tecla (`DRAWING_*_TOOL_KEY` en `resources/shortcuts.xml`, 
 - **Herramientas** por modo (Tab): objeto = Seleccionar V, Rotación W, Punto de anclaje Y*, Cámara C*, Mano H, Rotar vista R*, Zoom Z; edición = Seleccionar V, Pincel B, Lápiz vectorial L, Pluma P*, Texto Ctrl+T*, Formas Q, Borrador E, Relleno G, Cuentagotas I, Mano, Rotar vista*, Zoom. (* pendiente: está en la barra pero no hace nada todavía.) T oculta herramientas, N la barra lateral, O el papel cebolla.
 - **Papel cebolla de la interfaz**: 2 atrás y 2 adelante, hasta 12, opacidad del más cercano 40 % (10–80 %), ámbar `#fd6724` antes y azul `#5f8fb4` después. La caída por distancia sigue al original (0x1404dbbc0 y 0x1404e1200): `opacidad(d) = O · (0,25 + 0,75 · (1 − (d − 1)/10))`.
 - **Colores**: ui-0 `#141312`, ui-1 `#1a1918`, ui-2 `#211f1e`, ui-3 `#2a2826`, ui-4 `#34312e`, línea `#2e2b29`/`#3a3633`, tinta `#f2e8da`/`#b5a898`/`#857a6e`, acento `#fd6724`/`#ff8a52`.
-- **Pendiente**: vista 3D, huesos y deformadores, pluma Bézier, texto, punto de anclaje, cámara, rotar vista, capas de mapa de bits, PDF del storyboard, transiciones del animatic, preferencias (idioma de términos, escala de interfaz).
+- **Pendiente**: huesos y deformadores, pluma Bézier, texto, punto de anclaje, cámara, rotar vista, capas de mapa de bits, PDF del storyboard, transiciones del animatic, preferencias (idioma de términos, escala de interfaz).
+
+## Mesa de luz
+
+«Medido» = tomado del prototipo v0.3 (`referencia/`) y comprobado igual en el código. «Estimado» = propio de LeonToon, no tomado del prototipo. Vale para esta sección y las dos siguientes.
+
+| Dato | Valor | Fuente |
+|---|---|---|
+| Luz (0–100 %) | 55 % | medido: prototipo v0.3, estado `light` |
+| Temperatura (0 cálida – 100 fría) | 30 | medido: prototipo v0.3, estado `temp` |
+| Nombre de la temperatura | < 35 Cálida, < 65 Neutra, el resto Fría | medido: prototipo v0.3, `tempR` |
+| Color de la luz (0, 50 y 100) | `#ffcf8f` → `#fff4e2` → `#dfeaff`, mezcla lineal | medido: prototipo v0.3, `lightColor` |
+| Resplandor sobre el fondo | opacidad = luz × 0,55; radio = 0,85 × lado mayor de la hoja (pleno hasta el 10 %) | medido: prototipo v0.3, dibujo del visor |
+| Reflejo sobre el papel | opacidad = luz × 0,45; radio de 10 px a 0,7 × ancho de la hoja | medido: prototipo v0.3, dibujo del papel |
+| Gris del fondo (0 negro – 100 blanco) | 10, de 5 en 5 | medido: prototipo v0.3, estado `gray` |
+| Papeles de color | Blanco `#fbfaf7`, Crema `#f6efe2`, Arena `#ece2d2`, Gris `#d9d6d2` | medido: prototipo v0.3, `PAPERS` |
+| Cuadrícula de transparencia: tamaño | 20 px (6–60) | medido: prototipo v0.3, `chkSizeR` |
+| Cuadrícula de transparencia: contraste | 12 % (4–60); cuadro oscuro = blanco mezclado con negro en esa proporción | medido: prototipo v0.3, `chkConR`, `paperFill` |
+| Opacidad de la vista | 100 % (10–100, de 5 en 5) | medido: prototipo v0.3, `viewOpR` |
+| Barra de registro (pegbar) | activada | medido: prototipo v0.3, `pegChk` |
+| Papeles de estudio | 9 papeles, cada uno con color, grano, fuerza y translucidez (tabla `PAPERS`) | estimado: LeonToon, `app/src/paper.rs` (Issue #52) |
+| Textura de grano | 512 px de lado; 1 px de textura = 0,75 px de escena | estimado: LeonToon, `app/src/paper.rs` |
+| Escala del grano | 40–400 %, por defecto 100 % | estimado: LeonToon, `app/src/paper.rs` |
+| Opacidad del grano según la luz | `0,34 · fuerza · (mín + (1 − mín) · luz)`, con `mín = 0,05 + 0,3 · (1 − translucidez)` | estimado: LeonToon, `app/src/paper.rs` |
+
+## Agregar capa (Mayús+A)
+
+El prototipo ofrece 7 tipos (`ADDL`). El menú actual ofrece además Stop Motion, Colección y Audio; la Precomposición no se agrega desde el menú. La capa nueva se inserta sobre la actual.
+
+| Dato | Valor | Fuente |
+|---|---|---|
+| Atajo | Mayús+A, en la posición del cursor | medido: prototipo v0.3, mapa de teclas |
+| Tipos del prototipo | Vectorial, Mapa de bits, Color sólido, Nulo, Texto, Luz, Cámara | medido: prototipo v0.3, `ADDL` |
+| Tipos añadidos por LeonToon | Stop Motion, Colección, Audio | estimado: LeonToon, `app/src/app/dialogs.rs` |
+| Color de etiqueta | Vectorial `#fd6724`, Mapa de bits `#8fb3cf`, Sólido `#c58f5e`, Nulo y Cámara `#b7a2e6`, Texto `#e9a07a`, Luz `#f2d27a` | medido: prototipo v0.3, `addLayer` |
+| Color sólido nuevo | color crema `#f6efe2`, opacidad 40 % | medido: prototipo v0.3, `addLayer` |
+| Cámara nueva | 3D, profundidad −2400 | medido: prototipo v0.3, `addLayer` |
+| Luz nueva | 3D, profundidad −600, Y −300 | medido: prototipo v0.3, `addLayer` |
+| Tipos sin efecto todavía | Texto, Luz y Nulo se marcan «pendiente» | estimado: LeonToon, `app/src/model.rs` |
+
+## Vista 3D
+
+| Dato | Valor | Fuente |
+|---|---|---|
+| Abrir y cerrar | Ctrl+3 | medido: prototipo v0.3, mapa de teclas |
+| Profundidad de los planos | BG 900, MG 0, FG −380 | medido: prototipo v0.3, `PLANEZ` |
+| Distancia de la cámara | 2400 | medido: prototipo v0.3, `camState` |
+| Proyección en perspectiva | `s = d / máx(40, d + z)`; en la vista Cámara se multiplica por 2400 / d | medido: prototipo v0.3, `proj` |
+| Distancia en las vistas libres | 5600 | medido: prototipo v0.3, `proj` |
+| Escala en ortográfica | 0,85 | medido: prototipo v0.3, `proj` |
+| Encuadre | `mín((An − N − 80) / ancho, (Al − 110) / alto)`, mínimo 0,02; × 0,42 fuera de la vista Cámara | medido: prototipo v0.3, `v3` |
+| Vista inicial (giro, inclinación) | −32°, 16° | medido: prototipo v0.3, estado `yaw`, `pitch` |
+| Vistas fijas (giro, inclinación) | Frontal 0/0, Posterior 180/0, Lateral derecha −90/0, Lateral izquierda 90/0, Superior 0/85, Inferior 0/−85 | medido: prototipo v0.3, `numpad` |
+| Teclas de vista | 1 Frontal, 3 Lateral derecha, 7 Superior, 0 Cámara, 5 ortográfica | medido: prototipo v0.3, `numpad` |
+| Vistas opuestas | Alt + 1, 3 o 7 (el prototipo usa Ctrl) | estimado: LeonToon, `app/src/app/view3d.rs` |
+| Girar con el teclado | 4 / 6 giran ±15°; 8 / 2 inclinan ∓15° | medido: prototipo v0.3, `numpad` |
+| Orbitar arrastrando | 0,35° por píxel (clic izquierdo o central) | medido: prototipo v0.3, puntero |
+| Límite de inclinación | ±85° | medido: prototipo v0.3, puntero, `numpad` |
+| Desplazar | arrastrar con el botón derecho, o con la Mano o Espacio | estimado: LeonToon, `app/src/app/view3d.rs` |
+| Zoom con teclas | + / − multiplican o dividen por 1,15 (0,1–4); . restablece zoom y desplazamiento | medido: prototipo v0.3, `numpad` |
+| Zoom con la rueda | × 1,0015 por unidad de desplazamiento (el prototipo usa × 1,1 por paso) | estimado: LeonToon, `app/src/app/view3d.rs` |
+| Rejilla del suelo | X de −1800 a 1800, Z de −2600 a 1600, cada 200; altura de la hoja + 60 | medido: prototipo v0.3, dibujo 3D |
+| Gizmo: largo de los ejes | X 150, profundidad 360 (150 × 2,4), altura 150 | medido: prototipo v0.3, `giz` |
+| Gizmo: zona para agarrar | a menos de 14 px del eje y pasado el primer 25 % | medido: prototipo v0.3, `gizHit` |
+| Control «Cámara X» | −400 a 400 | medido: prototipo v0.3, `camX` |
+
+### Diferencias con el prototipo
+
+Anotadas al comparar; no se decide aquí cuál es la correcta.
+
+- Vistas opuestas: el prototipo usa Ctrl + 1, 3 o 7; LeonToon usa Alt.
+- Rueda en la vista 3D: el prototipo multiplica por 1,1 en cada paso; LeonToon, por 1,0015 en cada unidad de desplazamiento.
+- Fondo de la mesa en 2D: el prototipo usa un gris neutro; LeonToon resta 1 al verde y 2 al azul.
+- Barra de registro: el prototipo la dibuja bajo la hoja; LeonToon, dentro del borde inferior.
+- Teclas de vista: el prototipo usa solo el teclado numérico; LeonToon responde también a los números de la fila superior.
+- Agregar capa: 7 tipos en el prototipo, 10 en el menú de LeonToon.

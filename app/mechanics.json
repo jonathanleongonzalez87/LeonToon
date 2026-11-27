@@ -356,6 +356,297 @@
                        "group":  "controls",
                        "value":  "V W Y C B L P Q E G I H R Z",
                        "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), keydown map"
+                   },
+                   {
+                       "name":  "light table light default",
+                       "group":  "light table",
+                       "value":  55,
+                       "unit":  "%",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), estado light"
+                   },
+                   {
+                       "name":  "light table temperature default",
+                       "group":  "light table",
+                       "value":  30,
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), estado temp"
+                   },
+                   {
+                       "name":  "light table temperature names",
+                       "group":  "light table",
+                       "value":  "warm < 35, neutral < 65, cool",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), tempR"
+                   },
+                   {
+                       "name":  "light table colours",
+                       "group":  "light table",
+                       "value":  "#ffcf8f, #fff4e2, #dfeaff",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), lightColor"
+                   },
+                   {
+                       "name":  "light table background glow",
+                       "group":  "light table",
+                       "value":  0.55,
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), dibujo del visor"
+                   },
+                   {
+                       "name":  "light table paper glow",
+                       "group":  "light table",
+                       "value":  0.45,
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), dibujo del papel"
+                   },
+                   {
+                       "name":  "light table background gray default",
+                       "group":  "light table",
+                       "value":  10,
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), estado gray"
+                   },
+                   {
+                       "name":  "light table paper colours",
+                       "group":  "light table",
+                       "value":  "white #fbfaf7, cream #f6efe2, sand #ece2d2, gray #d9d6d2",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), PAPERS"
+                   },
+                   {
+                       "name":  "transparency grid square size",
+                       "group":  "light table",
+                       "value":  20,
+                       "unit":  "px",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), chkSizeR"
+                   },
+                   {
+                       "name":  "transparency grid contrast",
+                       "group":  "light table",
+                       "value":  12,
+                       "unit":  "%",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), chkConR, paperFill"
+                   },
+                   {
+                       "name":  "view opacity",
+                       "group":  "light table",
+                       "value":  100,
+                       "unit":  "%",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), viewOpR"
+                   },
+                   {
+                       "name":  "pegbar default",
+                       "group":  "light table",
+                       "value":  true,
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), pegChk"
+                   },
+                   {
+                       "name":  "studio papers",
+                       "group":  "light table",
+                       "value":  9,
+                       "source":  "LeonToon code, app/src/paper.rs",
+                       "estimated":  true
+                   },
+                   {
+                       "name":  "paper grain tile",
+                       "group":  "light table",
+                       "value":  512,
+                       "unit":  "px",
+                       "source":  "LeonToon code, app/src/paper.rs",
+                       "estimated":  true
+                   },
+                   {
+                       "name":  "paper grain scale",
+                       "group":  "light table",
+                       "value":  "40-400, default 100",
+                       "unit":  "%",
+                       "source":  "LeonToon code, app/src/paper.rs",
+                       "estimated":  true
+                   },
+                   {
+                       "name":  "paper grain alpha",
+                       "group":  "light table",
+                       "value":  "0.34 * strength * (floor + (1 - floor) * light), floor = 0.05 + 0.3 * (1 - translucency)",
+                       "source":  "LeonToon code, app/src/paper.rs",
+                       "estimated":  true
+                   },
+                   {
+                       "name":  "add layer shortcut",
+                       "group":  "add layer",
+                       "value":  "shift+a",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), mapa de teclas"
+                   },
+                   {
+                       "name":  "add layer prototype kinds",
+                       "group":  "add layer",
+                       "value":  "vector, bitmap, solid, null, text, light, camera",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), ADDL"
+                   },
+                   {
+                       "name":  "add layer extra kinds",
+                       "group":  "add layer",
+                       "value":  "stop motion, collection, audio",
+                       "source":  "LeonToon code, app/src/app/dialogs.rs",
+                       "estimated":  true
+                   },
+                   {
+                       "name":  "add layer tints",
+                       "group":  "add layer",
+                       "value":  "vector #fd6724, bitmap #8fb3cf, solid #c58f5e, null/camera #b7a2e6, text #e9a07a, light #f2d27a",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), addLayer"
+                   },
+                   {
+                       "name":  "solid layer defaults",
+                       "group":  "add layer",
+                       "value":  "#f6efe2 at 40 %",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), addLayer"
+                   },
+                   {
+                       "name":  "camera layer depth",
+                       "group":  "add layer",
+                       "value":  -2400,
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), addLayer"
+                   },
+                   {
+                       "name":  "light layer position",
+                       "group":  "add layer",
+                       "value":  "depth -600, y -300",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), addLayer"
+                   },
+                   {
+                       "name":  "add layer pending kinds",
+                       "group":  "add layer",
+                       "value":  "text, light, null",
+                       "source":  "LeonToon code, app/src/model.rs",
+                       "estimated":  true
+                   },
+                   {
+                       "name":  "3d view toggle",
+                       "group":  "3d view",
+                       "value":  "ctrl+3",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), mapa de teclas"
+                   },
+                   {
+                       "name":  "3d plane depths",
+                       "group":  "3d view",
+                       "value":  "BG 900, MG 0, FG -380",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), PLANEZ"
+                   },
+                   {
+                       "name":  "3d camera distance",
+                       "group":  "3d view",
+                       "value":  2400,
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), camState"
+                   },
+                   {
+                       "name":  "3d projection",
+                       "group":  "3d view",
+                       "value":  "s = d / max(40, d + z)",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), proj"
+                   },
+                   {
+                       "name":  "3d user view distance",
+                       "group":  "3d view",
+                       "value":  5600,
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), proj"
+                   },
+                   {
+                       "name":  "3d orthographic scale",
+                       "group":  "3d view",
+                       "value":  0.85,
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), proj"
+                   },
+                   {
+                       "name":  "3d view fit",
+                       "group":  "3d view",
+                       "value":  "min((W - N - 80) / width, (H - 110) / height); free views * 0.42",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), v3"
+                   },
+                   {
+                       "name":  "3d default view",
+                       "group":  "3d view",
+                       "value":  "yaw -32, pitch 16",
+                       "unit":  "deg",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), estado yaw, pitch"
+                   },
+                   {
+                       "name":  "3d preset views",
+                       "group":  "3d view",
+                       "value":  "front 0/0, back 180/0, right -90/0, left 90/0, top 0/85, bottom 0/-85",
+                       "unit":  "deg",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), numpad"
+                   },
+                   {
+                       "name":  "3d view keys",
+                       "group":  "3d view",
+                       "value":  "1 front, 3 right, 7 top, 0 camera, 5 orthographic",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), numpad"
+                   },
+                   {
+                       "name":  "3d opposite view modifier",
+                       "group":  "3d view",
+                       "value":  "alt",
+                       "source":  "LeonToon code, app/src/app/view3d.rs",
+                       "estimated":  true
+                   },
+                   {
+                       "name":  "3d key rotate step",
+                       "group":  "3d view",
+                       "value":  15,
+                       "unit":  "deg",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), numpad"
+                   },
+                   {
+                       "name":  "3d orbit sensitivity",
+                       "group":  "3d view",
+                       "value":  0.35,
+                       "unit":  "deg/px",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), puntero"
+                   },
+                   {
+                       "name":  "3d pitch limit",
+                       "group":  "3d view",
+                       "value":  85,
+                       "unit":  "deg",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), puntero, numpad"
+                   },
+                   {
+                       "name":  "3d pan",
+                       "group":  "3d view",
+                       "value":  "right drag; left drag with hand tool or space",
+                       "source":  "LeonToon code, app/src/app/view3d.rs",
+                       "estimated":  true
+                   },
+                   {
+                       "name":  "3d key zoom",
+                       "group":  "3d view",
+                       "value":  "factor 1.15, range 0.1-4",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), numpad"
+                   },
+                   {
+                       "name":  "3d wheel zoom",
+                       "group":  "3d view",
+                       "value":  "factor 1.0015 per scroll unit",
+                       "source":  "LeonToon code, app/src/app/view3d.rs",
+                       "estimated":  true
+                   },
+                   {
+                       "name":  "3d floor grid",
+                       "group":  "3d view",
+                       "value":  "x -1800..1800, z -2600..1600, step 200, y = height + 60",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), dibujo 3D"
+                   },
+                   {
+                       "name":  "3d gizmo axes",
+                       "group":  "3d view",
+                       "value":  "x 150, depth 360, height 150",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), giz"
+                   },
+                   {
+                       "name":  "3d gizmo hit distance",
+                       "group":  "3d view",
+                       "value":  14,
+                       "unit":  "px",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), gizHit"
+                   },
+                   {
+                       "name":  "3d camera x range",
+                       "group":  "3d view",
+                       "value":  "-400..400",
+                       "source":  "person\u0027s LeonToon UI prototype v0.3 (LeonToon — Prototipo de interfaz v0.3.html), camX"
                    }
                ]
 }
