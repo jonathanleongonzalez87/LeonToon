@@ -18,6 +18,7 @@ mod vumeter;
 mod storyboard;
 mod abrui;
 mod brushui;
+mod brushthumbs;
 mod vectorui;
 mod strokeui;
 mod penui;
@@ -324,6 +325,8 @@ pub struct LeonApp {
     brush_img_cache: std::collections::HashMap<String, std::sync::Arc<crate::brush::Gray>>,
     brush_tex: Option<egui::TextureHandle>,
     brush_prev: Option<(String, egui::TextureHandle)>,
+    /// Muestras de trazo de la lista de pinceles de píxeles (solo en memoria).
+    brush_thumbs: brushthumbs::Thumbs,
     view3d: bool,
     v3: u8,
     yaw: f32,
@@ -747,6 +750,7 @@ impl LeonApp {
             abr_report: None,
             brush_tex: None,
             brush_prev: None,
+            brush_thumbs: Default::default(),
             view3d: false,
             v3: std::env::var("LEONTOON_V3").ok().and_then(|v| v.parse().ok()).unwrap_or(1),
             yaw: match std::env::var("LEONTOON_V3").ok().and_then(|v| v.parse::<u8>().ok()) { Some(2) | Some(4) | Some(7) => 0.0, Some(3) => -90.0, Some(5) => 180.0, Some(6) => 90.0, _ => -32.0 },

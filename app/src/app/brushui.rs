@@ -1,10 +1,12 @@
 //! Pinceles guardados en la interfaz: estado del pincel dentro del proyecto, biblioteca del usuario y el
 //! panel de presets del panel N (guardar, actualizar, duplicar, renombrar, mover de categoría y eliminar).
 
+use super::brushthumbs::{self, Budget, THUMB_H, THUMB_W};
 use super::shell::muted;
 use super::*;
 use crate::brush::Gray;
 use crate::presets::{self, BrushImage, BrushPreset, BrushSetup, BrushState, PresetKey, USER_CATEGORY};
+use std::collections::HashSet;
 use std::sync::Arc;
 
 /// Imagen de punta o de textura en uso: identificador (huella), nombre del archivo y la máscara.
@@ -143,6 +145,7 @@ impl LeonApp {
     /// el proyecto (un paquete grande lo haría crecer varios MB): se traen desde «Biblioteca…».
     pub(super) fn adopt_project_brush(&mut self) {
         self.brush_img_cache.clear();
+        self.brush_thumbs.clear();
         if let Some(st) = self.project.brush_state.clone() {
             self.apply_setup(&st.setup);
             self.brush_preset = st.preset.filter(|k| presets::find(&self.project.brush_presets, k).is_some());
@@ -251,6 +254,58 @@ impl LeonApp {
         }
     }
 
+    /// Imagen de un pincel de la lista: la ya decodificada o, si no, una decodificada solo para esta vez,
+    /// para no retener en memoria las imágenes de todos los pinceles.
+    fn thumb_gray(&mut self, id: &str) -> Option<Arc<Gray>> {
+        if let Some(g) = self.brush_img_cache.get(id) {
+            return Some(g.clone());
+        }
+        let im = self.project.brush_images.iter().find(|i| i.id == id)?;
+        match im.to_gray() {
+            Ok(g) => Some(Arc::new(g)),
+            Err(e) => {
+                let name = im.name.clone();
+                self.say(format!("No se pudo leer la imagen «{name}» del pincel: {e}"));
+                None
+            }
+        }
+    }
+
+    /// Fila de la lista: muestra del trazo y nombre. La muestra se calcula cuando la fila se ve y queda tiempo
+    /// en este fotograma; mientras tanto se ve la anterior o un hueco.
+    fn preset_row(&mut self, ui: &mut egui::Ui, p: &BrushPreset, on: bool, budget: &mut Budget) -> egui::Response {
+        let (r, resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), THUMB_H as f32 * 0.5 + 4.0), Sense::click());
+        resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, on, &p.name));
+        if !ui.is_rect_visible(r) {
+            return resp;
+        }
+        let key = p.key();
+        if !self.brush_thumbs.get(&key, &p.setup).map_or(false, |(_, fresh)| fresh) {
+            if budget.allows() {
+                let sample = budget.run(|| {
+                    let tip = p.setup.tip.as_deref().and_then(|id| self.thumb_gray(id));
+                    let texture = p.setup.texture.as_deref().and_then(|id| self.thumb_gray(id));
+                    brushthumbs::render_thumb(&p.setup, tip, texture)
+                });
+                self.brush_thumbs.put(ui.ctx(), key.clone(), p.setup.clone(), &sample);
+            } else {
+                ui.ctx().request_repaint();
+            }
+        }
+        if on {
+            ui.painter().rect_filled(r, 4.0, Color32::from_rgba_unmultiplied(255, 122, 26, 36));
+        } else if resp.hovered() {
+            ui.painter().rect_filled(r, 4.0, Color32::from_white_alpha(10));
+        }
+        let sample = Rect::from_min_size(r.min + Vec2::new(4.0, 2.0), Vec2::new(THUMB_W as f32, THUMB_H as f32) * 0.5);
+        ui.painter().rect_filled(sample, 3.0, UI0);
+        if let Some((tex, _)) = self.brush_thumbs.get(&key, &p.setup) {
+            ui.painter().image(tex.id(), sample, Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)), Color32::WHITE);
+        }
+        ui.painter().with_clip_rect(r.intersect(ui.clip_rect())).text(Pos2::new(sample.max.x + 8.0, r.center().y), Align2::LEFT_CENTER, &p.name, FontId::proportional(12.0), if on { TX } else { MU });
+        resp
+    }
+
     /// Panel de pinceles guardados: lista por categorías y acciones.
     pub(super) fn brush_presets_ui(&mut self, ui: &mut egui::Ui) {
         let cur = self.brush_preset.clone();
@@ -269,13 +324,16 @@ impl LeonApp {
             let mut apply: Option<BrushPreset> = None;
             let scroll_to = cur != self.preset_ui.seen;
             self.preset_ui.seen = cur.clone();
+            let keys: HashSet<PresetKey> = all.iter().map(|p| p.key()).collect();
+            self.brush_thumbs.retain(|k| keys.contains(k));
+            let mut budget = Budget::default();
             egui::ScrollArea::vertical().id_salt("preset_list").max_height(210.0).auto_shrink([false, true]).show(ui, |ui| {
                 for cat in presets::categories(&self.project.brush_presets) {
                     ui.label(RichText::new(&cat).size(11.0).color(INK3));
                     for p in all.iter().filter(|p| p.category.eq_ignore_ascii_case(&cat)) {
                         let on = cur.as_ref() == Some(&p.key());
                         let tip = if p.builtin { "Pincel incluido: no se puede modificar, pero sí duplicar" } else { "Pincel guardado" };
-                        let r = ui.selectable_label(on, RichText::new(&p.name).size(12.0)).on_hover_text(tip);
+                        let r = self.preset_row(ui, p, on, &mut budget).on_hover_text(format!("{}\n{tip}", p.name));
                         if on && scroll_to {
                             r.scroll_to_me(Some(egui::Align::Center));
                         }
