@@ -425,7 +425,7 @@ pub struct LeonApp {
     picked: Vec<usize>,
     picked_owner: Option<(usize, u32)>,
     /// Zona elegida en una capa de mapa de bits (capa y rectángulo en píxeles) y su arrastre.
-    rsel: Option<(usize, [i32; 4])>,
+    rsel: Option<(String, [i32; 4])>,
     rdrag: Option<rsel::RDrag>,
     pal_sel: usize,
     swatch_sel: Option<usize>,

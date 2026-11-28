@@ -157,7 +157,7 @@ impl LeonApp {
             Arc::make_mut(r).edit(|pm| pm.draw_pixmap(0, 0, src.as_ref(), &paint, t, None));
             self.changed = true;
         }
-        self.rsel = Some((self.cl, [tx as i32, ty as i32, (tx + iw as f32 * s).ceil() as i32, (ty + ih as f32 * s).ceil() as i32]));
+        self.rsel = Some((self.layer().name.clone(), [tx as i32, ty as i32, (tx + iw as f32 * s).ceil() as i32, (ty + ih as f32 * s).ceil() as i32]));
         self.say(format!("Imagen pegada ({iw}×{ih})"));
         true
     }

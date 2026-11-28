@@ -39,14 +39,15 @@ fn clear(r: &mut crate::raster::Raster, b: [i32; 4]) {
 impl LeonApp {
     /// Zona elegida de la capa de mapa de bits actual, recortada a la escena.
     pub(super) fn rsel_rect(&self) -> Option<[i32; 4]> {
-        let (cl, b) = self.rsel?;
+        let (name, b) = self.rsel.as_ref()?;
+        let b = *b;
         let (w, h) = (self.project.width as i32, self.project.height as i32);
         let b = [b[0].max(0), b[1].max(0), b[2].min(w), b[3].min(h)];
-        (cl == self.cl && b[0] < b[2] && b[1] < b[3]).then_some(b)
+        (*name == self.layer().name && self.layer().kind == LayerKind::Bitmap && b[0] < b[2] && b[1] < b[3]).then_some(b)
     }
 
     pub(super) fn rsel_all(&mut self) {
-        self.rsel = Some((self.cl, [0, 0, self.project.width as i32, self.project.height as i32]));
+        self.rsel = Some((self.layer().name.clone(), [0, 0, self.project.width as i32, self.project.height as i32]));
         self.say("Lienzo entero elegido: Ctrl+C copia, Supr borra, arrastra para desplazar");
     }
 
@@ -88,7 +89,7 @@ impl LeonApp {
             });
             self.changed = true;
         }
-        self.rsel = Some((self.cl, [nx, ny, nx + w, ny + h]));
+        self.rsel = Some((self.layer().name.clone(), [nx, ny, nx + w, ny + h]));
         self.rdrag = Some(d);
     }
 
@@ -104,7 +105,7 @@ impl LeonApp {
             self.rsel = None;
             return;
         }
-        self.rsel = Some((self.cl, b));
+        self.rsel = Some((self.layer().name.clone(), b));
         self.say(format!("Zona elegida {}×{}: Ctrl+C copia, Supr borra, arrastra para desplazar", b[2] - b[0], b[3] - b[1]));
     }
 
@@ -147,7 +148,7 @@ impl LeonApp {
 
     /// Recuadro de la zona elegida en el visor.
     pub(super) fn paint_rsel(&self, p: &egui::Painter, map: &dyn Fn([f32; 2]) -> Pos2) {
-        let Some(b) = self.rsel.filter(|(cl, _)| *cl == self.cl).map(|(_, b)| b) else { return };
+        let Some(b) = self.rsel.as_ref().filter(|(n, _)| *n == self.layer().name && self.layer().kind == LayerKind::Bitmap).map(|(_, b)| *b) else { return };
         let c = [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]].map(|q| map([q[0] as f32, q[1] as f32]));
         p.add(Shape::convex_polygon(c.to_vec(), Color32::from_rgba_unmultiplied(61, 180, 255, 25), EStroke::NONE));
         for i in 0..4 {
