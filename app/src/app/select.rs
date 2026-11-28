@@ -43,6 +43,9 @@ impl LeonApp {
 
     /// Qué hacer al pulsar con la Selección en el punto `p` (del dibujo).
     pub(super) fn select_begin(&mut self, p: [f32; 2], shift: bool, command: bool) -> Gesture {
+        if self.layer().kind == LayerKind::Bitmap {
+            return self.rsel_begin(p);
+        }
         self.validate_pick();
         // Con una curva de nodos elegida, un clic en un nodo o tirador lo edita antes que mover el trazo.
         if let Some(g) = self.node_begin(p, command) {
@@ -139,6 +142,9 @@ impl LeonApp {
     }
 
     pub(super) fn select_finish(&mut self, start: [f32; 2], cur: [f32; 2], add: bool) {
+        if self.layer().kind == LayerKind::Bitmap {
+            return self.rsel_finish(start, cur);
+        }
         let r = [start[0].min(cur[0]), start[1].min(cur[1]), start[0].max(cur[0]), start[1].max(cur[1])];
         if (r[2] - r[0]).max(r[3] - r[1]) * self.view_scale() < 3.0 {
             if !add {
@@ -165,6 +171,9 @@ impl LeonApp {
     // ---------- Órdenes de la barra de opciones ----------
 
     pub(super) fn select_all(&mut self) {
+        if self.layer().kind == LayerKind::Bitmap {
+            return self.rsel_all();
+        }
         let n = self.layer().drawing_at(self.frame).map_or(0, |d| d.strokes.len());
         self.validate_pick();
         self.picked = (0..n).collect();
@@ -242,6 +251,9 @@ impl LeonApp {
 
     /// Copia lo elegido; devuelve false si no había selección.
     pub(super) fn picked_copy(&mut self) -> bool {
+        if self.layer().kind == LayerKind::Bitmap {
+            return self.rsel_copy();
+        }
         self.validate_pick();
         if self.picked.is_empty() {
             return false;
@@ -303,6 +315,7 @@ impl LeonApp {
                 }
             }
         }
+        self.paint_rsel(p, &map);
         if let Some(b) = self.picked_bounds() {
             let corners = [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]].map(map);
             for i in 0..4 {

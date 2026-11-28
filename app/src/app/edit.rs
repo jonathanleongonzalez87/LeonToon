@@ -118,6 +118,50 @@ impl LeonApp {
         self.say(format!("Dibujo pegado en el fotograma {}", f + 1));
     }
 
+    /// En una capa de mapa de bits, pega la imagen del portapapeles centrada en la escena
+    /// (reducida si no cabe). Devuelve `true` si había una imagen que pegar.
+    pub(super) fn paste_image(&mut self) -> bool {
+        if self.layer().kind != LayerKind::Bitmap {
+            return false;
+        }
+        let Ok(mut cb) = arboard::Clipboard::new() else { return false };
+        let Ok(img) = cb.get_image() else { return false };
+        if self.locked() {
+            return true;
+        }
+        let (iw, ih) = (img.width as u32, img.height as u32);
+        // arboard entrega RGBA sin premultiplicar; tiny-skia lo quiere premultiplicado.
+        let mut data = Vec::with_capacity(img.bytes.len());
+        for p in img.bytes.chunks_exact(4) {
+            let a = p[3] as u32;
+            data.extend([0, 1, 2].map(|c| ((p[c] as u32 * a + 127) / 255) as u8));
+            data.push(p[3]);
+        }
+        let Some(src) = tiny_skia::IntSize::from_wh(iw, ih).and_then(|s| tiny_skia::Pixmap::from_vec(data, s)) else {
+            self.say("La imagen del portapapeles no es válida");
+            return true;
+        };
+        let (w, h) = (self.project.width, self.project.height);
+        let s = (w as f32 / iw as f32).min(h as f32 / ih as f32).min(1.0);
+        let (tx, ty) = ((w as f32 - iw as f32 * s) / 2.0, (h as f32 - ih as f32 * s) / 2.0);
+        self.checkpoint();
+        let f = self.frame;
+        let layer = &mut self.project.layers[self.cl];
+        if layer.drawing_at(f).is_none() {
+            layer.keys.insert(f, Default::default());
+        }
+        if let Some(d) = layer.drawing_at_mut(f) {
+            let r = d.raster.get_or_insert_with(|| Arc::new(crate::raster::Raster::new(w, h)));
+            let paint = tiny_skia::PixmapPaint { quality: tiny_skia::FilterQuality::Bilinear, ..Default::default() };
+            let t = tiny_skia::Transform::from_translate(tx, ty).pre_scale(s, s);
+            Arc::make_mut(r).edit(|pm| pm.draw_pixmap(0, 0, src.as_ref(), &paint, t, None));
+            self.changed = true;
+        }
+        self.rsel = Some((self.layer().name.clone(), [tx as i32, ty as i32, (tx + iw as f32 * s).ceil() as i32, (ty + ih as f32 * s).ceil() as i32]));
+        self.say(format!("Imagen pegada ({iw}×{ih})"));
+        true
+    }
+
     fn unique_layer_name(&self, base: &str) -> String {
         let mut n = self.project.layers.len() + 1;
         loop {
@@ -693,6 +737,10 @@ impl LeonApp {
                 self.erase_segment(last, p);
                 self.gesture = Some(Gesture::Erase { last: p });
             }
+            Some(Gesture::Move { last }) if self.rdrag.is_some() => {
+                self.rsel_move(p);
+                self.gesture = Some(Gesture::Move { last });
+            }
             Some(Gesture::Move { last }) => {
                 let (dx, dy) = (p[0] - last[0], p[1] - last[1]);
                 if (dx != 0.0 || dy != 0.0) && self.transform_picked(|s| s.translate(dx, dy)) {
@@ -805,6 +853,7 @@ impl LeonApp {
                 }
             }
             Some(Gesture::Marquee { start, cur, add }) => self.select_finish(start, cur, add),
+            Some(Gesture::Move { .. }) => self.rdrag = None,
             _ => {}
         }
         if let Some(pre) = self.pre.take() {
@@ -936,7 +985,11 @@ impl LeonApp {
         if copy && !(selecting && self.picked_copy()) {
             self.copy_drawing();
         }
-        if paste {
+        // Con solo una imagen en el portapapeles egui no avisa del Ctrl+V: se lee la tecla directamente.
+        let paste_key = ctrl_v_pressed() && ctx.input(|i| i.focused) && !ctx.wants_keyboard_input();
+        if (paste || paste_key) && self.paste_image() {
+            // Imagen pegada en la capa de mapa de bits.
+        } else if paste {
             if selecting {
                 self.picked_paste();
             } else {
@@ -949,6 +1002,10 @@ impl LeonApp {
             }
             if k(none, Key::Escape) {
                 self.picked.clear();
+                self.rsel = None;
+            }
+            if self.layer().kind == LayerKind::Bitmap && (k(none, Key::Delete) || k(none, Key::Backspace)) {
+                self.rsel_delete();
             }
             if !self.picked.is_empty() && (k(none, Key::Delete) || k(none, Key::Backspace)) {
                 // Con un nodo elegido en una curva, Supr quita el nodo; si no, borra los trazos.
@@ -1079,4 +1136,23 @@ impl LeonApp {
         }
         // Que la barra espaciadora no "pulse" botones con foco.
         k(none, Key::Space);    }
+}
+
+/// `true` solo en el fotograma en que se pulsa Ctrl+V (Windows).
+#[cfg(windows)]
+fn ctrl_v_pressed() -> bool {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    #[link(name = "user32")]
+    extern "system" {
+        fn GetAsyncKeyState(vk: i32) -> i16;
+    }
+    static WAS_DOWN: AtomicBool = AtomicBool::new(false);
+    // SAFETY: función de user32 sin punteros; solo lee el estado de dos teclas.
+    let down = unsafe { GetAsyncKeyState(0x11) < 0 && GetAsyncKeyState(0x56) < 0 };
+    !WAS_DOWN.swap(down, Ordering::Relaxed) && down
+}
+
+#[cfg(not(windows))]
+fn ctrl_v_pressed() -> bool {
+    false
 }
