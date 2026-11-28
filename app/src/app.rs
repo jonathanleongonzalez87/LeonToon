@@ -11,6 +11,7 @@ mod rooms;
 mod safety;
 mod start;
 mod select;
+mod rsel;
 mod shell;
 mod audioui;
 mod exportjob;
@@ -423,6 +424,9 @@ pub struct LeonApp {
     /// Trazos elegidos con la herramienta Selección, y de qué capa y dibujo son.
     picked: Vec<usize>,
     picked_owner: Option<(usize, u32)>,
+    /// Zona elegida en una capa de mapa de bits (capa y rectángulo en píxeles) y su arrastre.
+    rsel: Option<(usize, [i32; 4])>,
+    rdrag: Option<rsel::RDrag>,
     pal_sel: usize,
     swatch_sel: Option<usize>,
     swatch_rename: Option<(usize, String)>,
@@ -822,6 +826,8 @@ impl LeonApp {
             space_panned: false,
             picked: Vec::new(),
             picked_owner: None,
+            rsel: None,
+            rdrag: None,
             pal_sel: 2,
             swatch_sel: None,
             swatch_rename: None,

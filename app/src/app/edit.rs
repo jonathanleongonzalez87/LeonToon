@@ -157,6 +157,7 @@ impl LeonApp {
             Arc::make_mut(r).edit(|pm| pm.draw_pixmap(0, 0, src.as_ref(), &paint, t, None));
             self.changed = true;
         }
+        self.rsel = Some((self.cl, [tx as i32, ty as i32, (tx + iw as f32 * s).ceil() as i32, (ty + ih as f32 * s).ceil() as i32]));
         self.say(format!("Imagen pegada ({iw}×{ih})"));
         true
     }
@@ -736,6 +737,10 @@ impl LeonApp {
                 self.erase_segment(last, p);
                 self.gesture = Some(Gesture::Erase { last: p });
             }
+            Some(Gesture::Move { last }) if self.rdrag.is_some() => {
+                self.rsel_move(p);
+                self.gesture = Some(Gesture::Move { last });
+            }
             Some(Gesture::Move { last }) => {
                 let (dx, dy) = (p[0] - last[0], p[1] - last[1]);
                 if (dx != 0.0 || dy != 0.0) && self.transform_picked(|s| s.translate(dx, dy)) {
@@ -848,6 +853,7 @@ impl LeonApp {
                 }
             }
             Some(Gesture::Marquee { start, cur, add }) => self.select_finish(start, cur, add),
+            Some(Gesture::Move { .. }) => self.rdrag = None,
             _ => {}
         }
         if let Some(pre) = self.pre.take() {
@@ -996,6 +1002,10 @@ impl LeonApp {
             }
             if k(none, Key::Escape) {
                 self.picked.clear();
+                self.rsel = None;
+            }
+            if self.layer().kind == LayerKind::Bitmap && (k(none, Key::Delete) || k(none, Key::Backspace)) {
+                self.rsel_delete();
             }
             if !self.picked.is_empty() && (k(none, Key::Delete) || k(none, Key::Backspace)) {
                 // Con un nodo elegido en una curva, Supr quita el nodo; si no, borra los trazos.
